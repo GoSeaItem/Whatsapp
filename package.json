@@ -1,0 +1,36 @@
+{
+  "name": "whatsapp-ai-sales-assistant-v1",
+  "version": "0.1.0",
+  "private": true,
+  "description": "WhatsApp AI sales assistant V1 prototype for cross-border ecommerce sales teams.",
+  "scripts": {
+    "dev": "npm run build -w @wa-ai/shared && concurrently \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:web": "npm run dev -w @wa-ai/web",
+    "dev:api": "npm run dev -w @wa-ai/api",
+    "build": "npm run build -w @wa-ai/shared && npm run build -w @wa-ai/api && npm run build -w @wa-ai/web && npm run build -w @wa-ai/extension",
+    "start": "node apps/api/dist/server.js",
+    "typecheck": "npm run build -w @wa-ai/shared && npm run typecheck -w @wa-ai/api && npm run typecheck -w @wa-ai/web && npm run typecheck -w @wa-ai/extension",
+    "test:ai": "npm run test:ai -w @wa-ai/api",
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose down",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:init": "npm run db:up && npm run prisma:generate && npm run prisma:migrate -- --name init && npm run db:seed",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "devDependencies": {
+    "@prisma/client": "^5.22.0",
+    "concurrently": "^9.1.2",
+    "prisma": "^5.22.0",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
