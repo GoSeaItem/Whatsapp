@@ -45,8 +45,12 @@ describe("personal account isolation", () => {
 
   it("keeps extension API calls credentialed and auth-aware", async () => {
     const contentScript = await readFile(new URL("../../extension/src/content.ts", import.meta.url), "utf8");
+    const backgroundScript = await readFile(new URL("../../extension/src/background.ts", import.meta.url), "utf8");
 
-    expect(contentScript).toContain('credentials: "include"');
+    expect(backgroundScript).toContain('credentials: "include"');
+    expect(backgroundScript).toContain("VITE_API_BASE_URL");
+    expect(contentScript).toContain("chrome.runtime.sendMessage");
+    expect(contentScript).toContain("WA_AI_API_FETCH");
     expect(contentScript).toContain("/api/auth/me");
     expect(contentScript).toContain("请先登录 Web 后台");
     expect(contentScript).toContain("打开 Web 后台登录");
