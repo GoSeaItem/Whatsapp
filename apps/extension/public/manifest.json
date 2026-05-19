@@ -8,6 +8,10 @@
     "default_popup": "popup.html"
   },
   "permissions": ["clipboardWrite", "storage"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
   "host_permissions": [
     "http://187.77.138.174/*",
     "https://api.yourdomain.com/*",

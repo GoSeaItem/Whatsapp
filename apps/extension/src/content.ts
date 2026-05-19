@@ -400,16 +400,41 @@ function ensureAuthenticated() {
   return false;
 }
 
-async function apiFetch(path: string, init: RequestInit = {}) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    credentials: "include"
+type ExtensionApiResponse = {
+  ok: boolean;
+  status: number;
+  statusText: string;
+  body: string;
+  json: () => Promise<unknown>;
+  text: () => Promise<string>;
+};
+
+async function apiFetch(path: string, init: RequestInit = {}): Promise<ExtensionApiResponse> {
+  const response = await chrome.runtime.sendMessage({
+    type: "WA_AI_API_FETCH",
+    path,
+    init: {
+      method: init.method,
+      headers: plainHeaders(init.headers),
+      body: typeof init.body === "string" ? init.body : null
+    }
   });
   if (response.status === 401) {
     authState = { status: "anonymous" };
     renderAuthState();
   }
-  return response;
+  return {
+    ...response,
+    json: async () => JSON.parse(response.body),
+    text: async () => response.body
+  };
+}
+
+function plainHeaders(headers: HeadersInit | undefined): Record<string, string> | undefined {
+  if (!headers) return undefined;
+  if (headers instanceof Headers) return Object.fromEntries(headers.entries());
+  if (Array.isArray(headers)) return Object.fromEntries(headers);
+  return headers;
 }
 
 async function loadProducts(query = "") {
