@@ -1,4 +1,4 @@
-﻿-- Upgrade the placeholder FollowUpTask table to the E-line V1 task model.
+-- Upgrade the placeholder FollowUpTask table to the E-line V1 task model.
 ALTER TABLE "FollowUpTask" ADD COLUMN "taskType" TEXT NOT NULL DEFAULT '普通提醒';
 ALTER TABLE "FollowUpTask" ADD COLUMN "remindAt" TIMESTAMP(3);
 ALTER TABLE "FollowUpTask" ADD COLUMN "recommendedScript" TEXT NOT NULL DEFAULT '';
