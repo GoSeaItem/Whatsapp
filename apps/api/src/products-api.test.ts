@@ -198,8 +198,8 @@ describe("Product CRUD API", () => {
 
     const response = await request(app).post("/api/products").set("x-user-id", "sales-1").send({ name: "", sku: "" }).expect(400);
 
-    expect(response.body.errors).toContainEqual({ field: "name", message: "产品名称不能为空" });
-    expect(response.body.errors).toContainEqual({ field: "sku", message: "SKU 不能为空" });
+    expect(response.body.errors).toContainEqual({ field: "name", message: "Product name is required" });
+    expect(response.body.errors).toContainEqual({ field: "sku", message: "SKU is required" });
   });
 });
 

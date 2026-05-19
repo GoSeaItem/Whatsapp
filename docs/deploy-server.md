@@ -1,5 +1,7 @@
 # Ubuntu 24.04 Staging Deployment
 
+Current release target: `v0.4-v2-sales-enhancement`.
+
 Target:
 
 - Server: Ubuntu 24.04 LTS
@@ -307,6 +309,19 @@ Migration failed:
 docker compose -f docker-compose.prod.yml --env-file .env.production exec api npx prisma migrate status
 docker compose -f docker-compose.prod.yml --env-file .env.production exec api npm run db:migrate:deploy
 ```
+
+Prisma libssl error:
+
+- The API Docker image installs `openssl` and `ca-certificates` to support Prisma on Debian-based Node images.
+- If logs show `PrismaClientInitializationError` or `libssl.so.1.1: cannot open shared object file`, rebuild the API image after pulling the latest `Dockerfile`:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production build --no-cache api
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d api
+docker compose -f docker-compose.prod.yml --env-file .env.production logs -f api
+```
+
+- Do not use `prisma migrate dev` on the staging server. Use `npm run db:migrate:deploy`.
 
 Login failed:
 

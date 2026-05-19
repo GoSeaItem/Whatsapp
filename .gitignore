@@ -2,6 +2,7 @@ node_modules
 dist
 build
 .env
+.env.*
 .env.local
 .env.production
 .env.*.local
@@ -9,6 +10,8 @@ build
 !.env.production.example
 .DS_Store
 *.log
+logs/
+backups/
 *.tsbuildinfo
 coverage
 .vite

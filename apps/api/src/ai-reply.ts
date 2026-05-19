@@ -1,5 +1,11 @@
 import { AI_SAFETY_NOTE, type AiReplyRequest, type AiReplyResponse, type AiReplyScenario } from "@wa-ai/shared";
 import { buildReplyPrompt } from "./prompts/reply-prompt.js";
+import {
+  detectForbiddenExpressionWarnings,
+  forbiddenExpressionsFrom,
+  noKnowledgeWarning,
+  type KnowledgeContextItem
+} from "./knowledge-base-utils.js";
 
 type Language = "English" | "Spanish" | "Chinese";
 
@@ -25,37 +31,37 @@ const scenarioDefinitions: Record<
   price: {
     intent: "询价 / 报价",
     concerns: ["价格"],
-    missing: ["目标数量", "产品型号"],
-    keywords: ["how much", "price", "quote", "quotation", "cost", "best price", "precio", "cotización", "cuanto", "cuánto", "价格", "报价"]
+    missing: ["产品型号", "目标数量"],
+    keywords: ["how much", "price", "quote", "quotation", "cost", "best price", "precio", "cotizacion", "cotización", "cuanto", "cuánto", "价格", "报价"]
   },
   moq: {
     intent: "确认起订量",
     concerns: ["MOQ"],
-    missing: ["目标数量", "产品型号"],
-    keywords: ["moq", "minimum order", "minimum quantity", "cantidad mínima", "mínimo", "起订", "起订量"]
+    missing: ["产品型号", "目标数量"],
+    keywords: ["moq", "minimum order", "minimum quantity", "cantidad minima", "cantidad mínima", "minimo", "mínimo", "起订", "起订量"]
   },
   shipping: {
     intent: "咨询物流",
     concerns: ["运费", "物流"],
-    missing: ["目的地国家", "目的地城市", "运输方式"],
-    keywords: ["ship", "shipping", "freight", "send to", "deliver to", "envío", "entrega", "发货", "运输", "运费", "物流"]
+    missing: ["目的国家", "目的城市", "运输方式"],
+    keywords: ["ship", "shipping", "freight", "send to", "deliver to", "envio", "envío", "entrega", "发货", "运输", "运费", "物流"]
   },
   discount: {
     intent: "价格异议 / 争取折扣",
     concerns: ["价格", "折扣"],
-    missing: ["目标数量", "可接受价格", "产品型号"],
+    missing: ["产品型号", "目标数量", "可接受目标价"],
     keywords: ["too high", "expensive", "discount", "lower price", "cheaper", "descuento", "rebaja", "太贵", "优惠", "折扣"]
   },
   sample: {
     intent: "样品咨询",
     concerns: ["样品", "库存"],
-    missing: ["样品数量", "收货国家", "收货城市"],
+    missing: ["产品型号", "样品数量", "收货国家", "收货城市"],
     keywords: ["sample", "muestra", "样品"]
   },
   lead_time: {
     intent: "咨询交期",
     concerns: ["交期"],
-    missing: ["目标数量", "产品型号", "目的地国家"],
+    missing: ["产品型号", "目标数量", "目的国家"],
     keywords: ["lead time", "delivery time", "how long", "delivery", "交期", "多久", "发货时间"]
   },
   product_proof: {
@@ -79,7 +85,7 @@ const scenarioDefinitions: Record<
   order_status: {
     intent: "订单物流状态咨询",
     concerns: ["物流状态", "订单"],
-    missing: ["订单号", "物流单号", "目的地国家", "目的地城市"],
+    missing: ["订单号", "物流单号"],
     keywords: ["where is my order", "order status", "tracking", "track", "my order", "订单", "物流状态", "到哪里"]
   }
 };
@@ -99,21 +105,32 @@ const scenarioPriority: AiReplyScenario[] = [
 
 export function generateAiReply(input: AiReplyRequest): AiReplyResponse {
   const customerMessage = input.customerMessage.trim();
-  if (!customerMessage) {
-    throw new Error("customerMessage is required");
-  }
+  if (!customerMessage) throw new Error("customerMessage is required");
 
   const prompt = buildReplyPrompt(input);
   const context = parseProductContext(input.productContext);
   const analysis = analyzeCustomerMessage(customerMessage, input.targetLanguage, input.scenario);
-  const riskWarnings = buildRiskWarnings(analysis, context);
+  const knowledgeItems = parseKnowledgeItems(input);
+  const knowledgeUsed = input.knowledgeUsed || knowledgeItems.map((item) => item.title);
+  const riskWarnings = buildRiskWarnings(analysis, context, { hasKnowledge: knowledgeUsed.length > 0 });
   const replies = buildReplies({
     language: analysis.language,
     intent: analysis.intent,
-    concerns: analysis.concerns,
     missing: analysis.missing,
-    hasUsefulContext: context.hasUsefulContext
+    hasUsefulContext: context.hasUsefulContext,
+    knowledgeUsed
   });
+  const forbiddenWarnings = detectForbiddenExpressionWarnings(
+    [
+      customerMessage,
+      input.productContext || "",
+      input.knowledgeContext || "",
+      replies.shortReply,
+      replies.professionalReply,
+      replies.closingReply
+    ].join("\n"),
+    forbiddenExpressionsFrom(knowledgeItems)
+  );
 
   void prompt;
 
@@ -125,7 +142,8 @@ export function generateAiReply(input: AiReplyRequest): AiReplyResponse {
     shortReply: replies.shortReply,
     professionalReply: replies.professionalReply,
     closingReply: replies.closingReply,
-    riskWarnings
+    riskWarnings: Array.from(new Set([...riskWarnings, ...forbiddenWarnings])),
+    knowledgeUsed
   };
 }
 
@@ -137,8 +155,7 @@ function analyzeCustomerMessage(message: string, targetLanguage?: string, reques
   const concerns = new Set<string>(definition.concerns);
 
   for (const candidate of scenarioPriority) {
-    if (candidate === scenario) continue;
-    if (matchesScenario(normalizedMessage, candidate)) {
+    if (candidate !== scenario && matchesScenario(normalizedMessage, candidate)) {
       scenarioDefinitions[candidate].concerns.forEach((concern) => concerns.add(concern));
     }
   }
@@ -165,7 +182,7 @@ function resolveLanguage(message: string, targetLanguage?: string): Language {
   if (normalized.includes("spanish") || normalized.includes("español")) return "Spanish";
   if (normalized.includes("chinese") || normalized.includes("zh") || normalized.includes("中文")) return "Chinese";
   if (normalized.includes("english")) return "English";
-  if (/[¿¡ñáéíóúü]/i.test(message) || containsAny(normalizeText(message), ["precio", "cotización", "envío", "descuento", "muestra", "disponible"])) return "Spanish";
+  if (/[¿¡ñáéíóúü]/i.test(message) || containsAny(normalizeText(message), ["precio", "cotizacion", "cotización", "envio", "envío", "descuento", "muestra"])) return "Spanish";
   if (/[\u4e00-\u9fff]/.test(message)) return "Chinese";
   return "English";
 }
@@ -185,12 +202,14 @@ function parseProductContext(productContext?: string) {
   };
 }
 
-function buildRiskWarnings(analysis: Analysis, context: ProductContextFlags) {
+function buildRiskWarnings(analysis: Analysis, context: ProductContextFlags, options: { hasKnowledge?: boolean } = {}) {
   const warnings = [
     AI_SAFETY_NOTE,
     "AI 仅生成草稿，不会自动发送 WhatsApp 消息。",
     "信息不足时不得编造具体价格、库存、运费、交期或物流状态。"
   ];
+
+  if (!options.hasKnowledge) warnings.push(noKnowledgeWarning());
 
   if (analysis.concerns.includes("价格") || analysis.concerns.includes("折扣")) {
     warnings.push(
@@ -246,55 +265,87 @@ function buildRiskWarnings(analysis: Analysis, context: ProductContextFlags) {
 function buildReplies(input: {
   language: Language;
   intent: string;
-  concerns: string[];
   missing: string[];
   hasUsefulContext: boolean;
+  knowledgeUsed: string[];
 }) {
   if (input.language === "Spanish") return buildSpanishReplies(input);
   if (input.language === "Chinese") return buildChineseReplies(input);
   return buildEnglishReplies(input);
 }
 
-function buildEnglishReplies(input: { intent: string; missing: string[]; hasUsefulContext: boolean }) {
+function buildEnglishReplies(input: { intent: string; missing: string[]; hasUsefulContext: boolean; knowledgeUsed: string[] }) {
   const need = englishNeed(input.missing);
   const contextLine = input.hasUsefulContext
-    ? "I will also check the product or order details you provided before confirming the final answer."
+    ? "I will also check the product, company policy, or order details you provided before confirming the final answer."
     : "To avoid giving you inaccurate information, I will confirm the details first.";
+  const knowledgeLine = input.knowledgeUsed.length > 0 ? `I will follow our company knowledge: ${input.knowledgeUsed.join(", ")}.` : "";
 
   return {
     shortReply: `Thanks for your message. Could you please share ${need}? I will check and get back to you soon.`,
-    professionalReply: `Thank you for your inquiry. I understand you are asking about ${englishIntent(input.intent)}. ${contextLine} Could you please confirm ${need} so I can prepare an accurate reply for you?`,
-    closingReply: `Thanks, this looks like a good fit. Once you confirm ${need}, I can help check the best available option and move the quotation or next step forward quickly.`
+    professionalReply: compact(`Thank you for your inquiry. I understand you are asking about ${englishIntent(input.intent)}. ${knowledgeLine} ${contextLine} Could you please confirm ${need} so I can prepare an accurate reply for you?`),
+    closingReply: compact(`Thanks, this looks like a good fit. ${knowledgeLine} Once you confirm ${need}, I can help check the best available option and move the quotation or next step forward quickly.`)
   };
 }
 
-function buildSpanishReplies(input: { intent: string; missing: string[]; hasUsefulContext: boolean }) {
+function buildSpanishReplies(input: { intent: string; missing: string[]; hasUsefulContext: boolean; knowledgeUsed: string[] }) {
   const need = spanishNeed(input.missing);
   const contextLine = input.hasUsefulContext
-    ? "También revisaré la información del producto o pedido que compartiste antes de confirmar la respuesta final."
-    : "Para evitar darte información incorrecta, primero voy a confirmar los detalles.";
+    ? "Tambien revisare la informacion del producto, la politica de la empresa o el pedido antes de confirmar la respuesta final."
+    : "Para evitar darte informacion incorrecta, primero voy a confirmar los detalles.";
+  const knowledgeLine = input.knowledgeUsed.length > 0 ? `Voy a seguir la informacion de nuestra empresa: ${input.knowledgeUsed.join(", ")}.` : "";
 
   return {
-    shortReply: `Gracias por tu mensaje. ¿Podrías confirmarme ${need}? Lo revisaré y te responderé pronto.`,
-    professionalReply: `Gracias por tu consulta. Entiendo que quieres confirmar ${spanishIntent(input.intent)}. ${contextLine} ¿Podrías confirmarme ${need} para prepararte una respuesta precisa?`,
-    closingReply: `Gracias, parece una buena oportunidad. Cuando me confirmes ${need}, puedo revisar la mejor opción disponible y avanzar rápidamente con la cotización o el siguiente paso.`
+    shortReply: `Gracias por tu mensaje. Podrias confirmarme ${need}? Lo revisare y te respondere pronto.`,
+    professionalReply: compact(`Gracias por tu consulta. Entiendo que quieres confirmar ${spanishIntent(input.intent)}. ${knowledgeLine} ${contextLine} Podrias confirmarme ${need} para prepararte una respuesta precisa?`),
+    closingReply: compact(`Gracias, parece una buena oportunidad. ${knowledgeLine} Cuando me confirmes ${need}, puedo revisar la mejor opcion disponible y avanzar rapidamente con la cotizacion o el siguiente paso.`)
   };
 }
 
-function buildChineseReplies(input: { intent: string; missing: string[]; hasUsefulContext: boolean }) {
+function buildChineseReplies(input: { intent: string; missing: string[]; hasUsefulContext: boolean; knowledgeUsed: string[] }) {
   const need = input.missing.length > 0 ? input.missing.join("、") : "具体需求";
-  const contextLine = input.hasUsefulContext ? "我会结合你提供的产品或订单信息再确认最终答复。" : "为了避免信息不准确，我会先确认关键细节。";
+  const contextLine = input.hasUsefulContext ? "我会结合你提供的产品、公司政策或订单信息再确认最终答复。" : "为了避免信息不准确，我会先确认关键细节。";
+  const knowledgeLine = input.knowledgeUsed.length > 0 ? `我会参考公司知识库：${input.knowledgeUsed.join("、")}。` : "";
 
   return {
     shortReply: `收到，谢谢你的消息。请先确认${need}，我会尽快核实后回复你。`,
-    professionalReply: `感谢咨询。我理解你主要想确认${input.intent}。${contextLine}麻烦你补充${need}，这样我可以给你更准确的回复。`,
-    closingReply: `谢谢，这个需求可以继续推进。你确认${need}后，我可以尽快核实合适方案，并推进报价或下一步。`
+    professionalReply: `感谢咨询。我理解你主要想确认${input.intent}。${knowledgeLine}${contextLine}麻烦你补充${need}，这样我可以给你更准确的回复。`,
+    closingReply: `谢谢，这个需求可以继续推进。${knowledgeLine}你确认${need}后，我可以尽快核实合适方案，并推进报价或下一步。`
   };
 }
 
 function translateToChinese(message: string, analysis: Analysis) {
   if (analysis.language === "Chinese") return message;
   return `客户消息大意：客户正在咨询“${analysis.intent}”，识别场景为 ${analysis.scenario}，关注点包括：${analysis.concerns.join("、")}。原文：${message}`;
+}
+
+function parseKnowledgeItems(input: AiReplyRequest): KnowledgeContextItem[] {
+  if (!input.knowledgeContext && !input.knowledgeUsed?.length) return [];
+  const parsed = parseStructuredKnowledgeContext(input.knowledgeContext || "", input.productId || null);
+  if (parsed.length > 0) return parsed;
+  return (input.knowledgeUsed || []).map((title) => ({
+    id: title,
+    title,
+    category: "faq",
+    content: input.knowledgeContext || "",
+    language: "other",
+    productId: input.productId || null
+  }));
+}
+
+function parseStructuredKnowledgeContext(context: string, productId: string | null): KnowledgeContextItem[] {
+  return context
+    .split(/\r?\n/)
+    .map((line) => line.match(/^\s*\d+\.\s+\[([^/\]]+)\/([^\]]+)\]\s+([^:]+):\s*(.+)$/))
+    .filter((match): match is RegExpMatchArray => Boolean(match))
+    .map((match) => ({
+      id: match[3].trim(),
+      title: match[3].trim(),
+      category: match[1].trim() as KnowledgeContextItem["category"],
+      language: match[2].trim() as KnowledgeContextItem["language"],
+      content: match[4].trim(),
+      productId
+    }));
 }
 
 function englishNeed(missing: string[]) {
@@ -309,14 +360,14 @@ function spanishNeed(missing: string[]) {
 
 function toEnglishFact(fact: string) {
   const map: Record<string, string> = {
-    目标数量: "target quantity",
     产品型号: "product model",
-    可接受价格: "acceptable target price",
+    目标数量: "target quantity",
+    可接受目标价: "acceptable target price",
     样品数量: "sample quantity",
     收货国家: "destination country",
     收货城市: "destination city",
-    目的地国家: "destination country",
-    目的地城市: "destination city",
+    目的国家: "destination country",
+    目的城市: "destination city",
     运输方式: "preferred shipping method",
     客户关注点: "your main concern",
     下次跟进时间: "a suitable follow-up time",
@@ -331,22 +382,22 @@ function toEnglishFact(fact: string) {
 
 function toSpanishFact(fact: string) {
   const map: Record<string, string> = {
-    目标数量: "la cantidad objetivo",
     产品型号: "el modelo del producto",
-    可接受价格: "el precio objetivo aceptable",
+    目标数量: "la cantidad objetivo",
+    可接受目标价: "el precio objetivo aceptable",
     样品数量: "la cantidad de muestra",
-    收货国家: "el país de destino",
+    收货国家: "el pais de destino",
     收货城市: "la ciudad de destino",
-    目的地国家: "el país de destino",
-    目的地城市: "la ciudad de destino",
-    运输方式: "el método de envío preferido",
-    客户关注点: "tu principal preocupación",
+    目的国家: "el pais de destino",
+    目的城市: "la ciudad de destino",
+    运输方式: "el metodo de envio preferido",
+    客户关注点: "tu principal preocupacion",
     下次跟进时间: "un horario adecuado para seguimiento",
-    付款方式: "el método de pago preferido",
+    付款方式: "el metodo de pago preferido",
     收款账户: "los datos de pago que debemos confirmar",
     订单金额: "el importe del pedido",
-    订单号: "el número de pedido",
-    物流单号: "el número de seguimiento"
+    订单号: "el numero de pedido",
+    物流单号: "el numero de seguimiento"
   };
   return map[fact] || fact;
 }
@@ -369,15 +420,15 @@ function englishIntent(intent: string) {
 
 function spanishIntent(intent: string) {
   const map: Record<string, string> = {
-    "询价 / 报价": "precio y cotización",
+    "询价 / 报价": "precio y cotizacion",
     确认起订量: "MOQ",
-    咨询物流: "envío",
+    咨询物流: "envio",
     "价格异议 / 争取折扣": "precio y opciones de descuento",
     样品咨询: "muestras",
     咨询交期: "plazo de entrega",
     "索要产品实拍 / 资料": "fotos reales o prueba del producto",
     "客户暂缓 / 跟进": "seguimiento",
-    付款方式咨询: "método de pago",
+    付款方式咨询: "metodo de pago",
     订单物流状态咨询: "estado del pedido"
   };
   return map[intent] || "los detalles";
@@ -388,5 +439,9 @@ function normalizeText(value: string) {
 }
 
 function containsAny(text: string, keywords: string[]) {
-  return keywords.some((keyword) => text.includes(keyword));
+  return keywords.some((keyword) => text.includes(normalizeText(keyword)));
+}
+
+function compact(value: string) {
+  return value.replace(/\s+/g, " ").trim();
 }

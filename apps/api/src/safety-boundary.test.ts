@@ -15,6 +15,7 @@ describe("safety boundaries", () => {
     expect(contentScript).toContain("当前不是聊天窗口");
     expect(contentScript).toContain("WhatsApp 页面未打开");
     expect(contentScript).toContain("插入 WhatsApp 输入框（预留）");
+    expect(contentScript).toContain("推荐动作只作为销售建议，不会自动发送消息");
 
     expect(contentScript).not.toMatch(/\.click\(\)/);
     expect(contentScript).not.toMatch(/querySelector\([^)]*(send|发送|data-icon=["']send)/i);

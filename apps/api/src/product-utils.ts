@@ -5,6 +5,7 @@ import type {
   ProductUpsertRequest
 } from "@wa-ai/shared";
 import { AI_SAFETY_NOTE } from "@wa-ai/shared";
+import { noKnowledgeWarning, type KnowledgeContextItem } from "./knowledge-base-utils.js";
 
 type DecimalLike = { toFixed(decimalPlaces?: number): string } | number | string | null;
 
@@ -63,27 +64,27 @@ export function validateProductPayload(input: Partial<ProductUpsertRequest>, opt
   const name = cleanString(input.name);
   const sku = cleanString(input.sku);
 
-  if (!options.partial && !name) errors.push({ field: "name", message: "产品名称不能为空" });
-  else if (options.partial && input.name !== undefined && !name) errors.push({ field: "name", message: "产品名称不能为空" });
-  if (!options.partial && !sku) errors.push({ field: "sku", message: "SKU 不能为空" });
-  else if (options.partial && input.sku !== undefined && !sku) errors.push({ field: "sku", message: "SKU 不能为空" });
-  if (name.length > 120) errors.push({ field: "name", message: "产品名称不能超过 120 个字符" });
-  if (sku.length > 80) errors.push({ field: "sku", message: "SKU 不能超过 80 个字符" });
+  if (!options.partial && !name) errors.push({ field: "name", message: "Product name is required" });
+  else if (options.partial && input.name !== undefined && !name) errors.push({ field: "name", message: "Product name is required" });
+  if (!options.partial && !sku) errors.push({ field: "sku", message: "SKU is required" });
+  else if (options.partial && input.sku !== undefined && !sku) errors.push({ field: "sku", message: "SKU is required" });
+  if (name.length > 120) errors.push({ field: "name", message: "Product name must be 120 characters or less" });
+  if (sku.length > 80) errors.push({ field: "sku", message: "SKU must be 80 characters or less" });
 
   const moq = input.moq;
   if (moq !== undefined && moq !== null && (!Number.isInteger(Number(moq)) || Number(moq) < 0)) {
-    errors.push({ field: "moq", message: "MOQ 必须是非负整数" });
+    errors.push({ field: "moq", message: "MOQ must be a non-negative integer" });
   }
 
   for (const field of ["suggestedPrice", "minPrice"] as const) {
     const value = input[field];
     if (value !== undefined && value !== null && value !== "" && Number.isNaN(Number(value))) {
-      errors.push({ field, message: "价格必须是数字" });
+      errors.push({ field, message: "Price must be numeric" });
     }
   }
 
   if (normalizeList(input.sellingPoints).length > 20) {
-    errors.push({ field: "sellingPoints", message: "卖点最多 20 条" });
+    errors.push({ field: "sellingPoints", message: "Selling points can contain at most 20 items" });
   }
 
   return errors;
@@ -133,29 +134,36 @@ export function toProductUpdateData(input: Partial<ProductUpsertRequest>) {
   return data;
 }
 
-export function generateProductIntro(product: ProductDetail, input: ProductIntroRequest): ProductIntroResponse {
+export function generateProductIntro(
+  product: ProductDetail,
+  input: ProductIntroRequest,
+  knowledgeItems: KnowledgeContextItem[] = []
+): ProductIntroResponse {
   const language = normalizeLanguage(input.targetLanguage || "English");
   const storedIntro = getStoredIntro(product, language);
-  const riskWarnings = buildProductIntroWarnings(product);
+  const knowledgeUsed = knowledgeItems.map((item) => item.title);
+  const riskWarnings = buildProductIntroWarnings(product, knowledgeItems);
 
   if (storedIntro) {
     return {
       productId: product.id,
       language,
-      intro: storedIntro,
+      intro: withKnowledgeLine(storedIntro, knowledgeUsed),
       source: "stored",
-      copyReminder: "产品介绍已生成。请复制或插入 WhatsApp 输入框后，由业务员手动确认发送。",
-      riskWarnings
+      copyReminder: "Product introduction is ready. Copy or insert it into WhatsApp, then 手动发送 after manual confirmation.",
+      riskWarnings,
+      knowledgeUsed
     };
   }
 
   return {
     productId: product.id,
     language,
-    intro: buildGeneratedIntro(product, language),
+    intro: withKnowledgeLine(buildGeneratedIntro(product, language, knowledgeItems), knowledgeUsed),
     source: "generated",
-    copyReminder: "未找到对应语言介绍，已根据 sellingPoints 生成草稿。请确认 MOQ、价格、库存和交期后手动发送。",
-    riskWarnings
+    copyReminder: "No stored intro was found for this language. A draft was generated from selling points and knowledge base. Confirm MOQ, price, stock, and lead time, then 手动发送.",
+    riskWarnings,
+    knowledgeUsed
   };
 }
 
@@ -164,35 +172,42 @@ export function normalizeList(value: unknown) {
   return Array.from(new Set(raw.map((item) => cleanString(item)).filter(Boolean)));
 }
 
-function buildGeneratedIntro(product: ProductDetail, language: string) {
+function buildGeneratedIntro(product: ProductDetail, language: string, knowledgeItems: KnowledgeContextItem[]) {
   const points = product.sellingPoints.length > 0 ? product.sellingPoints : ["reliable quality", "suitable for bulk orders"];
-  const pointText = points.join(", ");
+  const knowledgePoints = knowledgeItems
+    .filter((item) => item.category === "product_selling_points")
+    .map((item) => item.content)
+    .slice(0, 2);
+  const pointText = [...points, ...knowledgePoints].join(", ");
   const moqText = product.moq ? ` MOQ: ${product.moq}.` : "";
   const leadText = product.leadTime ? ` Lead time: ${product.leadTime}.` : "";
 
   if (language === "Spanish") {
-    return `Hola, te comparto una breve introducción de ${product.name} (${product.sku}). Puntos destacados: ${pointText}.${moqText}${leadText} Antes de enviar, confirmaré precio, stock, MOQ y plazo de entrega según tu cantidad y destino.`;
+    return `Hola, te comparto una breve introduccion de ${product.name} (${product.sku}). Puntos destacados: ${pointText}.${moqText}${leadText} Antes de enviar, confirmare precio, stock, MOQ y plazo de entrega segun tu cantidad y destino.`;
   }
   if (language === "Portuguese") {
-    return `Olá, segue uma breve apresentação de ${product.name} (${product.sku}). Destaques: ${pointText}.${moqText}${leadText} Antes de enviar, vou confirmar preço, estoque, MOQ e prazo conforme a quantidade e o destino.`;
-  }
-  if (language === "Arabic") {
-    return `Hello, here is a short introduction for ${product.name} (${product.sku}). Key points: ${pointText}.${moqText}${leadText} Before sending, I will confirm price, stock, MOQ, and lead time based on quantity and destination.`;
+    return `Ola, segue uma breve apresentacao de ${product.name} (${product.sku}). Destaques: ${pointText}.${moqText}${leadText} Antes de enviar, vou confirmar preco, estoque, MOQ e prazo conforme a quantidade e o destino.`;
   }
   return `Hi, here is a short introduction for ${product.name} (${product.sku}). Key selling points: ${pointText}.${moqText}${leadText} Before sending, I will confirm price, stock, MOQ, and lead time based on quantity and destination.`;
 }
 
-function buildProductIntroWarnings(product: ProductDetail) {
+function buildProductIntroWarnings(product: ProductDetail, knowledgeItems: KnowledgeContextItem[]) {
   const warnings = [
     AI_SAFETY_NOTE,
     "产品介绍仅作为草稿，不会自动发送 WhatsApp 消息。",
     "不得编造价格、库存、交期，也不得承诺最低价。"
   ];
+  if (knowledgeItems.length === 0) warnings.push(noKnowledgeWarning());
   if (!product.moq) warnings.push("产品 MOQ 未填写，请业务员确认后再发送。");
   if (!product.suggestedPrice) warnings.push("产品建议价未填写，请业务员确认价格后再发送。");
   if (!product.leadTime) warnings.push("产品交期未填写，请业务员确认交期后再发送。");
   warnings.push("库存状态未在产品资料中维护，请业务员确认库存后再发送。");
   return warnings;
+}
+
+function withKnowledgeLine(text: string, knowledgeUsed: string[]) {
+  if (knowledgeUsed.length === 0) return text;
+  return `${text}\nReference checked: ${knowledgeUsed.join(", ")}. Please confirm price, stock, lead time, logistics, and after-sales promise before sending.`;
 }
 
 function getStoredIntro(product: ProductDetail, language: string) {

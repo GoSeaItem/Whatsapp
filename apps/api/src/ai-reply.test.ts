@@ -39,7 +39,7 @@ describe("POST /api/ai/reply", () => {
     expect(response.body.intent).toBe("咨询物流");
     expect(response.body.scenario).toBe("shipping");
     expect(response.body.shortReply).toContain("Gracias");
-    expect(response.body.professionalReply).toContain("¿Podrías confirmarme");
+    expect(response.body.professionalReply).toContain("Podrias confirmarme");
     expect(response.body.concerns).toContain("运费");
   });
 

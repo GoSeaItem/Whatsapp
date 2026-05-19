@@ -1,5 +1,7 @@
 # Production Smoke Test
 
+Current release target: `v0.4-v2-sales-enhancement`.
+
 Use this checklist after deployment to `http://187.77.138.174`.
 
 Setup:

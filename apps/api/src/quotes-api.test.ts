@@ -3,12 +3,7 @@ import request from "supertest";
 import { describe, expect, it } from "vitest";
 import { createQuotesRouter } from "./quotes-api.js";
 
-type TestCustomer = {
-  id: string;
-  ownerId: string;
-  name: string;
-};
-
+type TestCustomer = { id: string; ownerId: string; name: string };
 type TestProduct = {
   id: string;
   name: string;
@@ -32,7 +27,6 @@ type TestProduct = {
   createdAt: Date;
   updatedAt: Date;
 };
-
 type TestQuote = {
   id: string;
   customerId: string;
@@ -67,11 +61,14 @@ function createTestApp(seed: { customers?: TestCustomer[]; products?: TestProduc
         return products.find((product) => matchesWhere(product, args.where)) || null;
       }
     },
+    knowledgeBase: {
+      async findMany() {
+        return [];
+      }
+    },
     quote: {
       async findMany(args: { where: Record<string, any> }) {
-        return quotes
-          .filter((quote) => matchesWhere(quote, args.where))
-          .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime());
+        return quotes.filter((quote) => matchesWhere(quote, args.where)).sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime());
       },
       async findFirst(args: { where: Record<string, any> }) {
         return quotes.find((quote) => matchesWhere(quote, args.where)) || null;
@@ -99,21 +96,7 @@ function createTestApp(seed: { customers?: TestCustomer[]; products?: TestProduc
       async update(args: { where: { id: string }; data: Record<string, any> }) {
         const index = quotes.findIndex((quote) => quote.id === args.where.id);
         if (index === -1) throw new Error("not found");
-        quotes[index] = {
-          ...quotes[index],
-          customerId: args.data.customerId,
-          productId: args.data.productId,
-          ownerId: args.data.ownerId,
-          quantity: args.data.quantity,
-          unitPrice: Number(args.data.unitPrice),
-          currency: args.data.currency,
-          shippingCost: args.data.shippingCost === null ? null : Number(args.data.shippingCost),
-          moq: args.data.moq ?? null,
-          leadTime: args.data.leadTime ?? null,
-          includeShipping: args.data.includeShipping,
-          quoteText: args.data.quoteText,
-          createdBy: args.data.createdBy
-        };
+        quotes[index] = { ...quotes[index], ...args.data, unitPrice: Number(args.data.unitPrice), shippingCost: args.data.shippingCost === null ? null : Number(args.data.shippingCost) };
         return quotes[index];
       },
       async deleteMany(args: { where: Record<string, any> }) {
@@ -140,15 +123,9 @@ function createTestApp(seed: { customers?: TestCustomer[]; products?: TestProduc
 describe("Quote CRUD API", () => {
   it("creates quotes for owned customer and product", async () => {
     const { app } = createTestApp(baseSeed());
-
     const response = await request(app).post("/api/quotes").set("x-user-id", "sales-1").send(validQuote()).expect(201);
 
-    expect(response.body).toMatchObject({
-      id: "quote-1",
-      customerId: "customer-1",
-      productId: "product-1",
-      createdBy: "sales-1"
-    });
+    expect(response.body).toMatchObject({ id: "quote-1", customerId: "customer-1", productId: "product-1", createdBy: "sales-1" });
     expect(response.body.quoteText).toContain("Bluetooth Speaker");
     expect(response.body.riskWarnings).toContain("报价话术是草稿，不会自动发送 WhatsApp 消息。");
   });
@@ -167,11 +144,7 @@ describe("Quote CRUD API", () => {
   });
 
   it("rejects cross-user detail, update, and delete access", async () => {
-    const { app } = createTestApp({
-      ...baseSeed(),
-      quotes: [makeQuote({ id: "quote-other", ownerId: "sales-2", createdBy: "sales-2", customerId: "customer-2", productId: "product-2" })]
-    });
-
+    const { app } = createTestApp({ ...baseSeed(), quotes: [makeQuote({ id: "quote-other", ownerId: "sales-2", createdBy: "sales-2", customerId: "customer-2", productId: "product-2" })] });
     await request(app).get("/api/quotes/quote-other").set("x-user-id", "sales-1").expect(404);
     await request(app).patch("/api/quotes/quote-other").set("x-user-id", "sales-1").send({ unitPrice: 8 }).expect(404);
     await request(app).delete("/api/quotes/quote-other").set("x-user-id", "sales-1").expect(404);
@@ -180,11 +153,7 @@ describe("Quote CRUD API", () => {
   it("updates and deletes the current user's quote", async () => {
     const { app } = createTestApp({ ...baseSeed(), quotes: [makeQuote({ id: "quote-1" })] });
 
-    const update = await request(app)
-      .patch("/api/quotes/quote-1")
-      .set("x-user-id", "sales-1")
-      .send({ unitPrice: 9, shippingCost: null, leadTime: "" })
-      .expect(200);
+    const update = await request(app).patch("/api/quotes/quote-1").set("x-user-id", "sales-1").send({ unitPrice: 9, shippingCost: null, leadTime: "" }).expect(200);
     expect(update.body.unitPrice).toBe("9.00");
     expect(update.body.riskWarnings).toContain("当前报价低于最低价，请确认");
 
@@ -194,48 +163,28 @@ describe("Quote CRUD API", () => {
 
   it("rejects create when customerId belongs to another user", async () => {
     const { app } = createTestApp(baseSeed());
-
-    await request(app)
-      .post("/api/quotes")
-      .set("x-user-id", "sales-1")
-      .send({ ...validQuote(), customerId: "customer-2" })
-      .expect(404);
+    await request(app).post("/api/quotes").set("x-user-id", "sales-1").send({ ...validQuote(), customerId: "customer-2" }).expect(404);
   });
 
   it("rejects create when productId belongs to another user", async () => {
     const { app } = createTestApp(baseSeed());
-
-    await request(app)
-      .post("/api/quotes")
-      .set("x-user-id", "sales-1")
-      .send({ ...validQuote(), productId: "product-2" })
-      .expect(404);
+    await request(app).post("/api/quotes").set("x-user-id", "sales-1").send({ ...validQuote(), productId: "product-2" }).expect(404);
   });
 
   it("returns required risk warnings for low price, missing shipping, and missing lead time", async () => {
     const { app } = createTestApp(baseSeed());
-
-    const response = await request(app)
-      .post("/api/quotes/generate")
-      .set("x-user-id", "sales-1")
-      .send({ ...validQuote(), customerId: null, unitPrice: 8, shippingCost: null, leadTime: null })
-      .expect(200);
+    const response = await request(app).post("/api/quotes/generate").set("x-user-id", "sales-1").send({ ...validQuote(), customerId: null, unitPrice: 8, shippingCost: null, leadTime: null }).expect(200);
 
     expect(response.body.riskWarnings).toContain("当前报价低于最低价，请确认");
     expect(response.body.riskWarnings).toContain("未填写运费，请确认客户国家、城市和物流方式");
     expect(response.body.riskWarnings).toContain("未填写交期，请确认后再发送");
-    expect(response.body.riskWarnings).toContain("库存未建模，请业务员确认库存后再承诺");
+    expect(response.body.riskWarnings).toContain("库存未建模，请业务员确认库存后再承诺。");
     expect(response.body.riskWarnings).toContain("不允许系统编造库存、运费、交期、折扣或付款条件。");
   });
 
   it("generates draft text without any WhatsApp auto-send behavior", async () => {
     const { app } = createTestApp(baseSeed());
-
-    const response = await request(app)
-      .post("/api/quotes/generate")
-      .set("x-user-id", "sales-1")
-      .send(validQuote())
-      .expect(200);
+    const response = await request(app).post("/api/quotes/generate").set("x-user-id", "sales-1").send(validQuote()).expect(200);
 
     const payloadText = JSON.stringify(response.body).toLowerCase();
     expect(response.body.createdBy).toBe("sales-1");
@@ -262,26 +211,21 @@ function validQuote() {
     customerId: "customer-1",
     productId: "product-1",
     quantity: 100,
-    unitPrice: 12.5,
+    unitPrice: 12,
     currency: "USD",
     shippingCost: 30,
     moq: 100,
     leadTime: "7-10 days",
     includeShipping: false,
     targetLanguage: "English",
-    tiers: [
-      { quantity: 50, unitPrice: 13 },
-      { quantity: 100, unitPrice: 12.5 },
-      { quantity: 300, unitPrice: 11.2 }
-    ],
+    tiers: [],
     stockKnown: false,
     promiseStock: false,
     attachmentSelected: false
   };
 }
 
-function makeProduct(overrides: Partial<TestProduct>): TestProduct {
-  const now = new Date("2026-05-18T08:00:00.000Z");
+function makeProduct(overrides: Partial<TestProduct> = {}): TestProduct {
   return {
     id: "product-1",
     name: "Bluetooth Speaker",
@@ -296,26 +240,26 @@ function makeProduct(overrides: Partial<TestProduct>): TestProduct {
     suggestedPrice: 12.5,
     minPrice: 10,
     leadTime: "7-10 days",
-    sellingPoints: ["portable"],
+    sellingPoints: ["waterproof shell"],
     introEn: null,
     introEs: null,
     introPt: null,
     introAr: null,
     ownerId: "sales-1",
-    createdAt: now,
-    updatedAt: now,
+    createdAt: new Date("2026-05-18T08:00:00.000Z"),
+    updatedAt: new Date("2026-05-18T08:00:00.000Z"),
     ...overrides
   };
 }
 
-function makeQuote(overrides: Partial<TestQuote>): TestQuote {
+function makeQuote(overrides: Partial<TestQuote> = {}): TestQuote {
   return {
     id: "quote-1",
     customerId: "customer-1",
     productId: "product-1",
     ownerId: "sales-1",
     quantity: 100,
-    unitPrice: 12.5,
+    unitPrice: 12,
     currency: "USD",
     shippingCost: 30,
     moq: 100,
@@ -328,9 +272,10 @@ function makeQuote(overrides: Partial<TestQuote>): TestQuote {
   };
 }
 
-function matchesWhere(record: Record<string, any>, where: Record<string, any>) {
-  return Object.entries(where).every(([key, value]) => {
-    if (value === undefined) return true;
-    return record[key] === value;
+function matchesWhere<T extends Record<string, any>>(item: T, where: Record<string, any>) {
+  return Object.entries(where).every(([key, expected]) => {
+    if (expected === undefined) return true;
+    if (expected && typeof expected === "object" && "equals" in expected) return item[key]?.toLowerCase?.() === expected.equals.toLowerCase();
+    return item[key] === expected;
   });
 }

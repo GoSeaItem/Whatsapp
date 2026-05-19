@@ -162,3 +162,33 @@ export function createRequireAuth(db: SessionLookupDb = prisma) {
 }
 
 export const requireAuth = createRequireAuth();
+
+export function createOptionalAuth(db: SessionLookupDb = prisma) {
+  return async function optionalAuth(req: Request, _res: Response, next: NextFunction) {
+    try {
+      const token = getSessionToken(req);
+      if (!token) {
+        next();
+        return;
+      }
+
+      const session = await db.authSession.findUnique({
+        where: { tokenHash: hashSessionToken(token) },
+        include: { user: true }
+      });
+
+      if (session && session.expiresAt.getTime() > Date.now()) {
+        req.user = {
+          id: session.user.id,
+          email: session.user.email,
+          name: session.user.name
+        };
+      }
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+}
+
+export const optionalAuth = createOptionalAuth();

@@ -56,7 +56,7 @@ describe("quote utils", () => {
     expect(quote.riskWarnings).toContain("报价话术是草稿，不会自动发送 WhatsApp 消息。");
     expect(quote.riskWarnings).toContain("当前报价低于最低价，请确认");
     expect(quote.riskWarnings).toContain("未填写运费，请确认客户国家、城市和物流方式");
-    expect(quote.riskWarnings).toContain("库存未建模，请业务员确认库存后再承诺");
+    expect(quote.riskWarnings).toContain("库存未建模，请业务员确认库存后再承诺。");
     expect(quote.riskWarnings).toContain("未填写交期，请确认后再发送");
     expect(quote.riskWarnings).toContain("不允许系统编造库存、运费、交期、折扣或付款条件。");
     expect(quote.riskWarnings.join(" ")).toContain("库存未知");
@@ -79,5 +79,16 @@ describe("quote utils", () => {
 
     expect(quote.riskWarnings.join(" ")).toContain("attached");
     expect(quote.riskWarnings.join(" ")).toContain("未选择附件");
+  });
+
+  it("adds knowledge base reference to quote drafts", () => {
+    const quote = buildQuoteResponse(
+      { productId: "p1", quantity: 100, unitPrice: 12, currency: "USD", shippingCost: 20, leadTime: "7-10 days" },
+      product,
+      [{ id: "kb1", title: "Payment policy", category: "payment_methods", language: "en", content: "T/T and PayPal available" }]
+    );
+
+    expect(quote.knowledgeUsed).toEqual(["Payment policy"]);
+    expect(quote.quoteText).toContain("Reference checked");
   });
 });

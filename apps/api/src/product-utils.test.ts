@@ -29,8 +29,8 @@ const product: ProductDetail = {
 describe("product utils", () => {
   it("validates required fields", () => {
     expect(validateProductPayload({ name: "", sku: "" })).toEqual([
-      { field: "name", message: "产品名称不能为空" },
-      { field: "sku", message: "SKU 不能为空" }
+      { field: "name", message: "Product name is required" },
+      { field: "sku", message: "SKU is required" }
     ]);
   });
 
@@ -75,5 +75,21 @@ describe("product utils", () => {
         "库存状态未在产品资料中维护，请业务员确认库存后再发送。"
       ])
     );
+  });
+
+  it("adds knowledge base reference when provided", () => {
+    const intro = generateProductIntro(product, { targetLanguage: "English" }, [
+      {
+        id: "kb1",
+        title: "Speaker selling points",
+        category: "product_selling_points",
+        language: "en",
+        content: "Suitable for outdoor gifts",
+        productId: product.id
+      }
+    ]);
+
+    expect(intro.knowledgeUsed).toEqual(["Speaker selling points"]);
+    expect(intro.intro).toContain("Reference checked");
   });
 });

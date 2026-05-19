@@ -1,8 +1,93 @@
 ﻿# WhatsApp AI 销售助手 V1
 
-当前内测版本：`v0.2-alpha`
+当前版本：`v0.4-v2-sales-enhancement`
 
 面向中国跨境电商业务员和外贸销售人员的 WhatsApp Web 销售辅助原型。V1 采用 Web 后台 + Chrome Extension 侧边栏 + Desktop 复制粘贴工作流，帮助业务员更快翻译客户消息、生成专业回复、管理客户标签、发送产品介绍、生成报价并设置跟进提醒。
+
+## v0.4-v2-sales-enhancement
+
+V2 成交增强版已经完成并进入全链路联调收尾。当前版本在 V1 销售闭环基础上新增：
+
+- V2-A AI 公司知识库：公司介绍、产品卖点、物流、售后、报价规则、付款方式、禁用表达和 FAQ。
+- V2-B 素材中心：用 URL 管理图片、视频、目录、尺码表、买家秀、工厂视频、物流/付款证明和证书素材。
+- V2-C 客户意向评分：基于标签、阶段、报价、跟进、摘要、样品和定制信号做规则评分。
+- V2-D 样品单管理：记录样品费、运费、付款状态、发货状态、签收反馈和样品跟进话术。
+- V2-E 定制需求管理：记录 Logo、包装、颜色、尺寸、材质、OEM/ODM、文件 URL 和定制话术。
+- V2-F 数据导入导出：支持客户、产品、知识库、素材、样品单、定制需求 CSV 导入、dryRun 预览、模板下载和 CSV 导出。
+
+V2 仍然明确不做收费、定价、支付、套餐、团队/角色/部门权限、完整订单系统、财务利润、采购预测或老板驾驶舱。系统不接入 WhatsApp 官方 API，不自动发送 WhatsApp 消息，不自动群发，不模拟点击发送按钮。所有 AI 回复、产品介绍、素材说明、报价、跟进、样品和定制话术都只是草稿，必须由业务员手动确认后发送。
+
+下一版本建议进入：`V3 团队协作版`，再评估团队共享、角色权限、协作知识库和更完整的数据运营能力。
+
+## V2-F 数据导入导出
+
+V2-F 新增 CSV 数据导入导出，支持业务员把历史表格迁移到系统中，也可以按当前账号导出数据做后续分析。
+
+- 支持对象：客户、产品、知识库、素材、样品单、定制需求。
+- 新增导出 API：`/api/export/customers`、`/api/export/products`、`/api/export/knowledge-base`、`/api/export/materials`、`/api/export/sample-orders`、`/api/export/custom-requests`。
+- 新增模板 API：`/api/import/templates/:type`，模板只包含表头和示例数据，不包含真实用户数据。
+- 新增导入 API：`/api/import/:type`，使用 `multipart/form-data` 上传 `.csv` 文件，支持 `dryRun=true` 预览校验。
+- Web 后台新增导航入口：`Import / Export`，可选择数据类型、下载模板、上传 CSV、预览错误、确认导入和导出当前数据。
+- 所有导入数据会自动绑定当前登录用户，CSV 中的 `ownerId`、`createdBy`、`organizationId`、密码、token、secret、API key、session、cookie 字段会被忽略。
+- 导出只返回当前登录用户自己的数据，不导出密码、密钥、token、session、cookie 或 `.env` 内容。
+- 数组字段使用 `|` 分隔；日期建议使用 ISO 字符串；导出 CSV 会对 `=`、`+`、`-`、`@` 开头的单元格做公式注入防护。
+- V2-F 只支持 CSV，不支持 Excel，不做复杂字段映射器，也不改动 WhatsApp 插件侧边栏。
+
+详细说明见：[docs/v2-import-export.md](docs/v2-import-export.md)。
+
+## V2-E 定制需求管理
+
+V2-E 新增定制需求管理，支持记录客户 Logo、包装、颜色、尺寸、材质、OEM/ODM 等需求，并生成定制确认、补充资料、MOQ、打样费、打样周期、大货周期和风险确认话术草稿。
+
+- 新增 `CustomRequest` 数据模型，按当前登录用户 `ownerId` 隔离。
+- 新增受保护 API：`/api/custom-requests`，覆盖创建、列表、详情、更新、删除、状态更新和定制话术生成。
+- 创建定制需求时会校验 `customerId` 属于当前用户；传入 `productId` 时会校验产品属于当前用户。
+- Web 后台新增导航入口：`定制需求 / Custom`。
+- 客户详情右侧记录区展示该客户定制需求。
+- Chrome Extension 侧边栏新增 `定制` 入口，可保存定制需求并生成话术草稿。
+- 客户意向评分轻量联动定制需求：有定制需求、Logo/包装/OEM/ODM、较大数量、等待客户确认、样品确认会加分；取消会减分。
+- 跟进提醒轻量联动：定制需求可创建客户确认提醒。
+
+定制模块不做真实生产排期、不做订单系统、不做支付系统、不做文件上传，只保存文件 URL。定制话术不会自动发送 WhatsApp 消息，也不能替代业务员确认 MOQ、打样费、打样周期、大货周期、定制能力、客户文件可生产性和售后规则。详细说明见：[docs/v2-custom-request.md](docs/v2-custom-request.md)。
+
+## V2-C 客户意向评分
+
+V2-C 新增客户意向评分，按规则动态计算客户 `intentScore`、`intentLevel`、评分原因和推荐动作，帮助业务员优先跟进更可能成交的客户。
+
+- 新增受保护 API：`GET /api/customers/:id/intent`、`POST /api/customers/:id/recalculate-intent`、`GET /api/dashboard/high-intent-customers`。
+- 客户列表支持 `sort=intentScore` 和 `intentLevel=high|medium|low`。
+- Web 后台客户列表显示意向分和等级，客户详情显示评分原因、推荐动作和重新计算按钮。
+- 首页工作台新增高意向客户 Top 10。
+- Chrome Extension 侧边栏客户信息区显示意向分、等级和推荐动作。
+- V2-C 只做规则评分，不做机器学习，也不把评分固定写入数据库。
+
+意向评分仅作销售辅助，不代表客户一定成交。系统不会因为评分高而自动发送 WhatsApp 消息；涉及价格、库存、交期、运费、付款仍需业务员确认。详细说明见：[docs/v2-customer-intent-score.md](docs/v2-customer-intent-score.md)。
+
+## V2-B 素材中心
+
+V2-B 新增素材中心，业务员可以用 URL 文本维护产品图片、视频、目录、尺码表、买家秀、工厂视频、物流截图、付款说明、证书等销售素材，并在 WhatsApp 侧边栏选择素材生成配套说明话术。
+
+- Web 后台新增导航入口：`素材中心`。
+- 新增受保护 API：`/api/materials`，所有数据按当前登录用户 `ownerId` 隔离。
+- 支持素材类型、语言、关联产品、标签、关键词搜索和图片 URL 预览。
+- 侧边栏新增 `发素材` 入口，可搜索素材、按类型/客户语言/已选产品筛选，并生成可复制或插入输入框的说明草稿。
+- 素材说明会轻量引用 V2-A 知识库，例如产品卖点、物流政策、付款方式、公司介绍和 FAQ。
+- V2-B 只支持 URL 管理，不做真实文件上传、对象存储或素材批量分发。
+
+素材说明不会自动发送 WhatsApp 消息，也不能替代业务员确认价格、库存、交期、物流时效、付款账户、证书真实性和售后承诺。详细说明见：[docs/v2-material-center.md](docs/v2-material-center.md)。
+
+## V2-A AI 公司知识库
+
+V2 第一刀新增 AI 公司知识库，让业务员维护公司介绍、产品卖点、物流政策、售后政策、报价规则、付款方式、禁用表达和 FAQ。AI 回复、产品介绍和报价话术会优先检索当前登录用户启用的知识条目，把知识作为草稿上下文引用。
+
+- Web 后台新增导航入口：`知识库`。
+- 新增受保护 API：`/api/knowledge-base`，所有数据按当前登录用户 `ownerId` 隔离。
+- `POST /api/ai/reply` 支持 `customerId`、`productId`、`useKnowledgeBase`，返回 `knowledgeUsed`。
+- 产品介绍生成会参考 `product_selling_points` 类知识。
+- 报价话术会参考 `quote_rules`、`payment_methods` 和物流类知识。
+- `forbidden_expressions` 会作为风险规则，命中后只提醒业务员修改，不自动阻止或发送。
+
+知识库不会自动发送 WhatsApp 消息，也不能替代业务员确认价格、库存、交期、运费、付款、售后承诺。详细说明见：[docs/v2-knowledge-base.md](docs/v2-knowledge-base.md)。
 
 ## v0.2-alpha 内测版
 
@@ -61,6 +146,18 @@ npm run build
 - 产品库存字段尚未建模，V1 报价和产品介绍会持续提示业务员确认库存，不允许系统编造库存状态。
 - 首页工作台目前展示基础列表，暂不做分页、批量操作、浏览器通知或日历同步。
 - Chrome 插件真实环境依赖 Web 后台 cookie；如果跨域 cookie 被浏览器策略阻止，请按下方 Chrome 登录态验证步骤排查 `CHROME_EXTENSION_ORIGIN`、`COOKIE_SAME_SITE` 和 `COOKIE_SECURE`。
+- V2-A 知识库检索采用轻量规则和排序，暂不做向量检索、知识分块、语义召回和团队共享知识库。
+- 知识库内容由业务员维护，系统只做引用和风险提醒；若知识库缺失或冲突，仍要求业务员人工确认。
+- V2-B 素材中心目前只支持 URL 文本维护，不做真实文件上传、对象存储、素材批量发送或素材权限共享。
+- 素材 URL 的真实性、可访问性、版权和证书/付款/物流材料真实性仍需业务员人工确认。
+- V2-C 意向评分目前只做规则评分，不做机器学习、预测模型、团队维度分析或老板驾驶舱。
+- 意向评分不会自动触发跟进消息，高分客户仍需业务员人工判断和手动沟通。
+- V2-D 样品单只做销售流程记录，不处理真实支付、退款、物流查询或完整订单履约。
+- V2-E 定制需求只做需求记录、状态管理和话术草稿，不处理真实生产排期、设计稿审核、订单系统、支付或财务利润。
+- V2-E 文件字段只保存 URL 文本，不做真实上传、对象存储或文件权限管理。
+- V2-F 数据导入导出只支持 CSV，不支持 Excel、复杂字段映射、批量自动发送或跨用户数据迁移。
+- CSV 导入依赖用户按模板填写字段；关联客户/产品时必须能匹配当前登录用户下的数据，否则该行会返回错误。
+- CSV 导出已做公式注入防护，但外部表格软件仍可能有不同安全策略，导出的 CSV 不应直接作为自动执行脚本使用。
 
 ## 产品边界
 
@@ -95,9 +192,12 @@ npm run build
 - 翻译
 - 客户 CRM
 - 产品资料库
+- 素材中心
+- 客户意向评分
 - 报价助手
 - 跟进提醒
 - 首页工作台
+- AI 公司知识库
 
 暂不做：
 
@@ -317,11 +417,14 @@ GET    /api/auth/me
 客户管理：
 
 ```text
-GET    /api/customers?tag=高意向&stage=已报价&q=Mexico
+GET    /api/customers?tag=高意向&stage=已报价&q=Mexico&sort=intentScore&intentLevel=high
 GET    /api/customers/:id
+GET    /api/customers/:id/intent
+POST   /api/customers/:id/recalculate-intent
 POST   /api/customers
 PATCH  /api/customers/:id
 DELETE /api/customers/:id
+GET    /api/dashboard/high-intent-customers
 ```
 
 ## 客户 CRM 最小闭环
@@ -353,6 +456,17 @@ DELETE /api/products/:id
 POST   /api/products/:id/intro
 ```
 
+素材中心：
+
+```text
+GET    /api/materials?type=image&language=en&productId=product_123&q=summer&tag=real
+GET    /api/materials/:id
+POST   /api/materials
+PATCH  /api/materials/:id
+DELETE /api/materials/:id
+POST   /api/materials/:id/intro
+```
+
 ## 产品资料库 + 侧边栏发产品
 
 登录后的业务员可以在 Web 后台进入“产品”页面维护自己的产品资料：
@@ -380,6 +494,36 @@ WhatsApp 侧边栏“发产品”能力：
 - 不编造交期。
 - 不承诺最低价。
 - 如果缺少 MOQ、价格、交期，会显示风险提醒，要求业务员确认后再发送。
+
+## 素材中心 + 侧边栏发素材
+
+登录后的业务员可以在 Web 后台进入“素材中心”维护自己的销售素材：
+
+- 创建/编辑素材：标题、类型、URL、描述、语言、关联产品和标签。
+- 搜索素材：支持按 `title`、`description`、`tags` 关键词搜索，也支持按类型、语言和关联产品筛选。
+- URL 预览：`image` 类型显示图片预览；视频、目录、证书等素材显示可点击链接。
+- 个人隔离：创建素材时后端自动写入当前登录用户 `ownerId`；列表、详情、编辑、删除和说明生成都按当前用户过滤，跨用户 `materialId` 返回 `404 material not found`。
+- 产品归属校验：如果素材关联 `productId`，后端会确认该产品属于当前登录用户。
+
+WhatsApp 侧边栏“发素材”能力：
+
+- 侧边栏启动后加载当前登录用户的素材。
+- 可搜索素材，并按素材类型、客户语言和已选产品筛选。
+- 选择素材后显示标题、URL、标签和说明话术。
+- 点击“发素材”生成素材说明草稿，可复制或插入 WhatsApp 输入框。
+- 插件不会自动发送 WhatsApp 消息，也不会点击发送按钮。
+
+素材说明安全边界：
+
+- 不编造价格。
+- 不编造库存。
+- 不编造交期。
+- 不编造证书真实性。
+- 不承诺 100% 到货。
+- 不承诺所有订单免费退换。
+- `payment_proof` 必须提醒确认收款账户、付款方式和手续费。
+- `shipping_proof` 必须提醒确认物流方式、目的地和时效。
+- `certificate` 必须提醒确认证书/资质真实性。
 
 AI 多语言回复：
 
@@ -516,6 +660,72 @@ WhatsApp 侧边栏入口：
 - 只生成草稿，不自动发送。
 - 不编造价格、库存、交期、物流状态、折扣或付款条件。
 - 涉及价格、库存、交期、运费、付款时，话术提醒业务员确认后再发送。
+
+## V2-D 样品单管理
+
+SampleOrder 模型字段：
+
+- `id`
+- `customerId`
+- `productId`
+- `sampleName`
+- `sampleFee`
+- `shippingCost`
+- `currency`
+- `paymentStatus`
+- `shippingStatus`
+- `trackingNumber`
+- `feedbackStatus`
+- `expectedShipDate`
+- `expectedDeliveryDate`
+- `notes`
+- `ownerId`
+- `createdAt`
+- `updatedAt`
+
+支持付款状态：`unpaid`、`paid`、`refunded`、`deducted`。支持发货状态：`pending`、`preparing`、`shipped`、`delivered`、`delayed`。支持反馈状态：`pending`、`satisfied`、`unsatisfied`、`converted_to_bulk`、`no_response`。
+
+API：
+
+- `GET /api/sample-orders`
+- `POST /api/sample-orders`
+- `GET /api/sample-orders/:id`
+- `PATCH /api/sample-orders/:id`
+- `DELETE /api/sample-orders/:id`
+- `PATCH /api/sample-orders/:id/payment-status`
+- `PATCH /api/sample-orders/:id/shipping-status`
+- `PATCH /api/sample-orders/:id/feedback-status`
+- `POST /api/sample-orders/:id/script`
+
+Web 后台入口：
+
+- 左侧“样品单”页面支持新增、编辑、删除、搜索样品名/客户名/物流单号，并按付款状态、发货状态、反馈状态筛选。
+- 客户详情右侧面板展示该客户的样品单记录，可从客户详情快速新增样品单。
+- 样品话术支持样品报价、付款提醒、发货通知、签收反馈跟进、转大货引导。
+
+WhatsApp 侧边栏入口：
+
+- 点击“样品”可创建当前客户的样品单，必须先保存客户。
+- 可复用当前选择的产品，填写样品费、运费、币种、预计发货日、预计签收日、物流单号和备注。
+- 可生成样品报价、付款提醒、发货通知、签收反馈跟进和转大货引导话术。
+- 可复制或插入 WhatsApp 输入框，但不会自动发送 WhatsApp 消息。
+- 可把样品签收反馈话术预填到“设置跟进”区域，再由业务员手动保存跟进提醒。
+
+个人账号隔离：
+
+- 创建样品单前会校验 `customerId` 属于当前登录用户。
+- 如果传入 `productId`，后端会校验产品属于当前登录用户。
+- 样品单创建时自动写入当前用户 `ownerId`。
+- 列表、详情、更新、删除、状态更新和话术生成均按 `ownerId` 过滤。
+- 跨用户访问 `sampleOrderId` 或使用其他用户的 `customerId` / `productId` 会返回 `404`。
+
+样品单安全边界：
+
+- 样品单只做销售流程记录，不做在线支付、不做真实物流查询、不做完整订单系统。
+- 样品话术只生成草稿，不自动发送 WhatsApp 消息。
+- 不编造样品费、运费、交期、付款方式、样品费抵扣规则或物流时效。
+- 不承诺样品费一定可抵扣，不承诺一定今天发货，不承诺物流一定按时到达。
+- 涉及付款时提醒业务员确认收款账户和付款方式；涉及发货时提醒业务员确认物流单号和物流时效。
 
 ## Chrome 插件加载方式
 

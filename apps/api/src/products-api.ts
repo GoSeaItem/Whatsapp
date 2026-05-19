@@ -2,6 +2,7 @@ import { Router } from "express";
 import { Prisma } from "@prisma/client";
 import type { ProductIntroRequest } from "@wa-ai/shared";
 import { prisma } from "./db.js";
+import { findKnowledgeForAi } from "./knowledge-base-service.js";
 import {
   generateProductIntro,
   serializeProduct,
@@ -10,7 +11,7 @@ import {
   validateProductPayload
 } from "./product-utils.js";
 
-type ProductDb = Pick<typeof prisma, "product">;
+type ProductDb = Pick<typeof prisma, "product" | "knowledgeBase">;
 
 export function createProductsRouter(db: ProductDb = prisma) {
   const productsRouter = Router();
@@ -135,7 +136,17 @@ productsRouter.post("/:id/intro", async (req, res, next) => {
       res.status(404).json({ message: "product not found" });
       return;
     }
-    res.json(generateProductIntro(serializeProduct(product), req.body as ProductIntroRequest));
+    const body = req.body as ProductIntroRequest;
+    const lookup = body.useKnowledgeBase === false
+      ? { items: [], productNotFound: false }
+      : await findKnowledgeForAi(db, {
+          ownerId: req.user!.id,
+          targetLanguage: body.targetLanguage,
+          productId: req.params.id,
+          mode: "product_intro",
+          keyword: body.customerMessage
+        });
+    res.json(generateProductIntro(serializeProduct(product), body, lookup.items));
   } catch (error) {
     next(error);
   }

@@ -25,9 +25,13 @@ model User {
   sessions      AuthSession[]
   customers     Customer[]
   products      Product[]
+  materials     Material[]
+  sampleOrders  SampleOrder[]
+  customRequests CustomRequest[]
   quotes        Quote[]
   followUps     FollowUpTask[]
   messageDrafts MessageDraft[]
+  knowledgeBases KnowledgeBase[]
 }
 
 model AuthSession {
@@ -61,6 +65,8 @@ model Customer {
   quotes            Quote[]
   followUps         FollowUpTask[]
   messageDrafts     MessageDraft[]
+  sampleOrders      SampleOrder[]
+  customRequests    CustomRequest[]
 
   @@index([ownerId])
 }
@@ -89,9 +95,55 @@ model Product {
   updatedAt      DateTime @updatedAt
   owner          User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   quotes         Quote[]
+  knowledgeBases KnowledgeBase[]
+  materials      Material[]
+  sampleOrders   SampleOrder[]
+  customRequests CustomRequest[]
 
   @@unique([ownerId, sku])
   @@index([ownerId])
+}
+
+model KnowledgeBase {
+  id        String   @id @default(cuid())
+  title     String
+  category  String
+  content   String
+  language  String   @default("other")
+  productId String?
+  enabled   Boolean  @default(true)
+  ownerId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([ownerId])
+  @@index([ownerId, category])
+  @@index([ownerId, language])
+  @@index([ownerId, productId])
+  @@index([ownerId, enabled])
+}
+
+model Material {
+  id          String   @id @default(cuid())
+  title       String
+  type        String
+  url         String
+  description String?
+  language    String   @default("other")
+  productId   String?
+  tags        String[] @default([])
+  ownerId     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([ownerId])
+  @@index([ownerId, type])
+  @@index([ownerId, language])
+  @@index([ownerId, productId])
 }
 
 model Quote {
@@ -115,6 +167,68 @@ model Quote {
 
   @@index([ownerId])
   @@index([customerId])
+}
+
+model SampleOrder {
+  id                   String   @id @default(cuid())
+  customerId           String
+  productId            String?
+  sampleName           String
+  sampleFee            Decimal? @db.Decimal(12, 2)
+  shippingCost         Decimal? @db.Decimal(12, 2)
+  currency             String   @default("USD")
+  paymentStatus        String   @default("unpaid")
+  shippingStatus       String   @default("pending")
+  trackingNumber       String?
+  feedbackStatus       String   @default("pending")
+  expectedShipDate     DateTime?
+  expectedDeliveryDate DateTime?
+  notes                String?
+  ownerId              String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  owner                User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  customer             Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  product              Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([ownerId])
+  @@index([customerId])
+  @@index([productId])
+  @@index([ownerId, paymentStatus])
+  @@index([ownerId, shippingStatus])
+  @@index([ownerId, feedbackStatus])
+}
+
+model CustomRequest {
+  id                  String   @id @default(cuid())
+  customerId          String
+  productId           String?
+  requestType         String
+  logoRequired        Boolean  @default(false)
+  packagingRequired   Boolean  @default(false)
+  colorRequirement    String?
+  sizeRequirement     String?
+  materialRequirement String?
+  quantity            Int?
+  moq                 Int?
+  sampleFee           Decimal? @db.Decimal(12, 2)
+  sampleLeadTime      String?
+  bulkLeadTime        String?
+  files               String[] @default([])
+  status              String   @default("draft")
+  notes               String?
+  ownerId             String
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  owner               User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  customer            Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  product             Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([ownerId])
+  @@index([customerId])
+  @@index([productId])
+  @@index([ownerId, requestType])
+  @@index([ownerId, status])
 }
 
 model FollowUpTask {

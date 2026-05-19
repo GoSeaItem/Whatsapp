@@ -1,5 +1,7 @@
 # Chrome Extension Production Build
 
+Current release target: `v0.4-v2-sales-enhancement`.
+
 The Chrome Extension is Manifest V3 and runs only on:
 
 ```text

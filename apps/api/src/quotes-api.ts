@@ -1,6 +1,7 @@
 import { Router } from "express";
 import type { QuoteGenerateRequest, QuoteSaveRequest } from "@wa-ai/shared";
 import { prisma } from "./db.js";
+import { findKnowledgeForAi } from "./knowledge-base-service.js";
 import { serializeProduct } from "./product-utils.js";
 import {
   buildQuoteCreateData,
@@ -9,7 +10,7 @@ import {
   validateQuotePayload
 } from "./quote-utils.js";
 
-type QuoteDb = Pick<typeof prisma, "quote" | "customer" | "product">;
+type QuoteDb = Pick<typeof prisma, "quote" | "customer" | "product" | "knowledgeBase">;
 
 export function createQuotesRouter(db: QuoteDb = prisma) {
   const quotesRouter = Router();
@@ -29,7 +30,13 @@ export function createQuotesRouter(db: QuoteDb = prisma) {
         return;
       }
 
-      res.json(buildQuoteResponse({ ...body, createdBy: req.user!.id }, product));
+      const knowledge = body.useKnowledgeBase === false ? { items: [] } : await findKnowledgeForAi(db, {
+        ownerId: req.user!.id,
+        targetLanguage: body.targetLanguage,
+        productId: body.productId,
+        mode: "quote"
+      });
+      res.json(buildQuoteResponse({ ...body, createdBy: req.user!.id }, product, knowledge.items));
     } catch (error) {
       next(error);
     }
@@ -57,7 +64,13 @@ export function createQuotesRouter(db: QuoteDb = prisma) {
         return;
       }
 
-      const response = buildQuoteResponse({ ...body, createdBy: req.user!.id }, product);
+      const knowledge = body.useKnowledgeBase === false ? { items: [] } : await findKnowledgeForAi(db, {
+        ownerId: req.user!.id,
+        targetLanguage: body.targetLanguage,
+        productId: body.productId,
+        mode: "quote"
+      });
+      const response = buildQuoteResponse({ ...body, createdBy: req.user!.id }, product, knowledge.items);
       const quote = await db.quote.create({
         data: {
           ...buildQuoteCreateData(response),
@@ -181,7 +194,13 @@ export function createQuotesRouter(db: QuoteDb = prisma) {
         attachmentSelected: req.body.attachmentSelected,
         quoteText: req.body.quoteText !== undefined ? req.body.quoteText : existing.quoteText
       };
-      const response = buildQuoteResponse(merged, product);
+      const knowledge = merged.useKnowledgeBase === false ? { items: [] } : await findKnowledgeForAi(db, {
+        ownerId: req.user!.id,
+        targetLanguage: merged.targetLanguage,
+        productId: nextProductId,
+        mode: "quote"
+      });
+      const response = buildQuoteResponse(merged, product, knowledge.items);
       const quote = await db.quote.update({
         where: { id: req.params.id },
         data: {

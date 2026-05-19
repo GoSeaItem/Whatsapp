@@ -6,12 +6,19 @@ import { PRODUCT_BOUNDARIES, type AiReplyRequest, type GenerateDraftRequest } fr
 import { generateAiReply } from "./ai-reply.js";
 import { generateDraft } from "./ai-draft.js";
 import { authRouter } from "./auth-api.js";
-import { requireAuth } from "./auth.js";
+import { optionalAuth, requireAuth } from "./auth.js";
 import { customersRouter } from "./customers-api.js";
+import { customRequestsRouter } from "./custom-requests-api.js";
+import { dashboardRouter } from "./dashboard-api.js";
 import { prisma } from "./db.js";
 import { followUpsRouter } from "./follow-ups-api.js";
+import { exportRouter, importRouter } from "./import-export-api.js";
+import { knowledgeBaseRouter } from "./knowledge-base-api.js";
+import { materialsRouter } from "./materials-api.js";
+import { buildKnowledgeContext, findKnowledgeForAi } from "./knowledge-base-service.js";
 import { productsRouter } from "./products-api.js";
 import { quotesRouter } from "./quotes-api.js";
+import { sampleOrdersRouter } from "./sample-orders-api.js";
 
 export const app = express();
 const port = Number(process.env.PORT || 4000);
@@ -67,7 +74,14 @@ app.use("/api/auth", authRouter);
 app.use("/api/customers", requireAuth, customersRouter);
 app.use("/api/products", requireAuth, productsRouter);
 app.use("/api/quotes", requireAuth, quotesRouter);
+app.use("/api/sample-orders", requireAuth, sampleOrdersRouter);
+app.use("/api/custom-requests", requireAuth, customRequestsRouter);
 app.use("/api/follow-ups", requireAuth, followUpsRouter);
+app.use("/api/dashboard", requireAuth, dashboardRouter);
+app.use("/api/knowledge-base", requireAuth, knowledgeBaseRouter);
+app.use("/api/materials", requireAuth, materialsRouter);
+app.use("/api/export", requireAuth, exportRouter);
+app.use("/api/import", requireAuth, importRouter);
 
 app.post("/api/ai/draft", async (req, res, next) => {
   try {
@@ -96,11 +110,29 @@ app.post("/api/ai/draft", async (req, res, next) => {
   }
 });
 
-app.post("/api/ai/reply", (req, res, next) => {
+app.post("/api/ai/reply", optionalAuth, async (req, res, next) => {
   try {
     const body = req.body as AiReplyRequest;
     if (!body.customerMessage?.trim()) {
       res.status(400).json({ message: "customerMessage is required" });
+      return;
+    }
+
+    if (req.user && body.useKnowledgeBase !== false) {
+      const lookup = await findKnowledgeForAi(prisma, {
+        ownerId: req.user.id,
+        targetLanguage: body.targetLanguage,
+        productId: body.productId,
+        scenario: body.scenario,
+        mode: "reply",
+        keyword: body.customerMessage
+      });
+      if (lookup.productNotFound) {
+        res.status(404).json({ message: "product not found" });
+        return;
+      }
+      const knowledge = buildKnowledgeContext(lookup.items);
+      res.json(generateAiReply({ ...body, ...knowledge }));
       return;
     }
 

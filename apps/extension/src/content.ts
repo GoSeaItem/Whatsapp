@@ -4,11 +4,20 @@ import type {
   AiReplyScenario,
   AuthUser,
   CustomerDetail,
+  CustomerIntentResponse,
+  CustomRequestDetail,
+  CustomScriptResponse,
+  CustomScriptScenario,
   CustomerUpsertRequest,
   FollowUpTaskType,
+  MaterialIntroResponse,
+  MaterialSummary,
   ProductIntroResponse,
   ProductSummary,
-  QuoteResponse
+  QuoteResponse,
+  SampleOrderDetail,
+  SampleScriptResponse,
+  SampleScriptScenario
 } from "@wa-ai/shared";
 import { AI_SAFETY_NOTE } from "@wa-ai/shared";
 
@@ -17,7 +26,7 @@ const WEB_LOGIN_URL = import.meta.env.VITE_WEB_LOGIN_URL || "http://localhost:51
 const SIDEBAR_ID = "wa-ai-sidebar";
 const HIDDEN_CLASS = "wa-ai-hidden";
 
-type QuickAction = "translate" | "reply" | "quote" | "urge" | "product" | "followUp";
+type QuickAction = "translate" | "reply" | "quote" | "urge" | "product" | "material" | "sample" | "custom" | "followUp";
 type ReplyVariant = "short" | "professional" | "closing";
 type RecognitionStatus = "normal" | "abnormal" | "notChat" | "whatsappNotOpen";
 type SidebarAuthState = { status: "checking" | "authenticated" | "anonymous"; user?: AuthUser };
@@ -122,6 +131,48 @@ function createSidebar() {
         <label class="wa-ai-field"><span>最近沟通摘要</span><textarea id="wa-ai-latest-summary" rows="3"></textarea></label>
         <label class="wa-ai-field"><span>下次跟进时间</span><input id="wa-ai-next-follow-up" type="datetime-local" /></label>
         <label class="wa-ai-field"><span>备注</span><textarea id="wa-ai-notes" rows="3"></textarea></label>
+        <div class="wa-ai-analysis-grid">
+          <div class="wa-ai-analysis-card"><span>意向分</span><strong id="wa-ai-intent-score">保存客户后可计算</strong></div>
+          <div class="wa-ai-analysis-card"><span>推荐动作</span><div id="wa-ai-intent-action">推荐动作仅作为销售建议。</div></div>
+        </div>
+        <button id="wa-ai-refresh-intent" type="button" class="wa-ai-wide-button wa-ai-secondary-wide">计算意向分</button>
+      </section>
+
+      <section class="wa-ai-section">
+        <div class="wa-ai-section-title">
+          <h3>素材中心</h3>
+          <button id="wa-ai-refresh-materials" type="button" class="wa-ai-link-button">刷新</button>
+        </div>
+        <div class="wa-ai-safety-note">素材说明只生成草稿，不会自动发送 WhatsApp 消息。证书、物流和付款信息必须人工确认。</div>
+        <div class="wa-ai-product-search">
+          <input id="wa-ai-material-search" type="search" placeholder="搜索素材标题、描述、标签" />
+          <button id="wa-ai-search-materials" type="button">搜索</button>
+        </div>
+        <div class="wa-ai-two-cols">
+          <label class="wa-ai-field">
+            <span>素材类型</span>
+            <select id="wa-ai-material-type">
+              <option value="">全部</option>
+              <option value="image">image</option>
+              <option value="video">video</option>
+              <option value="catalog">catalog</option>
+              <option value="size_chart">size_chart</option>
+              <option value="buyer_show">buyer_show</option>
+              <option value="factory_video">factory_video</option>
+              <option value="shipping_proof">shipping_proof</option>
+              <option value="payment_proof">payment_proof</option>
+              <option value="certificate">certificate</option>
+              <option value="other">other</option>
+            </select>
+          </label>
+          <label class="wa-ai-field"><span>选择素材</span><select id="wa-ai-material-select"><option value="">加载素材中...</option></select></label>
+        </div>
+        <div class="wa-ai-product-meta" id="wa-ai-material-meta">选择素材后显示 URL 和标签。</div>
+        <label class="wa-ai-field"><span>素材说明话术</span><textarea id="wa-ai-material-intro" rows="4"></textarea></label>
+        <div class="wa-ai-two-actions">
+          <button id="wa-ai-copy-material-intro" type="button" class="wa-ai-wide-button">复制素材说明</button>
+          <button id="wa-ai-insert-material-intro" type="button" class="wa-ai-wide-button wa-ai-secondary-wide">插入输入框</button>
+        </div>
       </section>
 
       <section class="wa-ai-section">
@@ -196,6 +247,89 @@ function createSidebar() {
       </section>
 
       <section class="wa-ai-section">
+        <div class="wa-ai-section-title"><h3>样品单</h3></div>
+        <div class="wa-ai-safety-note">样品单只记录销售流程，样品话术只生成草稿，不处理真实支付或物流，也不会自动发送 WhatsApp 消息。</div>
+        <input id="wa-ai-sample-id" type="hidden" />
+        <label class="wa-ai-field"><span>样品名称</span><input id="wa-ai-sample-name" type="text" placeholder="Blue Dress sample" /></label>
+        <div class="wa-ai-two-cols">
+          <label class="wa-ai-field"><span>样品费</span><input id="wa-ai-sample-fee" type="number" min="0" step="0.01" /></label>
+          <label class="wa-ai-field"><span>运费</span><input id="wa-ai-sample-shipping" type="number" min="0" step="0.01" /></label>
+        </div>
+        <div class="wa-ai-two-cols">
+          <label class="wa-ai-field"><span>币种</span><input id="wa-ai-sample-currency" type="text" value="USD" /></label>
+          <label class="wa-ai-field"><span>物流单号</span><input id="wa-ai-sample-tracking" type="text" placeholder="未发货可留空" /></label>
+        </div>
+        <div class="wa-ai-two-cols">
+          <label class="wa-ai-field"><span>预计发货日</span><input id="wa-ai-sample-ship-date" type="date" /></label>
+          <label class="wa-ai-field"><span>预计签收日</span><input id="wa-ai-sample-delivery-date" type="date" /></label>
+        </div>
+        <label class="wa-ai-field">
+          <span>样品话术场景</span>
+          <select id="wa-ai-sample-scenario">
+            <option value="sample_quote">样品报价</option>
+            <option value="sample_payment_reminder">样品付款提醒</option>
+            <option value="sample_shipped">样品发货通知</option>
+            <option value="sample_feedback_follow_up">样品签收反馈跟进</option>
+            <option value="sample_to_bulk_order">样品转大货引导</option>
+          </select>
+        </label>
+        <label class="wa-ai-field"><span>样品备注</span><textarea id="wa-ai-sample-notes" rows="3"></textarea></label>
+        <label class="wa-ai-field"><span>样品话术草稿</span><textarea id="wa-ai-sample-script" rows="5"></textarea></label>
+        <div class="wa-ai-two-actions">
+          <button id="wa-ai-save-sample" type="button" class="wa-ai-wide-button">保存样品单</button>
+          <button id="wa-ai-generate-sample-script" type="button" class="wa-ai-wide-button wa-ai-secondary-wide">生成样品话术</button>
+        </div>
+        <div class="wa-ai-two-actions">
+          <button id="wa-ai-copy-sample-script" type="button" class="wa-ai-wide-button">复制样品话术</button>
+          <button id="wa-ai-insert-sample-script" type="button" class="wa-ai-wide-button wa-ai-secondary-wide">插入输入框</button>
+        </div>
+        <button id="wa-ai-sample-follow-up" type="button" class="wa-ai-wide-button wa-ai-secondary-wide">设置样品反馈跟进</button>
+      </section>
+
+      <section class="wa-ai-section">
+        <div class="wa-ai-section-title"><h3>Custom</h3></div>
+        <div class="wa-ai-safety-note">Custom request scripts are drafts only. No production scheduling, payment processing, or WhatsApp auto-send.</div>
+        <input id="wa-ai-custom-id" type="hidden" />
+        <label class="wa-ai-field"><span>Type</span><select id="wa-ai-custom-type">
+          <option value="logo">logo</option><option value="packaging">packaging</option><option value="color">color</option><option value="size">size</option><option value="material">material</option><option value="oem">oem</option><option value="odm">odm</option><option value="mixed">mixed</option><option value="other">other</option>
+        </select></label>
+        <div class="wa-ai-secondary-actions">
+          <button id="wa-ai-custom-logo" type="button" data-active="false">Logo not confirmed</button>
+          <button id="wa-ai-custom-packaging" type="button" data-active="false">Packaging not confirmed</button>
+        </div>
+        <div class="wa-ai-two-cols">
+          <label class="wa-ai-field"><span>Color</span><input id="wa-ai-custom-color" type="text" /></label>
+          <label class="wa-ai-field"><span>Size</span><input id="wa-ai-custom-size" type="text" /></label>
+        </div>
+        <label class="wa-ai-field"><span>Material</span><input id="wa-ai-custom-material" type="text" /></label>
+        <div class="wa-ai-two-cols">
+          <label class="wa-ai-field"><span>Quantity</span><input id="wa-ai-custom-quantity" type="number" min="0" /></label>
+          <label class="wa-ai-field"><span>MOQ</span><input id="wa-ai-custom-moq" type="number" min="0" /></label>
+        </div>
+        <div class="wa-ai-two-cols">
+          <label class="wa-ai-field"><span>Sample fee</span><input id="wa-ai-custom-sample-fee" type="number" min="0" step="0.01" /></label>
+          <label class="wa-ai-field"><span>Status</span><select id="wa-ai-custom-status"><option value="draft">draft</option><option value="waiting_customer_confirm">waiting_customer_confirm</option><option value="sample_making">sample_making</option><option value="sample_confirmed">sample_confirmed</option><option value="bulk_production">bulk_production</option><option value="closed">closed</option><option value="cancelled">cancelled</option></select></label>
+        </div>
+        <div class="wa-ai-two-cols">
+          <label class="wa-ai-field"><span>Sample lead time</span><input id="wa-ai-custom-sample-lead-time" type="text" /></label>
+          <label class="wa-ai-field"><span>Bulk lead time</span><input id="wa-ai-custom-bulk-lead-time" type="text" /></label>
+        </div>
+        <label class="wa-ai-field"><span>File URLs</span><textarea id="wa-ai-custom-files" rows="2" placeholder="one URL per line"></textarea></label>
+        <label class="wa-ai-field"><span>Scenario</span><select id="wa-ai-custom-scenario"><option value="custom_confirm">custom_confirm</option><option value="custom_request_files">custom_request_files</option><option value="custom_moq_explain">custom_moq_explain</option><option value="custom_sample_fee">custom_sample_fee</option><option value="custom_sample_lead_time">custom_sample_lead_time</option><option value="custom_bulk_lead_time">custom_bulk_lead_time</option><option value="custom_risk_confirm">custom_risk_confirm</option></select></label>
+        <label class="wa-ai-field"><span>Notes</span><textarea id="wa-ai-custom-notes" rows="3"></textarea></label>
+        <label class="wa-ai-field"><span>Custom script draft</span><textarea id="wa-ai-custom-script" rows="5"></textarea></label>
+        <div class="wa-ai-two-actions">
+          <button id="wa-ai-save-custom" type="button" class="wa-ai-wide-button">Save custom request</button>
+          <button id="wa-ai-generate-custom-script" type="button" class="wa-ai-wide-button wa-ai-secondary-wide">Generate custom script</button>
+        </div>
+        <div class="wa-ai-two-actions">
+          <button id="wa-ai-copy-custom-script" type="button" class="wa-ai-wide-button">Copy custom script</button>
+          <button id="wa-ai-insert-custom-script" type="button" class="wa-ai-wide-button wa-ai-secondary-wide">Insert draft</button>
+        </div>
+        <button id="wa-ai-custom-follow-up" type="button" class="wa-ai-wide-button wa-ai-secondary-wide">Set custom follow-up</button>
+      </section>
+
+      <section class="wa-ai-section">
         <div class="wa-ai-section-title">
           <h3>客户消息理解</h3>
           <button id="wa-ai-read-selection" type="button" class="wa-ai-link-button">读取选中</button>
@@ -218,6 +352,9 @@ function createSidebar() {
           <button data-action="quote" type="button">报价</button>
           <button data-action="urge" type="button">催单</button>
           <button data-action="product" type="button">发产品</button>
+          <button data-action="material" type="button">发素材</button>
+          <button data-action="sample" type="button">样品</button>
+          <button data-action="custom" type="button">Custom</button>
           <button data-action="followUp" type="button">设置跟进</button>
         </div>
       </section>
@@ -267,6 +404,7 @@ function bindEvents(toggleButton: HTMLButtonElement) {
   });
 
   getElement<HTMLButtonElement>("wa-ai-save-customer").addEventListener("click", saveCustomerToApi);
+  getElement<HTMLButtonElement>("wa-ai-refresh-intent").addEventListener("click", () => void loadCustomerIntentScore());
   getElement<HTMLButtonElement>("wa-ai-open-login").addEventListener("click", () => {
     window.open(WEB_LOGIN_URL, "_blank", "noopener,noreferrer");
   });
@@ -276,13 +414,32 @@ function bindEvents(toggleButton: HTMLButtonElement) {
     if (event.key === "Enter") void loadProducts(getInput("wa-ai-product-search").value);
   });
   getElement<HTMLSelectElement>("wa-ai-product-select").addEventListener("change", updateSelectedProductMeta);
+  getElement<HTMLButtonElement>("wa-ai-refresh-materials").addEventListener("click", () => void loadMaterials());
+  getElement<HTMLButtonElement>("wa-ai-search-materials").addEventListener("click", () => void loadMaterials(getInput("wa-ai-material-search").value));
+  getInput("wa-ai-material-search").addEventListener("keydown", (event) => {
+    if (event.key === "Enter") void loadMaterials(getInput("wa-ai-material-search").value);
+  });
+  getElement<HTMLSelectElement>("wa-ai-material-type").addEventListener("change", () => void loadMaterials(getInput("wa-ai-material-search").value));
+  getElement<HTMLSelectElement>("wa-ai-material-select").addEventListener("change", updateSelectedMaterialMeta);
   getElement<HTMLButtonElement>("wa-ai-copy-product-intro").addEventListener("click", () => copyTextArea("wa-ai-product-intro", "产品介绍已复制，请手动发送。"));
   getElement<HTMLButtonElement>("wa-ai-insert-product-intro").addEventListener("click", () => insertTextAreaIntoWhatsApp("wa-ai-product-intro"));
   getElement<HTMLButtonElement>("wa-ai-copy-quote").addEventListener("click", () => copyTextArea("wa-ai-quote-text", "报价文案已复制，请手动发送。"));
   getElement<HTMLButtonElement>("wa-ai-insert-quote").addEventListener("click", () => insertTextAreaIntoWhatsApp("wa-ai-quote-text"));
+  getElement<HTMLButtonElement>("wa-ai-copy-material-intro").addEventListener("click", () => copyTextArea("wa-ai-material-intro", "素材说明已复制，请手动发送。"));
+  getElement<HTMLButtonElement>("wa-ai-insert-material-intro").addEventListener("click", () => insertTextAreaIntoWhatsApp("wa-ai-material-intro"));
   getElement<HTMLButtonElement>("wa-ai-save-quote").addEventListener("click", () => void saveQuoteToCustomer());
   getElement<HTMLSelectElement>("wa-ai-follow-up-type").addEventListener("change", updateFollowUpScript);
   getElement<HTMLButtonElement>("wa-ai-save-follow-up").addEventListener("click", () => void saveFollowUpTask());
+  getElement<HTMLButtonElement>("wa-ai-save-sample").addEventListener("click", () => void saveSampleOrderFromSidebar());
+  getElement<HTMLButtonElement>("wa-ai-generate-sample-script").addEventListener("click", () => void generateSampleScriptFromSidebar());
+  getElement<HTMLButtonElement>("wa-ai-copy-sample-script").addEventListener("click", () => copyTextArea("wa-ai-sample-script", "样品话术已复制，请人工确认后手动发送。"));
+  getElement<HTMLButtonElement>("wa-ai-insert-sample-script").addEventListener("click", () => insertTextAreaIntoWhatsApp("wa-ai-sample-script"));
+  getElement<HTMLButtonElement>("wa-ai-sample-follow-up").addEventListener("click", seedSampleFeedbackFollowUp);
+  getElement<HTMLButtonElement>("wa-ai-save-custom").addEventListener("click", () => void saveCustomRequestFromSidebar());
+  getElement<HTMLButtonElement>("wa-ai-generate-custom-script").addEventListener("click", () => void generateCustomScriptFromSidebar());
+  getElement<HTMLButtonElement>("wa-ai-copy-custom-script").addEventListener("click", () => copyTextArea("wa-ai-custom-script", "Custom script copied. Please confirm manually before sending."));
+  getElement<HTMLButtonElement>("wa-ai-insert-custom-script").addEventListener("click", () => insertTextAreaIntoWhatsApp("wa-ai-custom-script"));
+  getElement<HTMLButtonElement>("wa-ai-custom-follow-up").addEventListener("click", seedCustomFollowUp);
   document.querySelectorAll<HTMLButtonElement>("[data-follow-up-days]").forEach((button) => {
     button.addEventListener("click", () => {
       setFollowUpDate(Number(button.dataset.followUpDays || "1"));
@@ -291,6 +448,8 @@ function bindEvents(toggleButton: HTMLButtonElement) {
   });
   bindToggleButton("wa-ai-quote-include-shipping", "含运费", "不含运费");
   bindToggleButton("wa-ai-quote-stock-known", "库存已确认", "库存未知");
+  bindToggleButton("wa-ai-custom-logo", "Logo required", "Logo not confirmed");
+  bindToggleButton("wa-ai-custom-packaging", "Packaging required", "Packaging not confirmed");
 
   getElement<HTMLButtonElement>("wa-ai-read-selection").addEventListener("click", () => {
     const selectedText = window.getSelection()?.toString().trim();
@@ -307,7 +466,10 @@ function bindEvents(toggleButton: HTMLButtonElement) {
     button.addEventListener("click", async () => {
       const action = button.dataset.action as QuickAction;
       if (action === "product") return generateSelectedProductIntro();
+      if (action === "material") return generateSelectedMaterialIntro();
       if (action === "quote") return generateQuoteDraft();
+      if (action === "sample") return generateSampleScriptFromSidebar("sample_quote");
+      if (action === "custom") return generateCustomScriptFromSidebar("custom_confirm");
       if (action === "followUp") {
         updateFollowUpScript();
         setFollowUpDate(1);
@@ -333,6 +495,7 @@ async function checkAuthStatus() {
     authState = { status: "authenticated", user: result.user };
     renderAuthState();
     await loadProducts();
+    await loadMaterials();
   } catch {
     authState = { status: "anonymous" };
     renderAuthState();
@@ -371,19 +534,61 @@ function renderAuthState() {
 function setProtectedControlsDisabled(disabled: boolean) {
   [
     "wa-ai-save-customer",
+    "wa-ai-refresh-intent",
     "wa-ai-refresh-products",
     "wa-ai-search-products",
     "wa-ai-product-search",
     "wa-ai-product-select",
     "wa-ai-copy-product-intro",
     "wa-ai-insert-product-intro",
+    "wa-ai-refresh-materials",
+    "wa-ai-search-materials",
+    "wa-ai-material-search",
+    "wa-ai-material-type",
+    "wa-ai-material-select",
+    "wa-ai-copy-material-intro",
+    "wa-ai-insert-material-intro",
     "wa-ai-copy-quote",
     "wa-ai-insert-quote",
     "wa-ai-save-quote",
     "wa-ai-follow-up-type",
     "wa-ai-follow-up-remind-at",
     "wa-ai-follow-up-script",
-    "wa-ai-save-follow-up"
+    "wa-ai-save-follow-up",
+    "wa-ai-sample-name",
+    "wa-ai-sample-fee",
+    "wa-ai-sample-shipping",
+    "wa-ai-sample-currency",
+    "wa-ai-sample-tracking",
+    "wa-ai-sample-ship-date",
+    "wa-ai-sample-delivery-date",
+    "wa-ai-sample-scenario",
+    "wa-ai-sample-notes",
+    "wa-ai-save-sample",
+    "wa-ai-generate-sample-script",
+    "wa-ai-copy-sample-script",
+    "wa-ai-insert-sample-script",
+    "wa-ai-sample-follow-up",
+    "wa-ai-custom-type",
+    "wa-ai-custom-logo",
+    "wa-ai-custom-packaging",
+    "wa-ai-custom-color",
+    "wa-ai-custom-size",
+    "wa-ai-custom-material",
+    "wa-ai-custom-quantity",
+    "wa-ai-custom-moq",
+    "wa-ai-custom-sample-fee",
+    "wa-ai-custom-status",
+    "wa-ai-custom-sample-lead-time",
+    "wa-ai-custom-bulk-lead-time",
+    "wa-ai-custom-files",
+    "wa-ai-custom-scenario",
+    "wa-ai-custom-notes",
+    "wa-ai-save-custom",
+    "wa-ai-generate-custom-script",
+    "wa-ai-copy-custom-script",
+    "wa-ai-insert-custom-script",
+    "wa-ai-custom-follow-up"
   ].forEach((id) => {
     const element = document.getElementById(id) as HTMLButtonElement | HTMLSelectElement | null;
     if (element) element.disabled = disabled;
@@ -452,6 +657,30 @@ async function loadProducts(query = "") {
   } catch {
     select.replaceChildren(option("", "产品加载失败"));
     setStatus("产品资料库加载失败，请确认本地 API 已启动。");
+  }
+}
+
+async function loadMaterials(query = "") {
+  if (!ensureAuthenticated()) return;
+  const select = getElement<HTMLSelectElement>("wa-ai-material-select");
+  try {
+    const params = new URLSearchParams();
+    const type = getElement<HTMLSelectElement>("wa-ai-material-type").value;
+    const language = mapCustomerLanguageToMaterialLanguage(getSelect("wa-ai-language").value);
+    const product = selectedProduct();
+    if (query.trim()) params.set("q", query.trim());
+    if (type) params.set("type", type);
+    if (language) params.set("language", language);
+    if (product) params.set("productId", product.id);
+    const response = await apiFetch(`/api/materials${params.toString() ? `?${params.toString()}` : ""}`);
+    if (!response.ok) throw new Error("materials failed");
+    const materials = (await response.json()) as MaterialSummary[];
+    select.replaceChildren(option("", materials.length > 0 ? "请选择素材" : "暂无素材"), ...materials.map((material) => option(material.id, `${material.title} · ${material.type}`)));
+    select.dataset.materials = JSON.stringify(materials);
+    updateSelectedMaterialMeta();
+  } catch {
+    select.replaceChildren(option("", "素材加载失败"));
+    setStatus("素材中心加载失败，请确认 Web 后台已登录，且 API 已启动。");
   }
 }
 
@@ -575,6 +804,159 @@ async function saveFollowUpTask() {
   }
 }
 
+async function saveSampleOrderFromSidebar(options: { silent?: boolean } = {}) {
+  if (!ensureAuthenticated()) return null;
+  const customerId = getInput("wa-ai-customer-id").value.trim();
+  if (!customerId) {
+    setStatus("请先保存客户后再创建样品单。");
+    return null;
+  }
+  const sampleName = getInput("wa-ai-sample-name").value.trim();
+  if (!sampleName) {
+    setStatus("请填写样品名称。");
+    return null;
+  }
+
+  setButtonsBusy(true);
+  try {
+    const sampleId = getInput("wa-ai-sample-id").value.trim();
+    const payload = buildSampleOrderPayload(customerId);
+    const response = await apiFetch(sampleId ? `/api/sample-orders/${sampleId}` : "/api/sample-orders", {
+      method: sampleId ? "PATCH" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) throw new Error("sample order failed");
+    const saved = (await response.json()) as SampleOrderDetail;
+    getInput("wa-ai-sample-id").value = saved.id;
+    if (!options.silent) setStatus("样品单已保存。系统只记录销售流程，不处理真实支付或物流，也不会自动发送 WhatsApp 消息。");
+    return saved;
+  } catch {
+    setStatus("样品单保存失败，请确认客户和产品属于当前账号，并检查必填项。");
+    return null;
+  } finally {
+    setButtonsBusy(false);
+  }
+}
+
+async function generateSampleScriptFromSidebar(forcedScenario?: SampleScriptScenario) {
+  if (!ensureAuthenticated()) return;
+  const sample = await saveSampleOrderFromSidebar({ silent: true });
+  if (!sample?.id) return;
+
+  setButtonsBusy(true);
+  try {
+    const scenario = forcedScenario || (getSelect("wa-ai-sample-scenario").value as SampleScriptScenario);
+    const response = await apiFetch(`/api/sample-orders/${sample.id}/script`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        scenario,
+        customerLanguage: getSelect("wa-ai-language").value,
+        productContext: buildProductContext("sample"),
+        useKnowledgeBase: true
+      })
+    });
+    if (!response.ok) throw new Error("sample script failed");
+    const result = (await response.json()) as SampleScriptResponse;
+    const knowledgeUsed = result.knowledgeUsed || [];
+    getTextArea("wa-ai-sample-script").value = result.scriptText;
+    getReplyTextArea("professional").value = result.scriptText;
+    renderRisks(result.riskWarnings);
+    setStatus(`样品话术草稿已生成。${knowledgeUsed.length ? `已引用知识库：${knowledgeUsed.join("、")}。` : ""}请人工确认费用、运费、付款账户和物流信息后再发送。`);
+  } catch {
+    setStatus("样品话术生成失败，请确认样品单属于当前账号，并且 API 已启动。");
+  } finally {
+    setButtonsBusy(false);
+  }
+}
+
+function seedSampleFeedbackFollowUp() {
+  const customerId = getInput("wa-ai-customer-id").value.trim();
+  if (!customerId) return setStatus("请先保存客户后再设置样品反馈跟进。");
+  getSelect("wa-ai-follow-up-type").value = "样品反馈";
+  const deliveryDate = getInput("wa-ai-sample-delivery-date").value;
+  if (deliveryDate && !Number.isNaN(Date.parse(deliveryDate))) {
+    getInput("wa-ai-follow-up-remind-at").value = toDateTimeLocal(new Date(`${deliveryDate}T10:00:00`).toISOString());
+  } else {
+    setFollowUpDate(7);
+  }
+  getTextArea("wa-ai-follow-up-script").value =
+    getTextArea("wa-ai-sample-script").value ||
+    "Hi, did you receive and check the sample? Please share your feedback. This is only a draft and will not be sent automatically.";
+  setStatus("已填入样品反馈跟进提醒草稿，请确认提醒时间后点击保存跟进提醒。");
+}
+
+async function saveCustomRequestFromSidebar(options: { silent?: boolean } = {}) {
+  if (!ensureAuthenticated()) return null;
+  const customerId = getInput("wa-ai-customer-id").value.trim();
+  if (!customerId) {
+    setStatus("Please save the customer before creating a custom request.");
+    return null;
+  }
+
+  setButtonsBusy(true);
+  try {
+    const customId = getInput("wa-ai-custom-id").value.trim();
+    const response = await apiFetch(customId ? `/api/custom-requests/${customId}` : "/api/custom-requests", {
+      method: customId ? "PATCH" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(buildCustomRequestPayload(customerId))
+    });
+    if (!response.ok) throw new Error("custom request failed");
+    const saved = (await response.json()) as CustomRequestDetail;
+    getInput("wa-ai-custom-id").value = saved.id;
+    if (!options.silent) setStatus("Custom request saved. Scripts remain drafts only and will not auto-send WhatsApp messages.");
+    return saved;
+  } catch {
+    setStatus("Custom request save failed. Please confirm customer/product ownership and required fields.");
+    return null;
+  } finally {
+    setButtonsBusy(false);
+  }
+}
+
+async function generateCustomScriptFromSidebar(forcedScenario?: CustomScriptScenario) {
+  if (!ensureAuthenticated()) return;
+  const item = await saveCustomRequestFromSidebar({ silent: true });
+  if (!item?.id) return;
+  setButtonsBusy(true);
+  try {
+    const scenario = forcedScenario || (getSelect("wa-ai-custom-scenario").value as CustomScriptScenario);
+    const response = await apiFetch(`/api/custom-requests/${item.id}/script`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        scenario,
+        customerLanguage: getSelect("wa-ai-language").value,
+        productContext: buildProductContext("custom")
+      })
+    });
+    if (!response.ok) throw new Error("custom script failed");
+    const result = (await response.json()) as CustomScriptResponse;
+    const knowledgeUsed = result.knowledgeUsed || [];
+    getTextArea("wa-ai-custom-script").value = result.scriptText;
+    getReplyTextArea("professional").value = result.scriptText;
+    renderRisks(result.riskWarnings);
+    setStatus(`Custom script draft generated. ${knowledgeUsed.length ? `Knowledge used: ${knowledgeUsed.join(", ")}. ` : ""}Confirm MOQ, fees, lead time, files, and feasibility before sending.`);
+  } catch {
+    setStatus("Custom script generation failed. Please confirm the request belongs to the current account and API is running.");
+  } finally {
+    setButtonsBusy(false);
+  }
+}
+
+function seedCustomFollowUp() {
+  const customerId = getInput("wa-ai-customer-id").value.trim();
+  if (!customerId) return setStatus("Please save the customer before setting custom follow-up.");
+  getSelect("wa-ai-follow-up-type").value = "普通提醒";
+  setFollowUpDate(2);
+  getTextArea("wa-ai-follow-up-script").value =
+    getTextArea("wa-ai-custom-script").value ||
+    "Hi, may I confirm the customization details and files? This is only a draft and will not be sent automatically.";
+  setStatus("Custom follow-up draft is ready. Confirm the time and click save follow-up.");
+}
+
 async function generateSelectedProductIntro() {
   if (!ensureAuthenticated()) return;
   const productId = getElement<HTMLSelectElement>("wa-ai-product-select").value;
@@ -601,6 +983,36 @@ async function generateSelectedProductIntro() {
   }
 }
 
+async function generateSelectedMaterialIntro() {
+  if (!ensureAuthenticated()) return;
+  const material = selectedMaterial();
+  if (!material) return setStatus("请先选择素材。");
+
+  setButtonsBusy(true);
+  try {
+    const response = await apiFetch(`/api/materials/${material.id}/intro`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customerLanguage: getSelect("wa-ai-language").value,
+        productContext: buildProductContext("material"),
+        scenario: getTextArea("wa-ai-message").value,
+        useKnowledgeBase: true
+      })
+    });
+    if (!response.ok) throw new Error("material intro failed");
+    const result = (await response.json()) as MaterialIntroResponse;
+    getTextArea("wa-ai-material-intro").value = result.introText;
+    getReplyTextArea("professional").value = result.introText;
+    renderRisks(result.riskWarnings);
+    setStatus(`素材说明草稿已生成。${result.knowledgeUsed?.length ? `已引用知识库：${result.knowledgeUsed.join("、")}。` : ""}请人工确认后发送。`);
+  } catch {
+    setStatus("素材说明生成失败，请确认素材属于当前账号且 API 已启动。");
+  } finally {
+    setButtonsBusy(false);
+  }
+}
+
 async function saveCustomerToApi() {
   if (!ensureAuthenticated()) return;
   const payload = buildCustomerPayload();
@@ -617,9 +1029,28 @@ async function saveCustomerToApi() {
     const saved = (await response.json()) as CustomerDetail;
     getInput("wa-ai-customer-id").value = saved.id;
     await storeCustomerProfile(saved);
+    await loadCustomerIntentScore();
     setStatus(`客户已保存：${saved.name}`);
   } catch {
     setStatus("客户保存失败。请确认本地 API 和 PostgreSQL 已启动。");
+  }
+}
+
+async function loadCustomerIntentScore() {
+  if (!ensureAuthenticated()) return;
+  const customerId = getInput("wa-ai-customer-id").value.trim();
+  if (!customerId) {
+    renderCustomerIntent(null);
+    setStatus("保存客户后可计算意向分。推荐动作只作为销售建议，不会自动发送消息。");
+    return;
+  }
+  try {
+    const response = await apiFetch(`/api/customers/${customerId}/intent`);
+    if (!response.ok) throw new Error("intent failed");
+    renderCustomerIntent((await response.json()) as CustomerIntentResponse);
+  } catch {
+    renderCustomerIntent(null);
+    setStatus("意向分加载失败，请确认客户属于当前账号。");
   }
 }
 
@@ -633,7 +1064,9 @@ async function handleQuickAction(action: Exclude<QuickAction, "product" | "quote
       customerMessage,
       targetLanguage: getSelect("wa-ai-language").value,
       scenario: actionScenarioMap[action],
-      productContext: buildProductContext(action)
+      productContext: buildProductContext(action),
+      productId: selectedProduct()?.id || undefined,
+      useKnowledgeBase: true
     });
     renderAiReply(result);
     getTextArea("wa-ai-latest-summary").value = `${result.intent}；关注点：${result.concerns.join("、")}`;
@@ -663,6 +1096,7 @@ function renderAiReply(result: AiReplyResponse) {
   getReplyTextArea("short").value = result.shortReply;
   getReplyTextArea("professional").value = result.professionalReply;
   getReplyTextArea("closing").value = result.closingReply;
+  if (result.knowledgeUsed.length > 0) setStatus(`已引用知识库：${result.knowledgeUsed.join("、")}。请人工确认后发送。`);
 }
 
 function updateRecognitionStatus() {
@@ -723,6 +1157,34 @@ function selectedProductLabel() {
   return product ? `${product.name} (${product.sku})` : "";
 }
 
+function updateSelectedMaterialMeta() {
+  const material = selectedMaterial();
+  const root = getElement("wa-ai-material-meta");
+  if (!material) {
+    root.textContent = "选择素材后显示 URL 和标签。";
+    return;
+  }
+  root.textContent = `${material.type} · ${material.url} · ${material.tags.join(" / ") || "无标签"}`;
+}
+
+function selectedMaterial() {
+  const select = getElement<HTMLSelectElement>("wa-ai-material-select");
+  const materials = JSON.parse(select.dataset.materials || "[]") as MaterialSummary[];
+  return materials.find((material) => material.id === select.value);
+}
+
+function mapCustomerLanguageToMaterialLanguage(value: string) {
+  const text = value.toLowerCase();
+  if (text.includes("spanish")) return "es";
+  if (text.includes("portuguese")) return "pt";
+  if (text.includes("arabic")) return "ar";
+  if (text.includes("french")) return "fr";
+  if (text.includes("russian")) return "ru";
+  if (text.includes("chinese")) return "zh";
+  if (text.includes("english")) return "en";
+  return "";
+}
+
 function renderChips(id: string, values: string[]) {
   const root = getElement(id);
   root.replaceChildren(...values.map((value) => {
@@ -739,6 +1201,11 @@ function renderRisks(values: string[]) {
     item.textContent = value;
     return item;
   }));
+}
+
+function renderCustomerIntent(result: CustomerIntentResponse | null) {
+  getElement("wa-ai-intent-score").textContent = result ? `${result.intentScore} · ${result.intentLevel}` : "保存客户后可计算";
+  getElement("wa-ai-intent-action").textContent = result ? result.recommendedAction : "推荐动作仅作为销售建议。";
 }
 
 function updateFollowUpScript() {
@@ -786,9 +1253,63 @@ function buildCustomerPayload(): CustomerUpsertRequest {
   };
 }
 
+function buildSampleOrderPayload(customerId: string) {
+  return {
+    customerId,
+    productId: selectedProduct()?.id || null,
+    sampleName: getInput("wa-ai-sample-name").value,
+    sampleFee: getInput("wa-ai-sample-fee").value || null,
+    shippingCost: getInput("wa-ai-sample-shipping").value || null,
+    currency: getInput("wa-ai-sample-currency").value || "USD",
+    trackingNumber: getInput("wa-ai-sample-tracking").value || null,
+    expectedShipDate: getInput("wa-ai-sample-ship-date").value || null,
+    expectedDeliveryDate: getInput("wa-ai-sample-delivery-date").value || null,
+    notes: getTextArea("wa-ai-sample-notes").value || null
+  };
+}
+
+function buildCustomRequestPayload(customerId: string) {
+  return {
+    customerId,
+    productId: selectedProduct()?.id || null,
+    requestType: getSelect("wa-ai-custom-type").value,
+    logoRequired: isToggleActive("wa-ai-custom-logo"),
+    packagingRequired: isToggleActive("wa-ai-custom-packaging"),
+    colorRequirement: getInput("wa-ai-custom-color").value || null,
+    sizeRequirement: getInput("wa-ai-custom-size").value || null,
+    materialRequirement: getInput("wa-ai-custom-material").value || null,
+    quantity: getInput("wa-ai-custom-quantity").value || null,
+    moq: getInput("wa-ai-custom-moq").value || null,
+    sampleFee: getInput("wa-ai-custom-sample-fee").value || null,
+    sampleLeadTime: getInput("wa-ai-custom-sample-lead-time").value || null,
+    bulkLeadTime: getInput("wa-ai-custom-bulk-lead-time").value || null,
+    files: getTextArea("wa-ai-custom-files").value.split(/\n/).map((item) => item.trim()).filter(Boolean),
+    status: getSelect("wa-ai-custom-status").value,
+    notes: getTextArea("wa-ai-custom-notes").value || null
+  };
+}
+
 function buildProductContext(action: QuickAction) {
   const manualContext = getTextArea("wa-ai-product-context").value.trim();
-  const labels: Record<QuickAction, string> = {
+  if (action === "material") {
+    return [
+      "用户点击了发素材，需要生成素材说明草稿，不得编造价格、库存、交期、证书真实性、物流时效或付款账户。",
+      manualContext
+    ].filter(Boolean).join("\n");
+  }
+  if (action === "sample") {
+    return [
+      "用户点击了样品，需要生成样品流程话术草稿，不得编造样品费、运费、交期、付款方式、样品费抵扣规则或物流时效。",
+      manualContext
+    ].filter(Boolean).join("\n");
+  }
+  if (action === "custom") {
+    return [
+      "User clicked custom request. Generate a draft only. Do not invent MOQ, sample fee, sample lead time, bulk lead time, customization feasibility, payment terms, or file readiness.",
+      manualContext
+    ].filter(Boolean).join("\n");
+  }
+  const labels: Record<Exclude<QuickAction, "material" | "sample" | "custom">, string> = {
     translate: "用户点击了翻译。",
     reply: "用户点击了生成回复。",
     quote: "用户点击了报价，需要避免编造价格、库存、交期和运费。",
@@ -800,15 +1321,17 @@ function buildProductContext(action: QuickAction) {
 }
 
 function statusForAction(action: QuickAction, risks: string[]) {
-  const prefixMap: Record<QuickAction, string> = {
+  const prefixMap: Partial<Record<QuickAction, string>> = {
     translate: "中文翻译和回复草稿已生成。",
     reply: "三种多语言回复草稿已生成。",
     quote: "报价草稿已生成。",
     urge: "催单回复草稿已生成。",
     product: "产品介绍草稿已生成。",
+    sample: "样品话术草稿已生成。",
+    custom: "Custom script draft generated.",
     followUp: "跟进草稿已生成。"
   };
-  return `${prefixMap[action]}${risks[0] ? ` ${risks[0]}` : ""}`;
+  return `${prefixMap[action] || "素材说明草稿已生成。"}${risks[0] ? ` ${risks[0]}` : ""}`;
 }
 
 function parseTiers(value: string) {
@@ -902,6 +1425,7 @@ async function restoreCustomerProfile() {
   getTextArea("wa-ai-latest-summary").value = profile.latestSummary || "";
   getInput("wa-ai-next-follow-up").value = profile.nextFollowUpAt || "";
   getTextArea("wa-ai-notes").value = profile.notes || "";
+  if (profile.customerId) void loadCustomerIntentScore();
 }
 
 async function storeCustomerProfile(customer: CustomerDetail) {

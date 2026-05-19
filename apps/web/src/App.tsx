@@ -1,73 +1,115 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import {
-  Calculator,
-  CalendarClock,
-  Check,
-  Clock3,
-  Copy,
-  Home,
-  LogOut,
-  Package,
-  Plus,
-  RefreshCw,
-  Save,
-  Search,
-  Tag,
-  Trash2,
-  Users
-} from "lucide-react";
-import {
   AI_SAFETY_NOTE,
-  DEFAULT_CUSTOMER_STAGES,
-  DEFAULT_CUSTOMER_TAGS,
-  type CustomerDetail,
+  CUSTOM_REQUEST_STATUSES,
+  CUSTOM_REQUEST_TYPES,
+  CUSTOM_SCRIPT_SCENARIOS,
+  KNOWLEDGE_BASE_CATEGORIES,
+  KNOWLEDGE_BASE_LANGUAGES,
+  MATERIAL_LANGUAGES,
+  MATERIAL_TYPES,
+  SAMPLE_FEEDBACK_STATUSES,
+  SAMPLE_PAYMENT_STATUSES,
+  SAMPLE_SCRIPT_SCENARIOS,
+  SAMPLE_SHIPPING_STATUSES,
+  type CustomRequestStatus,
+  type CustomRequestSummary,
+  type CustomRequestType,
+  type CustomRequestUpsertRequest,
+  type CustomScriptScenario,
+  type CustomerIntentResponse,
   type CustomerSummary,
   type CustomerUpsertRequest,
   type FollowUpSummary,
   type FollowUpTaskType,
-  type FollowUpUpsertRequest,
-  type ProductDetail,
+  type KnowledgeBaseCategory,
+  type KnowledgeBaseLanguage,
+  type KnowledgeBaseSummary,
+  type KnowledgeBaseUpsertRequest,
+  type MaterialLanguage,
+  type MaterialSummary,
+  type MaterialType,
+  type MaterialUpsertRequest,
   type ProductSummary,
   type ProductUpsertRequest,
   type QuoteGenerateRequest,
   type QuoteResponse,
+  type SampleFeedbackStatus,
+  type SampleOrderSummary,
+  type SampleOrderUpsertRequest,
+  type SamplePaymentStatus,
+  type SampleScriptScenario,
+  type SampleShippingStatus,
   type WorkbenchDashboard
 } from "@wa-ai/shared";
 import {
   completeFollowUp,
+  createCustomRequest,
   createCustomer,
   createFollowUp,
+  createKnowledgeBaseItem,
+  createMaterial,
   createProduct,
+  createSampleOrder,
+  deleteCustomRequest,
   deleteCustomer,
+  deleteKnowledgeBaseItem,
+  deleteMaterial,
   deleteProduct,
+  deleteSampleOrder,
+  disableKnowledgeBaseItem,
+  enableKnowledgeBaseItem,
+  generateCustomScript,
+  generateMaterialIntro,
   generateQuote,
-  getFollowUps,
+  generateSampleScript,
+  importCsv,
+  getCustomRequest,
+  getCustomRequests,
   getCustomer,
+  getCustomerIntent,
   getCustomerQuotes,
   getCustomers,
+  getFollowUps,
+  getHighIntentCustomers,
+  getKnowledgeBase,
+  getKnowledgeBaseItem,
+  getMaterials,
   getMe,
-  getProduct,
   getProducts,
+  getSampleOrder,
+  getSampleOrders,
   getWorkbenchDashboard,
   login,
   logout,
+  recalculateCustomerIntent,
   saveQuote,
+  updateCustomRequest,
   updateCustomer,
+  updateKnowledgeBaseItem,
+  updateMaterial,
   updateProduct,
+  updateSampleOrder,
   type AuthUser
 } from "./api";
+import type { CsvImportResult, ImportExportType } from "./api";
+import { exportCsvUrl, templateCsvUrl } from "./api";
 
-type View = "dashboard" | "customers" | "products" | "quotes";
-type Filters = { tag: string; stage: string; q: string };
+type View = "dashboard" | "customers" | "products" | "quotes" | "knowledge" | "materials" | "samples" | "custom" | "importExport";
+type CustomerFilters = { q: string; tag: string; stage: string; sort: "" | "intentScore"; intentLevel: "" | "low" | "medium" | "high" };
 type ProductFilters = { q: string; category: string };
+type KnowledgeFilters = { q: string; category: string; language: string; productId: string };
+type MaterialFilters = { q: string; type: string; language: string; productId: string; tag: string };
+type SampleFilters = { q: string; customerId: string; productId: string; paymentStatus: string; shippingStatus: string; feedbackStatus: string };
+type CustomFilters = { q: string; customerId: string; productId: string; requestType: string; status: string };
 
 type CustomerForm = {
   name: string;
   whatsappNumber: string;
   country: string;
   language: string;
-  tags: string[];
+  tags: string;
   stage: string;
   interestedProduct: string;
   latestSummary: string;
@@ -79,20 +121,13 @@ type ProductForm = {
   name: string;
   sku: string;
   category: string;
-  images: string;
-  videos: string;
-  colors: string;
-  sizes: string;
-  material: string;
   moq: string;
   suggestedPrice: string;
   minPrice: string;
   leadTime: string;
   sellingPoints: string;
-  introEn: string;
-  introEs: string;
-  introPt: string;
-  introAr: string;
+  images: string;
+  videos: string;
 };
 
 type QuoteForm = {
@@ -107,27 +142,80 @@ type QuoteForm = {
   includeShipping: boolean;
   targetLanguage: string;
   tiers: string;
-  stockKnown: boolean;
-  promiseStock: boolean;
 };
 
-type FollowUpForm = {
+type KnowledgeForm = {
+  title: string;
+  category: KnowledgeBaseCategory;
+  content: string;
+  language: KnowledgeBaseLanguage;
+  productId: string;
+  enabled: boolean;
+};
+
+type MaterialForm = {
+  title: string;
+  type: MaterialType;
+  url: string;
+  description: string;
+  language: MaterialLanguage;
+  productId: string;
+  tags: string;
+};
+
+type SampleForm = {
   customerId: string;
-  taskType: FollowUpTaskType;
-  remindAt: string;
-  recommendedScript: string;
+  productId: string;
+  sampleName: string;
+  sampleFee: string;
+  shippingCost: string;
+  currency: string;
+  paymentStatus: SamplePaymentStatus;
+  shippingStatus: SampleShippingStatus;
+  trackingNumber: string;
+  feedbackStatus: SampleFeedbackStatus;
+  expectedShipDate: string;
+  expectedDeliveryDate: string;
+  notes: string;
 };
 
-const emptyFilters: Filters = { tag: "", stage: "", q: "" };
+type CustomForm = {
+  customerId: string;
+  productId: string;
+  requestType: CustomRequestType;
+  logoRequired: boolean;
+  packagingRequired: boolean;
+  colorRequirement: string;
+  sizeRequirement: string;
+  materialRequirement: string;
+  quantity: string;
+  moq: string;
+  sampleFee: string;
+  sampleLeadTime: string;
+  bulkLeadTime: string;
+  files: string;
+  status: CustomRequestStatus;
+  notes: string;
+};
+
+const CUSTOMER_TAGS = ["新客户", "高意向", "已报价", "待付款", "已成交", "售后中", "老客户", "无效客户", "需要跟进"];
+const CUSTOMER_STAGES = ["新线索", "已沟通需求", "已推荐产品", "已报价", "待付款", "已成交", "待复购", "无效客户"];
+const FOLLOW_UP_TYPES = ["报价后跟进", "催付款", "样品反馈", "老客户复购", "售后跟进", "普通提醒"] as FollowUpTaskType[];
+const IMPORT_EXPORT_TYPES: ImportExportType[] = ["customers", "products", "knowledge-base", "materials", "sample-orders", "custom-requests"];
+
+const emptyCustomerFilters: CustomerFilters = { q: "", tag: "", stage: "", sort: "", intentLevel: "" };
 const emptyProductFilters: ProductFilters = { q: "", category: "" };
-const followUpTaskTypes: FollowUpTaskType[] = ["报价后跟进", "催付款", "样品反馈", "老客户复购", "售后跟进", "普通提醒"];
+const emptyKnowledgeFilters: KnowledgeFilters = { q: "", category: "", language: "", productId: "" };
+const emptyMaterialFilters: MaterialFilters = { q: "", type: "", language: "", productId: "", tag: "" };
+const emptySampleFilters: SampleFilters = { q: "", customerId: "", productId: "", paymentStatus: "", shippingStatus: "", feedbackStatus: "" };
+const emptyCustomFilters: CustomFilters = { q: "", customerId: "", productId: "", requestType: "", status: "" };
 
 const emptyCustomerForm: CustomerForm = {
   name: "",
   whatsappNumber: "",
   country: "",
   language: "English",
-  tags: ["新客户"],
+  tags: "新客户",
   stage: "新线索",
   interestedProduct: "",
   latestSummary: "",
@@ -139,20 +227,13 @@ const emptyProductForm: ProductForm = {
   name: "",
   sku: "",
   category: "",
-  images: "",
-  videos: "",
-  colors: "",
-  sizes: "",
-  material: "",
   moq: "",
   suggestedPrice: "",
   minPrice: "",
   leadTime: "",
   sellingPoints: "",
-  introEn: "",
-  introEs: "",
-  introPt: "",
-  introAr: ""
+  images: "",
+  videos: ""
 };
 
 const emptyQuoteForm: QuoteForm = {
@@ -166,48 +247,114 @@ const emptyQuoteForm: QuoteForm = {
   leadTime: "",
   includeShipping: false,
   targetLanguage: "English",
-  tiers: "50,12.50\n100,11.80\n300,10.90",
-  stockKnown: false,
-  promiseStock: false
+  tiers: "50,12.5\n100,11.8\n300,10.9"
 };
 
-const emptyFollowUpForm: FollowUpForm = {
+const emptyKnowledgeForm: KnowledgeForm = {
+  title: "",
+  category: "company_intro",
+  content: "",
+  language: "zh",
+  productId: "",
+  enabled: true
+};
+
+const emptyMaterialForm: MaterialForm = {
+  title: "",
+  type: "image",
+  url: "",
+  description: "",
+  language: "other",
+  productId: "",
+  tags: ""
+};
+
+const emptySampleForm: SampleForm = {
   customerId: "",
-  taskType: "普通提醒",
-  remindAt: "",
-  recommendedScript: ""
+  productId: "",
+  sampleName: "",
+  sampleFee: "",
+  shippingCost: "",
+  currency: "USD",
+  paymentStatus: "unpaid",
+  shippingStatus: "pending",
+  trackingNumber: "",
+  feedbackStatus: "pending",
+  expectedShipDate: "",
+  expectedDeliveryDate: "",
+  notes: ""
+};
+
+const emptyCustomForm: CustomForm = {
+  customerId: "",
+  productId: "",
+  requestType: "logo",
+  logoRequired: false,
+  packagingRequired: false,
+  colorRequirement: "",
+  sizeRequirement: "",
+  materialRequirement: "",
+  quantity: "",
+  moq: "",
+  sampleFee: "",
+  sampleLeadTime: "",
+  bulkLeadTime: "",
+  files: "",
+  status: "draft",
+  notes: ""
 };
 
 export function App() {
   const [view, setView] = useState<View>("dashboard");
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState("Ready");
+  const [loginForm, setLoginForm] = useState({ email: "", password: "" });
+
+  const [dashboard, setDashboard] = useState<WorkbenchDashboard | null>(null);
+  const [highIntent, setHighIntent] = useState<CustomerSummary[]>([]);
   const [customers, setCustomers] = useState<CustomerSummary[]>([]);
   const [products, setProducts] = useState<ProductSummary[]>([]);
-  const [dashboard, setDashboard] = useState<WorkbenchDashboard | null>(null);
-  const [filters, setFilters] = useState<Filters>(emptyFilters);
+  const [knowledgeBase, setKnowledgeBase] = useState<KnowledgeBaseSummary[]>([]);
+  const [materials, setMaterials] = useState<MaterialSummary[]>([]);
+  const [sampleOrders, setSampleOrders] = useState<SampleOrderSummary[]>([]);
+  const [customRequests, setCustomRequests] = useState<CustomRequestSummary[]>([]);
+
+  const [customerFilters, setCustomerFilters] = useState<CustomerFilters>(emptyCustomerFilters);
   const [productFilters, setProductFilters] = useState<ProductFilters>(emptyProductFilters);
+  const [knowledgeFilters, setKnowledgeFilters] = useState<KnowledgeFilters>(emptyKnowledgeFilters);
+  const [materialFilters, setMaterialFilters] = useState<MaterialFilters>(emptyMaterialFilters);
+  const [sampleFilters, setSampleFilters] = useState<SampleFilters>(emptySampleFilters);
+  const [customFilters, setCustomFilters] = useState<CustomFilters>(emptyCustomFilters);
+
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [selectedProductId, setSelectedProductId] = useState("");
+  const [selectedKnowledgeId, setSelectedKnowledgeId] = useState("");
+  const [selectedMaterialId, setSelectedMaterialId] = useState("");
+  const [selectedSampleOrderId, setSelectedSampleOrderId] = useState("");
+  const [selectedCustomRequestId, setSelectedCustomRequestId] = useState("");
+
   const [customerForm, setCustomerForm] = useState<CustomerForm>(emptyCustomerForm);
   const [productForm, setProductForm] = useState<ProductForm>(emptyProductForm);
   const [quoteForm, setQuoteForm] = useState<QuoteForm>(emptyQuoteForm);
-  const [followUpForm, setFollowUpForm] = useState<FollowUpForm>(emptyFollowUpForm);
+  const [knowledgeForm, setKnowledgeForm] = useState<KnowledgeForm>(emptyKnowledgeForm);
+  const [materialForm, setMaterialForm] = useState<MaterialForm>(emptyMaterialForm);
+  const [sampleForm, setSampleForm] = useState<SampleForm>(emptySampleForm);
+  const [customForm, setCustomForm] = useState<CustomForm>(emptyCustomForm);
+
   const [quote, setQuote] = useState<QuoteResponse | null>(null);
   const [customerQuotes, setCustomerQuotes] = useState<QuoteResponse[]>([]);
   const [customerFollowUps, setCustomerFollowUps] = useState<FollowUpSummary[]>([]);
-  const [status, setStatus] = useState("准备就绪");
-  const [loading, setLoading] = useState(false);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
-  const [loginForm, setLoginForm] = useState({ email: "", password: "" });
+  const [customerSampleOrders, setCustomerSampleOrders] = useState<SampleOrderSummary[]>([]);
+  const [customerCustomRequests, setCustomerCustomRequests] = useState<CustomRequestSummary[]>([]);
+  const [customerIntent, setCustomerIntent] = useState<CustomerIntentResponse | null>(null);
+  const [importType, setImportType] = useState<ImportExportType>("customers");
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importResult, setImportResult] = useState<CsvImportResult | null>(null);
 
-  const selectedCustomer = useMemo(
-    () => customers.find((customer) => customer.id === selectedCustomerId),
-    [customers, selectedCustomerId]
-  );
-  const selectedProduct = useMemo(
-    () => products.find((product) => product.id === selectedProductId),
-    [products, selectedProductId]
-  );
+  const selectedCustomer = useMemo(() => customers.find((item) => item.id === selectedCustomerId), [customers, selectedCustomerId]);
+  const selectedProduct = useMemo(() => products.find((item) => item.id === selectedProductId), [products, selectedProductId]);
 
   useEffect(() => {
     void loadCurrentUser();
@@ -215,19 +362,12 @@ export function App() {
 
   useEffect(() => {
     if (!currentUser) return;
-    void loadDashboard();
-    void loadCustomers();
-    void loadProducts();
+    void refreshAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id]);
 
-  async function loadDashboard() {
-    try {
-      setDashboard(await getWorkbenchDashboard());
-    } catch {
-      setDashboard(null);
-      setStatus("首页工作台加载失败，请确认 API 和数据库已启动");
-    }
+  async function refreshAll() {
+    await Promise.all([loadDashboard(), loadCustomers(), loadProducts(), loadKnowledgeBase(), loadMaterials(), loadSampleOrders(), loadCustomRequests()]);
   }
 
   async function loadCurrentUser() {
@@ -248,9 +388,9 @@ export function App() {
     try {
       const result = await login(loginForm);
       setCurrentUser(result.user);
-      setStatus("登录成功，数据已按当前账号隔离");
+      setStatus("Login success. Data is isolated by current user.");
     } catch {
-      setStatus("登录失败，请确认邮箱、密码和数据库服务");
+      setStatus("Login failed. Check email, password, API and database.");
     } finally {
       setLoading(false);
     }
@@ -261,89 +401,142 @@ export function App() {
     setCurrentUser(null);
     setCustomers([]);
     setProducts([]);
-    setDashboard(null);
-    setSelectedCustomerId("");
-    setSelectedProductId("");
-    setQuote(null);
-    setCustomerQuotes([]);
-    setCustomerFollowUps([]);
-    setStatus("已退出登录");
+    setKnowledgeBase([]);
+    setMaterials([]);
+    setSampleOrders([]);
+    setCustomRequests([]);
+    setStatus("Logged out.");
   }
 
-  async function loadCustomers(nextFilters = filters) {
-    setLoading(true);
+  async function loadDashboard() {
     try {
-      const list = await getCustomers(nextFilters);
-      setCustomers(list);
-      if (!selectedCustomerId && list[0]) await selectCustomer(list[0].id, list);
-      if (!quoteForm.customerId && list[0]) setQuoteForm((form) => ({ ...form, customerId: list[0].id }));
-      setStatus("客户列表已同步");
+      const [nextDashboard, nextHighIntent] = await Promise.all([getWorkbenchDashboard(), getHighIntentCustomers(10)]);
+      setDashboard(nextDashboard);
+      setHighIntent(nextHighIntent);
     } catch {
-      setStatus("客户加载失败，请确认 API 和数据库已启动");
-    } finally {
-      setLoading(false);
+      setDashboard(null);
+      setHighIntent([]);
     }
   }
 
-  async function loadProducts(nextFilters = productFilters) {
-    setLoading(true);
+  async function loadCustomers(next = customerFilters) {
+    setCustomerFilters(next);
     try {
-      const list = await getProducts(nextFilters);
-      setProducts(list);
-      if (!selectedProductId && list[0]) await selectProduct(list[0].id, list);
-      if (!quoteForm.productId && list[0]) seedQuoteFromProduct(list[0]);
-      setStatus("产品列表已同步");
+      const list = await getCustomers(next);
+      setCustomers(list);
+      if (!selectedCustomerId && list[0]) await selectCustomer(list[0].id, list);
     } catch {
-      setStatus("产品加载失败，请确认 API 和数据库已启动");
-    } finally {
-      setLoading(false);
+      setStatus("Customer list failed to load.");
+    }
+  }
+
+  async function loadProducts(next = productFilters) {
+    setProductFilters(next);
+    try {
+      const list = await getProducts(next);
+      setProducts(list);
+      if (!selectedProductId && list[0]) {
+        setSelectedProductId(list[0].id);
+        setProductForm(toProductForm(list[0]));
+      }
+    } catch {
+      setStatus("Product list failed to load.");
+    }
+  }
+
+  async function loadKnowledgeBase(next = knowledgeFilters) {
+    setKnowledgeFilters(next);
+    try {
+      setKnowledgeBase(await getKnowledgeBase({
+        q: next.q,
+        category: next.category as KnowledgeBaseCategory | "",
+        language: next.language as KnowledgeBaseLanguage | "",
+        productId: next.productId
+      }));
+    } catch {
+      setStatus("Knowledge base failed to load.");
+    }
+  }
+
+  async function loadMaterials(next = materialFilters) {
+    setMaterialFilters(next);
+    try {
+      setMaterials(await getMaterials({
+        q: next.q,
+        type: next.type as MaterialType | "",
+        language: next.language as MaterialLanguage | "",
+        productId: next.productId,
+        tag: next.tag
+      }));
+    } catch {
+      setStatus("Materials failed to load.");
+    }
+  }
+
+  async function loadSampleOrders(next = sampleFilters) {
+    setSampleFilters(next);
+    try {
+      setSampleOrders(await getSampleOrders({
+        q: next.q,
+        customerId: next.customerId,
+        productId: next.productId,
+        paymentStatus: next.paymentStatus as SamplePaymentStatus | "",
+        shippingStatus: next.shippingStatus as SampleShippingStatus | "",
+        feedbackStatus: next.feedbackStatus as SampleFeedbackStatus | ""
+      }));
+    } catch {
+      setStatus("Sample orders failed to load.");
+    }
+  }
+
+  async function loadCustomRequests(next = customFilters) {
+    setCustomFilters(next);
+    try {
+      setCustomRequests(await getCustomRequests({
+        q: next.q,
+        customerId: next.customerId,
+        productId: next.productId,
+        requestType: next.requestType as CustomRequestType | "",
+        status: next.status as CustomRequestStatus | ""
+      }));
+    } catch {
+      setStatus("Custom requests failed to load.");
     }
   }
 
   async function selectCustomer(id: string, source = customers) {
     setSelectedCustomerId(id);
     setQuoteForm((form) => ({ ...form, customerId: id }));
-    setFollowUpForm((form) => ({ ...form, customerId: id }));
-    void loadCustomerQuotes(id);
-    void loadCustomerFollowUps(id);
+    setSampleForm((form) => ({ ...form, customerId: id }));
+    setCustomForm((form) => ({ ...form, customerId: id }));
     try {
-      setCustomerForm(toCustomerForm(await getCustomer(id)));
+      const [detail, quotes, followUps, samples, customItems, intent] = await Promise.all([
+        getCustomer(id),
+        getCustomerQuotes(id),
+        getFollowUps({ customerId: id }),
+        getSampleOrders({ customerId: id }),
+        getCustomRequests({ customerId: id }),
+        getCustomerIntent(id)
+      ]);
+      setCustomerForm(toCustomerForm(detail));
+      setCustomerQuotes(quotes);
+      setCustomerFollowUps(followUps);
+      setCustomerSampleOrders(samples);
+      setCustomerCustomRequests(customItems);
+      setCustomerIntent(intent);
     } catch {
-      const fallback = source.find((customer) => customer.id === id);
+      const fallback = source.find((item) => item.id === id);
       if (fallback) setCustomerForm(toCustomerForm(fallback));
-    }
-  }
-
-  async function loadCustomerQuotes(customerId: string) {
-    try {
-      setCustomerQuotes(await getCustomerQuotes(customerId));
-    } catch {
       setCustomerQuotes([]);
+      setCustomerSampleOrders([]);
+      setCustomerCustomRequests([]);
+      setCustomerIntent(null);
     }
   }
 
-  async function loadCustomerFollowUps(customerId: string) {
-    try {
-      setCustomerFollowUps(await getFollowUps({ customerId }));
-    } catch {
-      setCustomerFollowUps([]);
-    }
-  }
-
-  async function selectProduct(id: string, source = products) {
-    setSelectedProductId(id);
-    const fallback = source.find((product) => product.id === id);
-    if (fallback) seedQuoteFromProduct(fallback);
-    try {
-      const detail = await getProduct(id);
-      setProductForm(toProductForm(detail));
-      seedQuoteFromProduct(detail);
-    } catch {
-      if (fallback) setProductForm(toProductForm(fallback));
-    }
-  }
-
-  function seedQuoteFromProduct(product: ProductSummary) {
+  function selectProduct(product: ProductSummary) {
+    setSelectedProductId(product.id);
+    setProductForm(toProductForm(product));
     setQuoteForm((form) => ({
       ...form,
       productId: product.id,
@@ -351,12 +544,12 @@ export function App() {
       moq: product.moq ? String(product.moq) : form.moq,
       leadTime: product.leadTime || form.leadTime
     }));
+    setSampleForm((form) => ({ ...form, productId: product.id }));
+    setCustomForm((form) => ({ ...form, productId: product.id }));
   }
 
-  async function saveCustomer() {
-    const validation = validateCustomerForm(customerForm);
-    if (validation) return setStatus(validation);
-
+  async function saveCustomerRecord() {
+    if (!customerForm.name.trim()) return setStatus("Customer name is required.");
     setLoading(true);
     try {
       const saved = selectedCustomerId
@@ -364,20 +557,27 @@ export function App() {
         : await createCustomer(toCustomerPayload(customerForm));
       setSelectedCustomerId(saved.id);
       setCustomerForm(toCustomerForm(saved));
-      await loadCustomers(filters);
-      await loadDashboard();
-      setStatus("客户信息已保存");
+      await loadCustomers(customerFilters);
+      await selectCustomer(saved.id);
+      setStatus("Customer saved.");
     } catch {
-      setStatus("客户保存失败，请检查必填项和数据库连接");
+      setStatus("Customer save failed.");
     } finally {
       setLoading(false);
     }
   }
 
-  async function saveProduct() {
-    const validation = validateProductForm(productForm);
-    if (validation) return setStatus(validation);
+  async function removeCustomer() {
+    if (!selectedCustomerId || !window.confirm("Delete this customer?")) return;
+    await deleteCustomer(selectedCustomerId);
+    setSelectedCustomerId("");
+    setCustomerForm(emptyCustomerForm);
+    await loadCustomers(customerFilters);
+    setStatus("Customer deleted.");
+  }
 
+  async function saveProductRecord() {
+    if (!productForm.name.trim() || !productForm.sku.trim()) return setStatus("Product name and SKU are required.");
     setLoading(true);
     try {
       const saved = selectedProductId
@@ -386,983 +586,1115 @@ export function App() {
       setSelectedProductId(saved.id);
       setProductForm(toProductForm(saved));
       await loadProducts(productFilters);
-      setStatus("产品资料已保存");
+      setStatus("Product saved.");
     } catch {
-      setStatus("产品保存失败，请检查 SKU 是否重复，以及数据库连接是否正常");
+      setStatus("Product save failed. Check SKU uniqueness and required fields.");
     } finally {
       setLoading(false);
     }
   }
 
-  async function removeCustomer() {
-    if (!selectedCustomerId || !window.confirm("确定删除这个客户吗？")) return;
-    await deleteCustomer(selectedCustomerId);
-    setSelectedCustomerId("");
-    setCustomerForm(emptyCustomerForm);
-    setCustomerQuotes([]);
-    setCustomerFollowUps([]);
-    await loadCustomers(filters);
-    await loadDashboard();
-    setStatus("客户已删除");
-  }
-
   async function removeProduct() {
-    if (!selectedProductId || !window.confirm("确定删除这个产品吗？")) return;
+    if (!selectedProductId || !window.confirm("Delete this product?")) return;
     await deleteProduct(selectedProductId);
     setSelectedProductId("");
     setProductForm(emptyProductForm);
     await loadProducts(productFilters);
-    setStatus("产品已删除");
+    setStatus("Product deleted.");
   }
 
-  async function handleGenerateQuote() {
-    const validation = validateQuoteForm(quoteForm, false);
-    if (validation) return setStatus(validation);
-
+  async function generateAndSaveQuote() {
+    if (!quoteForm.productId || !quoteForm.customerId) return setStatus("Customer and product are required for quote.");
     setLoading(true);
     try {
-      const result = await generateQuote(toQuotePayload(quoteForm));
-      setQuote(result);
-      setStatus(result.followUpPrompt);
+      const payload = toQuotePayload(quoteForm);
+      const generated = await generateQuote(payload);
+      const saved = await saveQuote({ ...payload, customerId: quoteForm.customerId, quoteText: generated.quoteText });
+      setQuote(saved);
+      await selectCustomer(quoteForm.customerId);
+      await loadDashboard();
+      setStatus("Quote generated and saved as draft text. No WhatsApp message was sent.");
     } catch {
-      setStatus("报价生成失败，请检查产品、数量和单价");
+      setStatus("Quote generation failed.");
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleSaveQuote() {
-    const validation = validateQuoteForm(quoteForm, true);
-    if (validation) return setStatus(validation);
-
+  async function saveKnowledgeRecord() {
+    if (!knowledgeForm.title.trim() || !knowledgeForm.content.trim()) return setStatus("Knowledge title and content are required.");
     setLoading(true);
     try {
-      const result = await saveQuote({
-        ...toQuotePayload(quoteForm),
-        customerId: quoteForm.customerId,
-        quoteText: quote?.quoteText
+      const payload: KnowledgeBaseUpsertRequest = {
+        title: knowledgeForm.title,
+        category: knowledgeForm.category,
+        content: knowledgeForm.content,
+        language: knowledgeForm.language,
+        productId: knowledgeForm.productId || null,
+        enabled: knowledgeForm.enabled
+      };
+      const saved = selectedKnowledgeId ? await updateKnowledgeBaseItem(selectedKnowledgeId, payload) : await createKnowledgeBaseItem(payload);
+      setSelectedKnowledgeId(saved.id);
+      setKnowledgeForm(toKnowledgeForm(saved));
+      await loadKnowledgeBase(knowledgeFilters);
+      setStatus("Knowledge saved. AI only uses it as draft context.");
+    } catch {
+      setStatus("Knowledge save failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function removeKnowledge(id: string) {
+    await deleteKnowledgeBaseItem(id);
+    if (selectedKnowledgeId === id) {
+      setSelectedKnowledgeId("");
+      setKnowledgeForm(emptyKnowledgeForm);
+    }
+    await loadKnowledgeBase(knowledgeFilters);
+  }
+
+  async function saveMaterialRecord() {
+    if (!materialForm.title.trim() || !materialForm.url.trim()) return setStatus("Material title and URL are required.");
+    setLoading(true);
+    try {
+      const payload: MaterialUpsertRequest = {
+        title: materialForm.title,
+        type: materialForm.type,
+        url: materialForm.url,
+        description: materialForm.description || null,
+        language: materialForm.language,
+        productId: materialForm.productId || null,
+        tags: splitLinesOrComma(materialForm.tags)
+      };
+      const saved = selectedMaterialId ? await updateMaterial(selectedMaterialId, payload) : await createMaterial(payload);
+      setSelectedMaterialId(saved.id);
+      setMaterialForm(toMaterialForm(saved));
+      await loadMaterials(materialFilters);
+      setStatus("Material saved. Material intro remains a draft only.");
+    } catch {
+      setStatus("Material save failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function generateMaterialDescription(id = selectedMaterialId) {
+    if (!id) return setStatus("Select a material first.");
+    setLoading(true);
+    try {
+      const result = await generateMaterialIntro(id, {
+        customerLanguage: selectedCustomer?.language || materialForm.language,
+        productContext: selectedProduct ? `${selectedProduct.name} ${selectedProduct.sku}` : "",
+        useKnowledgeBase: true
       });
-      setQuote(result);
-      if (result.customerId) await loadCustomerQuotes(result.customerId);
-      seedQuoteFollowUp(result.customerId || quoteForm.customerId);
-      setStatus(`${result.followUpPrompt} 可在客户详情里一键保存报价后跟进提醒。`);
+      setMaterialForm((form) => ({ ...form, description: result.introText }));
+      setStatus(`Material draft generated. ${result.riskWarnings[0] || ""}`);
     } catch {
-      setStatus("报价保存失败，请确认客户、产品和数据库连接");
+      setStatus("Material draft generation failed.");
     } finally {
       setLoading(false);
     }
   }
 
-  function seedQuoteFollowUp(customerId: string) {
-    if (!customerId) return;
-    setFollowUpForm({
-      customerId,
-      taskType: "报价后跟进",
-      remindAt: toDateTimeLocal(new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()),
-      recommendedScript: defaultFollowUpScript("报价后跟进")
+  async function removeMaterial(id: string) {
+    await deleteMaterial(id);
+    if (selectedMaterialId === id) {
+      setSelectedMaterialId("");
+      setMaterialForm(emptyMaterialForm);
+    }
+    await loadMaterials(materialFilters);
+  }
+
+  async function saveSampleRecord() {
+    if (!sampleForm.customerId || !sampleForm.sampleName.trim()) return setStatus("Customer and sample name are required.");
+    setLoading(true);
+    try {
+      const payload: SampleOrderUpsertRequest = {
+        customerId: sampleForm.customerId,
+        productId: sampleForm.productId || null,
+        sampleName: sampleForm.sampleName,
+        sampleFee: sampleForm.sampleFee || null,
+        shippingCost: sampleForm.shippingCost || null,
+        currency: sampleForm.currency || "USD",
+        paymentStatus: sampleForm.paymentStatus,
+        shippingStatus: sampleForm.shippingStatus,
+        trackingNumber: sampleForm.trackingNumber || null,
+        feedbackStatus: sampleForm.feedbackStatus,
+        expectedShipDate: sampleForm.expectedShipDate || null,
+        expectedDeliveryDate: sampleForm.expectedDeliveryDate || null,
+        notes: sampleForm.notes || null
+      };
+      const saved = selectedSampleOrderId ? await updateSampleOrder(selectedSampleOrderId, payload) : await createSampleOrder(payload);
+      setSelectedSampleOrderId(saved.id);
+      setSampleForm(toSampleForm(saved));
+      await loadSampleOrders(sampleFilters);
+      if (sampleForm.customerId) await selectCustomer(sampleForm.customerId);
+      setStatus("Sample order saved.");
+    } catch {
+      setStatus("Sample order save failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function generateSelectedSampleScript(scenario: SampleScriptScenario) {
+    if (!selectedSampleOrderId) return setStatus("Select or save a sample order first.");
+    setLoading(true);
+    try {
+      const result = await generateSampleScript(selectedSampleOrderId, {
+        scenario,
+        customerLanguage: selectedCustomer?.language || "English",
+        productContext: selectedProduct ? `${selectedProduct.name} ${selectedProduct.sku}` : ""
+      });
+      setSampleForm((form) => ({ ...form, notes: result.scriptText }));
+      setStatus(`Sample script generated as draft. ${result.riskWarnings[0] || ""}`);
+    } catch {
+      setStatus("Sample script generation failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function removeSample(id: string) {
+    await deleteSampleOrder(id);
+    if (selectedSampleOrderId === id) {
+      setSelectedSampleOrderId("");
+      setSampleForm(emptySampleForm);
+    }
+    await loadSampleOrders(sampleFilters);
+  }
+
+  async function saveCustomRecord() {
+    if (!customForm.customerId) return setStatus("Customer is required for custom request.");
+    setLoading(true);
+    try {
+      const payload = toCustomPayload(customForm);
+      const saved = selectedCustomRequestId ? await updateCustomRequest(selectedCustomRequestId, payload) : await createCustomRequest(payload);
+      setSelectedCustomRequestId(saved.id);
+      setCustomForm(toCustomForm(saved));
+      await loadCustomRequests(customFilters);
+      if (customForm.customerId) await selectCustomer(customForm.customerId);
+      setStatus("Custom request saved. It is only a sales record, not production scheduling.");
+    } catch {
+      setStatus("Custom request save failed. Check customer/product ownership and required fields.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function generateSelectedCustomScript(scenario: CustomScriptScenario) {
+    if (!selectedCustomRequestId) return setStatus("Select or save a custom request first.");
+    setLoading(true);
+    try {
+      const result = await generateCustomScript(selectedCustomRequestId, {
+        scenario,
+        customerLanguage: selectedCustomer?.language || "English",
+        productContext: selectedProduct ? `${selectedProduct.name} ${selectedProduct.sku}` : ""
+      });
+      setCustomForm((form) => ({ ...form, notes: result.scriptText }));
+      setStatus(`Custom script generated as draft. ${result.riskWarnings[0] || ""}`);
+    } catch {
+      setStatus("Custom script generation failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function removeCustom(id: string) {
+    await deleteCustomRequest(id);
+    if (selectedCustomRequestId === id) {
+      setSelectedCustomRequestId("");
+      setCustomForm(emptyCustomForm);
+    }
+    await loadCustomRequests(customFilters);
+  }
+
+  async function createCustomFollowUp() {
+    if (!customForm.customerId) return setStatus("Select a customer before creating a follow-up.");
+    await createFollowUp({
+      customerId: customForm.customerId,
+      taskType: FOLLOW_UP_TYPES[5],
+      remindAt: tomorrowIso(),
+      recommendedScript: customForm.notes || "Please confirm the custom requirements, files, MOQ, sample fee and lead time."
     });
-    if (selectedCustomerId !== customerId) setSelectedCustomerId(customerId);
+    await loadDashboard();
+    await selectCustomer(customForm.customerId);
+    setStatus("Custom follow-up reminder created. No WhatsApp message was sent.");
   }
 
-  async function saveFollowUp() {
-    const validation = validateFollowUpForm(followUpForm);
-    if (validation) return setStatus(validation);
-
-    setLoading(true);
-    try {
-      const payload = toFollowUpPayload(followUpForm);
-      const saved = await createFollowUp(payload);
-      setFollowUpForm({ ...emptyFollowUpForm, customerId: saved.customerId, taskType: "普通提醒" });
-      await loadCustomerFollowUps(saved.customerId);
-      await loadDashboard();
-      setStatus("跟进提醒已保存，只会作为任务提示，不会自动发送 WhatsApp 消息。");
-    } catch {
-      setStatus("跟进提醒保存失败，请确认已选择当前账号下的客户并填写提醒时间");
-    } finally {
-      setLoading(false);
-    }
+  async function refreshIntent() {
+    if (!selectedCustomerId) return;
+    const result = await recalculateCustomerIntent(selectedCustomerId);
+    setCustomerIntent(result);
+    await loadCustomers(customerFilters);
+    await loadDashboard();
+    setStatus("Intent score recalculated. It is only a sales assistant signal.");
   }
 
-  async function completeTask(task: FollowUpSummary) {
-    setLoading(true);
-    try {
-      await completeFollowUp(task.id);
-      if (selectedCustomerId) await loadCustomerFollowUps(selectedCustomerId);
-      await loadDashboard();
-      setStatus("跟进任务已标记完成");
-    } catch {
-      setStatus("跟进任务更新失败，请刷新后重试");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function setFollowUpTime(days: number) {
-    const next = new Date();
-    next.setDate(next.getDate() + days);
-    next.setHours(10, 0, 0, 0);
-    setFollowUpForm((form) => ({
-      ...form,
-      customerId: form.customerId || selectedCustomerId,
-      remindAt: toDateTimeLocal(next.toISOString()),
-      recommendedScript: form.recommendedScript || defaultFollowUpScript(form.taskType)
-    }));
+  async function markTaskDone(id: string) {
+    await completeFollowUp(id);
+    await loadDashboard();
+    if (selectedCustomerId) await selectCustomer(selectedCustomerId);
   }
 
   if (authLoading) {
-    return (
-      <main className="auth-shell">
-        <section className="auth-card">
-          <div className="brand-mark">WA</div>
-          <h1>正在检查登录状态</h1>
-          <p>请稍候。</p>
-        </section>
-      </main>
-    );
+    return <div className="auth-shell"><div className="auth-card">Loading...</div></div>;
   }
 
   if (!currentUser) {
     return (
-      <main className="auth-shell">
+      <div className="auth-shell">
         <form className="auth-card" onSubmit={handleLogin}>
-          <div className="brand-mark">WA</div>
-          <h1>WhatsApp AI 销售助手</h1>
-          <p>使用个人账号登录后，客户、产品、报价和跟进数据会按账号隔离保存。</p>
-          <Field label="邮箱">
-            <input
-              type="email"
-              value={loginForm.email}
-              onChange={(event) => setLoginForm({ ...loginForm, email: event.target.value })}
-            />
-          </Field>
-          <Field label="密码">
-            <input
-              type="password"
-              value={loginForm.password}
-              onChange={(event) => setLoginForm({ ...loginForm, password: event.target.value })}
-            />
-          </Field>
-          <button type="submit" disabled={loading}>
-            登录
-          </button>
-          <p className="empty-note">{status}</p>
+          <h1>WhatsApp AI Sales Assistant</h1>
+          <p>Sign in to manage your own customers, products, quotes, follow-ups and V2 custom workflow.</p>
+          <label className="field">
+            <span>Email</span>
+            <input value={loginForm.email} onChange={(event) => setLoginForm({ ...loginForm, email: event.target.value })} />
+          </label>
+          <label className="field">
+            <span>Password</span>
+            <input type="password" value={loginForm.password} onChange={(event) => setLoginForm({ ...loginForm, password: event.target.value })} />
+          </label>
+          <button disabled={loading}>Login</button>
+          <p>{status}</p>
         </form>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="app-shell">
+    <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-mark">WA</div>
           <div>
-            <h1>WhatsApp AI 销售助手</h1>
-            <p>V1 管理后台</p>
+            <h1>AI Sales Assistant</h1>
+            <p>V2 internal build</p>
           </div>
         </div>
-
-        <nav className="nav-list" aria-label="主导航">
-          <button className={view === "dashboard" ? "active" : ""} type="button" onClick={() => setView("dashboard")}>
-            <Home size={18} />
-            首页
-          </button>
-          <button className={view === "customers" ? "active" : ""} type="button" onClick={() => setView("customers")}>
-            <Users size={18} />
-            客户
-          </button>
-          <button className={view === "products" ? "active" : ""} type="button" onClick={() => setView("products")}>
-            <Package size={18} />
-            产品
-          </button>
-          <button className={view === "quotes" ? "active" : ""} type="button" onClick={() => setView("quotes")}>
-            <Calculator size={18} />
-            报价
-          </button>
-          <button className={view === "dashboard" ? "active" : ""} type="button" onClick={() => setView("dashboard")}>
-            <CalendarClock size={18} />
-            跟进
-          </button>
+        <nav className="nav-list">
+          {navButton("dashboard", "Home")}
+          {navButton("customers", "Customers")}
+          {navButton("products", "Products")}
+          {navButton("quotes", "Quotes")}
+          {navButton("knowledge", "Knowledge")}
+          {navButton("materials", "Materials")}
+          {navButton("samples", "Samples")}
+          {navButton("custom", "Custom")}
+          {navButton("importExport", "Import / Export")}
         </nav>
       </aside>
-
-      <section className="workspace">
+      <main className="workspace">
         <header className="topbar">
           <div>
-            <p className="eyebrow">{viewEyebrow(view)}</p>
-            <h2>{viewTitle(view)}</h2>
+            <p className="eyebrow">Current user: {currentUser.email}</p>
+            <h2>{titleForView(view)}</h2>
+            <p>{status}</p>
           </div>
           <div className="topbar-actions">
-            <span className="user-chip">{currentUser.name}</span>
-            <button className="secondary-button" type="button" onClick={startNew}>
-              <Plus size={16} />
-              新建
-            </button>
-            <button className="icon-button" type="button" onClick={refreshCurrent} title="刷新">
-              <RefreshCw size={18} />
-            </button>
-            <button className="icon-button" type="button" onClick={handleLogout} title="退出登录">
-              <LogOut size={18} />
-            </button>
+            <span className="user-chip">{currentUser.name || currentUser.email}</span>
+            <button className="secondary-button" onClick={refreshAll} disabled={loading}>Refresh</button>
+            <button className="secondary-button" onClick={handleLogout}>Logout</button>
           </div>
         </header>
-
-        {view === "dashboard" ? renderDashboardView() : null}
-        {view === "customers" ? renderCustomerView() : null}
-        {view === "products" ? renderProductView() : null}
-        {view === "quotes" ? renderQuoteView() : null}
-      </section>
-    </main>
-  );
-
-  function startNew() {
-    if (view === "dashboard") {
-      setView("customers");
-      setSelectedCustomerId("");
-      setCustomerForm(emptyCustomerForm);
-    } else if (view === "customers") {
-      setSelectedCustomerId("");
-      setCustomerForm(emptyCustomerForm);
-    } else if (view === "products") {
-      setSelectedProductId("");
-      setProductForm(emptyProductForm);
-    } else {
-      setQuote(null);
-      setQuoteForm(emptyQuoteForm);
-    }
-  }
-
-  function refreshCurrent() {
-    if (view === "dashboard") void loadDashboard();
-    else if (view === "customers") void loadCustomers();
-    else if (view === "products") void loadProducts();
-    else {
-      void loadCustomers();
-      void loadProducts();
-    }
-  }
-
-  function renderDashboardView() {
-    const today = dashboard?.today || [];
-    const overdue = dashboard?.overdue || [];
-    const future = dashboard?.future || [];
-    const quoted = dashboard?.quotedWithoutFollowUp || [];
-    const highIntent = dashboard?.highIntent || [];
-    const recent = dashboard?.recentCustomers || [];
-
-    return (
-      <>
-        <section className="metrics" aria-label="首页跟进概览">
-          <Metric label="今日待跟进" value={today.length} />
-          <Metric label="逾期未跟进" value={overdue.length} />
-          <Metric label="未来待跟进" value={future.length} />
-        </section>
-
-        <section className="dashboard-grid">
-          <FollowUpPanel title="今日待跟进" items={today} empty="今天暂无待跟进任务" onComplete={completeTask} onOpen={openTaskCustomer} />
-          <FollowUpPanel title="逾期未跟进" items={overdue} empty="暂无逾期任务" onComplete={completeTask} onOpen={openTaskCustomer} />
-          <FollowUpPanel title="未来待跟进" items={future} empty="暂无未来跟进任务" onComplete={completeTask} onOpen={openTaskCustomer} />
-          <CustomerPanel title="已报价未跟进客户" items={quoted} empty="暂无已报价未跟进客户" onOpen={openCustomerFromDashboard} />
-          <CustomerPanel title="高意向待跟进客户" items={highIntent} empty="暂无高意向待跟进客户" onOpen={openCustomerFromDashboard} />
-          <CustomerPanel title="最近新增客户" items={recent} empty="暂无客户数据" onOpen={openCustomerFromDashboard} />
-        </section>
-      </>
-    );
-  }
-
-  function openTaskCustomer(task: FollowUpSummary) {
-    setView("customers");
-    void selectCustomer(task.customerId);
-  }
-
-  function openCustomerFromDashboard(customer: CustomerSummary) {
-    setView("customers");
-    void selectCustomer(customer.id);
-  }
-
-  function renderCustomerView() {
-    return (
-      <>
-        <section className="metrics" aria-label="客户概览">
-          <Metric label="客户总数" value={customers.length} />
-          <Metric label="待跟进" value={customers.filter((item) => item.tags.includes("需要跟进")).length} />
-          <Metric label="已成交" value={customers.filter((item) => item.stage === "已成交").length} />
-        </section>
-
-        <section className="customer-layout">
-          <div className="panel">
-            <PanelHeader title="客户列表" desc="按标签、销售阶段和关键词筛选" icon={<Search size={20} />} />
-            <div className="filters">
-              <input
-                aria-label="搜索客户"
-                placeholder="搜索名称、号码、国家、产品"
-                value={filters.q}
-                onChange={(event) => setFilters({ ...filters, q: event.target.value })}
-                onKeyDown={(event) => event.key === "Enter" && void loadCustomers(filters)}
-              />
-              <select value={filters.tag} onChange={(event) => loadCustomers({ ...filters, tag: event.target.value })}>
-                <option value="">全部标签</option>
-                {DEFAULT_CUSTOMER_TAGS.map((tag) => (
-                  <option key={tag} value={tag}>
-                    {tag}
-                  </option>
-                ))}
-              </select>
-              <select value={filters.stage} onChange={(event) => loadCustomers({ ...filters, stage: event.target.value })}>
-                <option value="">全部阶段</option>
-                {DEFAULT_CUSTOMER_STAGES.map((stage) => (
-                  <option key={stage} value={stage}>
-                    {stage}
-                  </option>
-                ))}
-              </select>
-              <button type="button" onClick={() => loadCustomers(filters)}>
-                <Search size={16} />
-                筛选
-              </button>
-            </div>
-            <div className="customer-list">
-              {customers.map((customer) => (
-                <button
-                  className={`customer-row ${customer.id === selectedCustomerId ? "selected" : ""}`}
-                  key={customer.id}
-                  type="button"
-                  onClick={() => selectCustomer(customer.id)}
-                >
-                  <div>
-                    <strong>{customer.name}</strong>
-                    <span>{customer.whatsappNumber || "未填写号码"} · {customer.country || "未知国家"}</span>
-                  </div>
-                  <div className="row-meta">
-                    <b>{customer.stage}</b>
-                    {customer.nextFollowUpAt ? <time>{formatDateTime(customer.nextFollowUpAt)}</time> : null}
-                  </div>
-                  <TagList values={customer.tags} />
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="panel detail-panel">
-            <PanelHeader title={selectedCustomer?.name || "客户详情"} desc="保存标签、阶段、备注和跟进时间" icon={<Tag size={20} />} />
-            <div className="form-grid">
-              <Field label="客户名称" required>
-                <input value={customerForm.name} onChange={(event) => setCustomerForm({ ...customerForm, name: event.target.value })} />
-              </Field>
-              <Field label="WhatsApp 号码">
-                <input value={customerForm.whatsappNumber} onChange={(event) => setCustomerForm({ ...customerForm, whatsappNumber: event.target.value })} />
-              </Field>
-              <Field label="国家">
-                <input value={customerForm.country} onChange={(event) => setCustomerForm({ ...customerForm, country: event.target.value })} />
-              </Field>
-              <Field label="语言">
-                <LanguageSelect value={customerForm.language} onChange={(language) => setCustomerForm({ ...customerForm, language })} />
-              </Field>
-              <Field label="销售阶段">
-                <select value={customerForm.stage} onChange={(event) => setCustomerForm({ ...customerForm, stage: event.target.value })}>
-                  {DEFAULT_CUSTOMER_STAGES.map((stage) => <option key={stage}>{stage}</option>)}
-                </select>
-              </Field>
-              <Field label="下次跟进时间">
-                <input type="datetime-local" value={customerForm.nextFollowUpAt} onChange={(event) => setCustomerForm({ ...customerForm, nextFollowUpAt: event.target.value })} />
-              </Field>
-              <Field label="意向产品">
-                <input value={customerForm.interestedProduct} onChange={(event) => setCustomerForm({ ...customerForm, interestedProduct: event.target.value })} />
-              </Field>
-            </div>
-            <div className="tag-picker">
-              {DEFAULT_CUSTOMER_TAGS.map((tag) => (
-                <label key={tag} className={customerForm.tags.includes(tag) ? "checked" : ""}>
-                  <input type="checkbox" checked={customerForm.tags.includes(tag)} onChange={() => setCustomerForm({ ...customerForm, tags: toggleTag(customerForm.tags, tag) })} />
-                  <Check size={14} />
-                  {tag}
-                </label>
-              ))}
-            </div>
-            <Field label="最近沟通摘要">
-              <textarea rows={4} value={customerForm.latestSummary} onChange={(event) => setCustomerForm({ ...customerForm, latestSummary: event.target.value })} />
-            </Field>
-            <Field label="备注">
-              <textarea rows={5} value={customerForm.notes} onChange={(event) => setCustomerForm({ ...customerForm, notes: event.target.value })} />
-            </Field>
-            <section className="quote-history" aria-label="客户报价记录">
-              <div className="section-subhead">
-                <strong>报价记录</strong>
-                <span>{customerQuotes.length} 条</span>
-              </div>
-              {customerQuotes.length === 0 ? (
-                <p className="empty-note">暂无报价记录。可在报价助手生成后保存到客户。</p>
-              ) : (
-                <div className="quote-history-list">
-                  {customerQuotes.map((item) => (
-                    <article key={item.id} className="quote-history-item">
-                      <div>
-                        <strong>
-                          {item.currency} {item.unitPrice} / pc
-                        </strong>
-                        <span>
-                          {item.quantity} pcs · MOQ {item.moq || "-"} · {item.leadTime || "交期待确认"}
-                        </span>
-                      </div>
-                      <time>{item.createdAt ? formatDateTime(item.createdAt) : ""}</time>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </section>
-            <section className="quote-history" id="follow-up" aria-label="客户跟进任务">
-              <div className="section-subhead">
-                <strong>跟进任务</strong>
-                <span>{customerFollowUps.length} 条</span>
-              </div>
-              <div className="form-grid">
-                <Field label="任务类型">
-                  <select
-                    value={followUpForm.taskType}
-                    onChange={(event) =>
-                      setFollowUpForm({
-                        ...followUpForm,
-                        taskType: event.target.value as FollowUpTaskType,
-                        recommendedScript: defaultFollowUpScript(event.target.value as FollowUpTaskType)
-                      })
-                    }
-                  >
-                    {followUpTaskTypes.map((taskType) => <option key={taskType}>{taskType}</option>)}
-                  </select>
-                </Field>
-                <Field label="提醒时间">
-                  <input
-                    type="datetime-local"
-                    value={followUpForm.remindAt}
-                    onChange={(event) => setFollowUpForm({ ...followUpForm, remindAt: event.target.value })}
-                  />
-                </Field>
-              </div>
-              <div className="quick-time-row">
-                <button type="button" onClick={() => setFollowUpTime(1)}>明天</button>
-                <button type="button" onClick={() => setFollowUpTime(3)}>3 天后</button>
-                <button type="button" onClick={() => setFollowUpTime(7)}>下周</button>
-              </div>
-              <Field label="推荐话术草稿">
-                <textarea
-                  rows={4}
-                  value={followUpForm.recommendedScript}
-                  onChange={(event) => setFollowUpForm({ ...followUpForm, recommendedScript: event.target.value })}
-                />
-              </Field>
-              <div className="detail-actions">
-                <button type="button" onClick={saveFollowUp} disabled={loading || !selectedCustomerId}>
-                  <CalendarClock size={16} />
-                  新增跟进
-                </button>
-              </div>
-              {customerFollowUps.length === 0 ? (
-                <p className="empty-note">暂无跟进记录。可从侧边栏、报价后流程或这里新增。</p>
-              ) : (
-                <div className="quote-history-list">
-                  {customerFollowUps.map((task) => (
-                    <article key={task.id} className="quote-history-item">
-                      <div>
-                        <strong>{task.taskType} · {task.status}</strong>
-                        <span>{task.recommendedScript}</span>
-                      </div>
-                      <div className="task-side">
-                        <time>{formatDateTime(task.remindAt)}</time>
-                        {task.status === "pending" ? (
-                          <button type="button" onClick={() => completeTask(task)} disabled={loading}>
-                            <Check size={14} />
-                            完成
-                          </button>
-                        ) : null}
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </section>
-            <ActionFooter status={status} onSave={saveCustomer} onDelete={removeCustomer} canDelete={Boolean(selectedCustomerId)} loading={loading} />
-          </div>
-        </section>
-      </>
-    );
-  }
-
-  function renderProductView() {
-    const categories = Array.from(new Set(products.map((product) => product.category).filter(Boolean))) as string[];
-    return (
-      <>
-        <section className="metrics" aria-label="产品概览">
-          <Metric label="产品总数" value={products.length} />
-          <Metric label="类目数" value={categories.length} />
-          <Metric label="有西语介绍" value={products.filter((item) => Boolean(item.introEs)).length} />
-        </section>
-
-        <section className="customer-layout">
-          <div className="panel">
-            <PanelHeader title="产品列表" desc="按名称、SKU、类目搜索" icon={<Package size={20} />} />
-            <div className="filters product-filters">
-              <input
-                aria-label="搜索产品"
-                placeholder="搜索名称、SKU、类目"
-                value={productFilters.q}
-                onChange={(event) => setProductFilters({ ...productFilters, q: event.target.value })}
-                onKeyDown={(event) => event.key === "Enter" && void loadProducts(productFilters)}
-              />
-              <select value={productFilters.category} onChange={(event) => loadProducts({ ...productFilters, category: event.target.value })}>
-                <option value="">全部类目</option>
-                {categories.map((category) => <option key={category}>{category}</option>)}
-              </select>
-              <button type="button" onClick={() => loadProducts(productFilters)}>
-                <Search size={16} />
-                搜索
-              </button>
-            </div>
-            <div className="customer-list">
-              {products.map((product) => (
-                <button
-                  className={`customer-row ${product.id === selectedProductId ? "selected" : ""}`}
-                  key={product.id}
-                  type="button"
-                  onClick={() => selectProduct(product.id)}
-                >
-                  <div>
-                    <strong>{product.name}</strong>
-                    <span>{product.sku} · {product.category || "未分类"}</span>
-                  </div>
-                  <div className="row-meta">
-                    <b>{product.suggestedPrice ? `USD ${product.suggestedPrice}` : "待定价"}</b>
-                    <span>MOQ {product.moq || "-"}</span>
-                  </div>
-                  <TagList values={product.sellingPoints.slice(0, 3)} />
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="panel detail-panel">
-            <PanelHeader title={selectedProduct?.name || "产品详情"} desc="维护多语言介绍、卖点、图片和价格" icon={<Package size={20} />} />
-            <div className="form-grid">
-              <Field label="产品名称" required><input value={productForm.name} onChange={(event) => setProductForm({ ...productForm, name: event.target.value })} /></Field>
-              <Field label="SKU" required><input value={productForm.sku} onChange={(event) => setProductForm({ ...productForm, sku: event.target.value })} /></Field>
-              <Field label="类目"><input value={productForm.category} onChange={(event) => setProductForm({ ...productForm, category: event.target.value })} /></Field>
-              <Field label="材质"><input value={productForm.material} onChange={(event) => setProductForm({ ...productForm, material: event.target.value })} /></Field>
-              <Field label="MOQ"><input type="number" min="0" value={productForm.moq} onChange={(event) => setProductForm({ ...productForm, moq: event.target.value })} /></Field>
-              <Field label="交期"><input value={productForm.leadTime} onChange={(event) => setProductForm({ ...productForm, leadTime: event.target.value })} /></Field>
-              <Field label="建议价"><input type="number" min="0" step="0.01" value={productForm.suggestedPrice} onChange={(event) => setProductForm({ ...productForm, suggestedPrice: event.target.value })} /></Field>
-              <Field label="底价"><input type="number" min="0" step="0.01" value={productForm.minPrice} onChange={(event) => setProductForm({ ...productForm, minPrice: event.target.value })} /></Field>
-            </div>
-            <Field label="图片 URL（逗号或换行分隔）"><textarea rows={2} value={productForm.images} onChange={(event) => setProductForm({ ...productForm, images: event.target.value })} /></Field>
-            <Field label="视频 URL（逗号或换行分隔）"><textarea rows={2} value={productForm.videos} onChange={(event) => setProductForm({ ...productForm, videos: event.target.value })} /></Field>
-            <div className="form-grid">
-              <Field label="颜色"><textarea rows={2} value={productForm.colors} onChange={(event) => setProductForm({ ...productForm, colors: event.target.value })} /></Field>
-              <Field label="尺寸"><textarea rows={2} value={productForm.sizes} onChange={(event) => setProductForm({ ...productForm, sizes: event.target.value })} /></Field>
-            </div>
-            <Field label="卖点 sellingPoints（逗号或换行分隔）"><textarea rows={3} value={productForm.sellingPoints} onChange={(event) => setProductForm({ ...productForm, sellingPoints: event.target.value })} /></Field>
-            <div className="form-grid">
-              <Field label="英文介绍"><textarea rows={4} value={productForm.introEn} onChange={(event) => setProductForm({ ...productForm, introEn: event.target.value })} /></Field>
-              <Field label="西语介绍"><textarea rows={4} value={productForm.introEs} onChange={(event) => setProductForm({ ...productForm, introEs: event.target.value })} /></Field>
-              <Field label="葡语介绍"><textarea rows={4} value={productForm.introPt} onChange={(event) => setProductForm({ ...productForm, introPt: event.target.value })} /></Field>
-              <Field label="阿语介绍"><textarea rows={4} value={productForm.introAr} onChange={(event) => setProductForm({ ...productForm, introAr: event.target.value })} /></Field>
-            </div>
-            <ActionFooter status={status} onSave={saveProduct} onDelete={removeProduct} canDelete={Boolean(selectedProductId)} loading={loading} />
-          </div>
-        </section>
-      </>
-    );
-  }
-
-  function renderQuoteView() {
-    return (
-      <section className="customer-layout quote-layout">
-        <div className="panel">
-          <PanelHeader title="报价表单" desc="支持普通报价和阶梯报价" icon={<Calculator size={20} />} />
-          <div className="form-grid">
-            <Field label="客户">
-              <select value={quoteForm.customerId} onChange={(event) => setQuoteForm({ ...quoteForm, customerId: event.target.value })}>
-                <option value="">选择客户</option>
-                {customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}
-              </select>
-            </Field>
-            <Field label="商品">
-              <select
-                value={quoteForm.productId}
-                onChange={(event) => {
-                  const product = products.find((item) => item.id === event.target.value);
-                  setQuoteForm({ ...quoteForm, productId: event.target.value });
-                  if (product) seedQuoteFromProduct(product);
-                }}
-              >
-                <option value="">选择商品</option>
-                {products.map((product) => <option key={product.id} value={product.id}>{product.name} · {product.sku}</option>)}
-              </select>
-            </Field>
-            <Field label="数量"><input type="number" min="1" value={quoteForm.quantity} onChange={(event) => setQuoteForm({ ...quoteForm, quantity: event.target.value })} /></Field>
-            <Field label="单价"><input type="number" min="0" step="0.01" value={quoteForm.unitPrice} onChange={(event) => setQuoteForm({ ...quoteForm, unitPrice: event.target.value })} /></Field>
-            <Field label="币种"><input value={quoteForm.currency} onChange={(event) => setQuoteForm({ ...quoteForm, currency: event.target.value.toUpperCase() })} /></Field>
-            <Field label="运费"><input type="number" min="0" step="0.01" value={quoteForm.shippingCost} onChange={(event) => setQuoteForm({ ...quoteForm, shippingCost: event.target.value })} /></Field>
-            <Field label="MOQ"><input type="number" min="0" value={quoteForm.moq} onChange={(event) => setQuoteForm({ ...quoteForm, moq: event.target.value })} /></Field>
-            <Field label="交期"><input value={quoteForm.leadTime} onChange={(event) => setQuoteForm({ ...quoteForm, leadTime: event.target.value })} /></Field>
-            <Field label="客户语言"><LanguageSelect value={quoteForm.targetLanguage} onChange={(targetLanguage) => setQuoteForm({ ...quoteForm, targetLanguage })} /></Field>
-          </div>
-          <div className="tag-picker">
-            <label className={quoteForm.includeShipping ? "checked" : ""}>
-              <input type="checkbox" checked={quoteForm.includeShipping} onChange={() => setQuoteForm({ ...quoteForm, includeShipping: !quoteForm.includeShipping })} />
-              <Check size={14} />
-              报价含运费
-            </label>
-            <label className={quoteForm.stockKnown ? "checked" : ""}>
-              <input type="checkbox" checked={quoteForm.stockKnown} onChange={() => setQuoteForm({ ...quoteForm, stockKnown: !quoteForm.stockKnown })} />
-              <Check size={14} />
-              库存已确认
-            </label>
-            <label className={quoteForm.promiseStock ? "checked" : ""}>
-              <input type="checkbox" checked={quoteForm.promiseStock} onChange={() => setQuoteForm({ ...quoteForm, promiseStock: !quoteForm.promiseStock })} />
-              <Check size={14} />
-              文案承诺现货
-            </label>
-          </div>
-          <Field label="阶梯报价（每行：数量,单价）">
-            <textarea rows={4} value={quoteForm.tiers} onChange={(event) => setQuoteForm({ ...quoteForm, tiers: event.target.value })} />
-          </Field>
-          <div className="detail-actions">
-            <button type="button" onClick={handleGenerateQuote} disabled={loading}>
-              <Calculator size={16} />
-              生成报价
-            </button>
-            <button type="button" onClick={handleSaveQuote} disabled={loading || !quoteForm.customerId}>
-              <Save size={16} />
-              保存到客户
-            </button>
-          </div>
-        </div>
-
-        <div className="panel detail-panel">
-          <PanelHeader title="WhatsApp 报价话术" desc="复制后由业务员手动发送" icon={<Copy size={20} />} />
-          <div className="safety-note">{AI_SAFETY_NOTE}</div>
-          <Field label="报价文案">
-            <textarea rows={14} value={quote?.quoteText || ""} onChange={(event) => setQuote((current) => current ? { ...current, quoteText: event.target.value } : current)} />
-          </Field>
-          <div className="risk-box">
-            {(quote?.riskWarnings || ["报价生成后会显示风险提醒。"]).map((warning) => <span key={warning}>{warning}</span>)}
-          </div>
-          <div className="footer-row">
-            <p>{quote?.followUpPrompt || status}</p>
-            <button type="button" disabled={!quote?.quoteText} onClick={() => quote?.quoteText && navigator.clipboard.writeText(quote.quoteText).then(() => setStatus("报价文案已复制，请手动发送"))}>
-              <Copy size={16} />
-              复制
-            </button>
-          </div>
-        </div>
-      </section>
-    );
-  }
-}
-
-function viewTitle(view: View) {
-  if (view === "dashboard") return "首页工作台";
-  if (view === "products") return "产品资料库";
-  if (view === "quotes") return "报价助手";
-  return "客户管理工作台";
-}
-
-function viewEyebrow(view: View) {
-  if (view === "dashboard") return "今日跟进、逾期任务和客户机会";
-  if (view === "products") return "商品资料和多语言介绍";
-  if (view === "quotes") return "商品报价和 WhatsApp 话术";
-  return "客户标签、阶段和跟进时间";
-}
-
-function PanelHeader({ title, desc, icon }: { title: string; desc: string; icon: ReactNode }) {
-  return (
-    <div className="panel-header">
-      <div>
-        <h3>{title}</h3>
-        <p>{desc}</p>
-      </div>
-      {icon}
+        <div className="safety-note">{AI_SAFETY_NOTE} All generated text is draft only. 复制后由业务员手动发送。The system never sends WhatsApp messages automatically.</div>
+        {view === "dashboard" && renderDashboard()}
+        {view === "customers" && renderCustomers()}
+        {view === "products" && renderProducts()}
+        {view === "quotes" && renderQuotes()}
+        {view === "knowledge" && renderKnowledge()}
+        {view === "materials" && renderMaterials()}
+        {view === "samples" && renderSamples()}
+        {view === "custom" && renderCustom()}
+        {view === "importExport" && renderImportExport()}
+      </main>
     </div>
   );
+
+  function navButton(nextView: View, label: string) {
+    return (
+      <button className={view === nextView ? "active" : ""} onClick={() => setView(nextView)} type="button">
+        {label}
+      </button>
+    );
+  }
+
+  function renderDashboard() {
+    return (
+      <>
+        <section className="metrics">
+          <Metric label="Today follow-ups" value={dashboard?.today.length || 0} />
+          <Metric label="Overdue follow-ups" value={dashboard?.overdue.length || 0} />
+          <Metric label="High intent customers" value={highIntent.length} />
+        </section>
+        <section className="dashboard-grid">
+          <TaskPanel title="Today" tasks={dashboard?.today || []} />
+          <TaskPanel title="Overdue" tasks={dashboard?.overdue || []} />
+          <CustomerPanel title="High intent customers" customers={highIntent} />
+          <CustomerPanel title="Recent customers" customers={dashboard?.recentCustomers || []} />
+        </section>
+      </>
+    );
+  }
+
+  function renderCustomers() {
+    return (
+      <section className="customer-layout">
+        <Panel title="Customer list" description="Filtered by current logged-in user only.">
+          <div className="filters">
+            <input placeholder="Search" value={customerFilters.q} onChange={(event) => setCustomerFilters({ ...customerFilters, q: event.target.value })} />
+            <select value={customerFilters.tag} onChange={(event) => setCustomerFilters({ ...customerFilters, tag: event.target.value })}>
+              <option value="">All tags</option>
+              {CUSTOMER_TAGS.map((tag) => <option key={tag}>{tag}</option>)}
+            </select>
+            <select value={customerFilters.intentLevel} onChange={(event) => setCustomerFilters({ ...customerFilters, intentLevel: event.target.value as CustomerFilters["intentLevel"] })}>
+              <option value="">All intent</option>
+              <option value="high">high</option>
+              <option value="medium">medium</option>
+              <option value="low">low</option>
+            </select>
+            <button onClick={() => loadCustomers(customerFilters)}>Search</button>
+          </div>
+          <div className="customer-list">
+            {customers.map((customer) => (
+              <button key={customer.id} className={`customer-row ${customer.id === selectedCustomerId ? "selected" : ""}`} onClick={() => selectCustomer(customer.id)}>
+                <strong>{customer.name}</strong>
+                <span>{customer.whatsappNumber || "No WhatsApp"} · {customer.stage}</span>
+                <span>Intent: {customer.intentScore ?? "-"} / {customer.intentLevel || "-"}</span>
+              </button>
+            ))}
+          </div>
+        </Panel>
+        <Panel title="Customer detail" description="Tags, stage, notes, quotes, samples and custom requests.">
+          {renderCustomerForm()}
+          {renderCustomerSideRecords()}
+        </Panel>
+      </section>
+    );
+  }
+
+  function renderCustomerForm() {
+    return (
+      <>
+        <div className="form-grid">
+          <Field label="Name"><input value={customerForm.name} onChange={(event) => setCustomerForm({ ...customerForm, name: event.target.value })} /></Field>
+          <Field label="WhatsApp"><input value={customerForm.whatsappNumber} onChange={(event) => setCustomerForm({ ...customerForm, whatsappNumber: event.target.value })} /></Field>
+          <Field label="Country"><input value={customerForm.country} onChange={(event) => setCustomerForm({ ...customerForm, country: event.target.value })} /></Field>
+          <Field label="Language"><input value={customerForm.language} onChange={(event) => setCustomerForm({ ...customerForm, language: event.target.value })} /></Field>
+          <Field label="Tags"><input value={customerForm.tags} onChange={(event) => setCustomerForm({ ...customerForm, tags: event.target.value })} /></Field>
+          <Field label="Stage">
+            <select value={customerForm.stage} onChange={(event) => setCustomerForm({ ...customerForm, stage: event.target.value })}>
+              {CUSTOMER_STAGES.map((stage) => <option key={stage}>{stage}</option>)}
+            </select>
+          </Field>
+          <Field label="Interested product"><input value={customerForm.interestedProduct} onChange={(event) => setCustomerForm({ ...customerForm, interestedProduct: event.target.value })} /></Field>
+          <Field label="Next follow-up"><input type="datetime-local" value={customerForm.nextFollowUpAt} onChange={(event) => setCustomerForm({ ...customerForm, nextFollowUpAt: event.target.value })} /></Field>
+        </div>
+        <Field label="Latest summary"><textarea rows={3} value={customerForm.latestSummary} onChange={(event) => setCustomerForm({ ...customerForm, latestSummary: event.target.value })} /></Field>
+        <Field label="Notes"><textarea rows={3} value={customerForm.notes} onChange={(event) => setCustomerForm({ ...customerForm, notes: event.target.value })} /></Field>
+        <div className="detail-actions">
+          <button onClick={saveCustomerRecord} disabled={loading}>Save</button>
+          <button className="secondary-button" onClick={() => { setSelectedCustomerId(""); setCustomerForm(emptyCustomerForm); }}>New</button>
+          <button className="danger-button" onClick={removeCustomer}>Delete</button>
+          <button className="secondary-button" onClick={refreshIntent}>Recalculate intent</button>
+        </div>
+      </>
+    );
+  }
+
+  function renderCustomerSideRecords() {
+    return (
+      <div className="quote-history">
+        {customerIntent && (
+          <div className="risk-box">
+            <strong>Intent {customerIntent.intentScore} / {customerIntent.intentLevel}</strong>
+            <span>{customerIntent.recommendedAction}</span>
+            {customerIntent.intentReasons.slice(0, 4).map((item) => <span key={item}>{item}</span>)}
+          </div>
+        )}
+        <RecordList title="Quotes" items={customerQuotes.map((item) => `${item.currency} ${item.unitPrice} · ${item.quoteText.slice(0, 80)}`)} />
+        <RecordList title="Follow-ups" items={customerFollowUps.map((item) => `${item.taskType} · ${item.status} · ${formatDate(item.remindAt)}`)} />
+        <RecordList title="Samples" items={customerSampleOrders.map((item) => `${item.sampleName} · ${item.paymentStatus} · ${item.shippingStatus}`)} />
+        <RecordList title="Custom requests" items={customerCustomRequests.map((item) => `${item.requestType} · ${item.status} · ${item.productName || "No product"}`)} />
+      </div>
+    );
+  }
+
+  function renderProducts() {
+    return (
+      <section className="customer-layout">
+        <Panel title="Products" description="Search by name, SKU or category.">
+          <div className="filters product-filters">
+            <input placeholder="Search" value={productFilters.q} onChange={(event) => setProductFilters({ ...productFilters, q: event.target.value })} />
+            <input placeholder="Category" value={productFilters.category} onChange={(event) => setProductFilters({ ...productFilters, category: event.target.value })} />
+            <button onClick={() => loadProducts(productFilters)}>Search</button>
+          </div>
+          <div className="customer-list">
+            {products.map((product) => (
+              <button key={product.id} className={`customer-row ${product.id === selectedProductId ? "selected" : ""}`} onClick={() => selectProduct(product)}>
+                <strong>{product.name}</strong>
+                <span>{product.sku} · {product.category || "No category"}</span>
+                <span>MOQ {product.moq || "-"} · Price {product.suggestedPrice || "-"}</span>
+              </button>
+            ))}
+          </div>
+        </Panel>
+        <Panel title="Product editor" description="V2 still uses URL text for images and videos.">
+          <div className="form-grid">
+            <Field label="Name"><input value={productForm.name} onChange={(event) => setProductForm({ ...productForm, name: event.target.value })} /></Field>
+            <Field label="SKU"><input value={productForm.sku} onChange={(event) => setProductForm({ ...productForm, sku: event.target.value })} /></Field>
+            <Field label="Category"><input value={productForm.category} onChange={(event) => setProductForm({ ...productForm, category: event.target.value })} /></Field>
+            <Field label="MOQ"><input value={productForm.moq} onChange={(event) => setProductForm({ ...productForm, moq: event.target.value })} /></Field>
+            <Field label="Suggested price"><input value={productForm.suggestedPrice} onChange={(event) => setProductForm({ ...productForm, suggestedPrice: event.target.value })} /></Field>
+            <Field label="Min price"><input value={productForm.minPrice} onChange={(event) => setProductForm({ ...productForm, minPrice: event.target.value })} /></Field>
+          </div>
+          <Field label="Lead time"><input value={productForm.leadTime} onChange={(event) => setProductForm({ ...productForm, leadTime: event.target.value })} /></Field>
+          <Field label="Selling points"><textarea rows={4} value={productForm.sellingPoints} onChange={(event) => setProductForm({ ...productForm, sellingPoints: event.target.value })} /></Field>
+          <Field label="Image URLs"><textarea rows={2} value={productForm.images} onChange={(event) => setProductForm({ ...productForm, images: event.target.value })} /></Field>
+          <Field label="Video URLs"><textarea rows={2} value={productForm.videos} onChange={(event) => setProductForm({ ...productForm, videos: event.target.value })} /></Field>
+          <div className="detail-actions">
+            <button onClick={saveProductRecord}>Save</button>
+            <button className="secondary-button" onClick={() => { setSelectedProductId(""); setProductForm(emptyProductForm); }}>New</button>
+            <button className="danger-button" onClick={removeProduct}>Delete</button>
+          </div>
+        </Panel>
+      </section>
+    );
+  }
+
+  function renderQuotes() {
+    return (
+      <section className="grid quote-layout">
+        <Panel title="Quote assistant" description="Generate and save WhatsApp-ready quote draft.">
+          <div className="form-grid">
+            <SelectField label="Customer" value={quoteForm.customerId} onChange={(value) => setQuoteForm({ ...quoteForm, customerId: value })} options={customers.map((item) => [item.id, item.name])} />
+            <SelectField label="Product" value={quoteForm.productId} onChange={(value) => setQuoteForm({ ...quoteForm, productId: value })} options={products.map((item) => [item.id, item.name])} />
+            <Field label="Quantity"><input value={quoteForm.quantity} onChange={(event) => setQuoteForm({ ...quoteForm, quantity: event.target.value })} /></Field>
+            <Field label="Unit price"><input value={quoteForm.unitPrice} onChange={(event) => setQuoteForm({ ...quoteForm, unitPrice: event.target.value })} /></Field>
+            <Field label="Currency"><input value={quoteForm.currency} onChange={(event) => setQuoteForm({ ...quoteForm, currency: event.target.value })} /></Field>
+            <Field label="Shipping cost"><input value={quoteForm.shippingCost} onChange={(event) => setQuoteForm({ ...quoteForm, shippingCost: event.target.value })} /></Field>
+            <Field label="MOQ"><input value={quoteForm.moq} onChange={(event) => setQuoteForm({ ...quoteForm, moq: event.target.value })} /></Field>
+            <Field label="Lead time"><input value={quoteForm.leadTime} onChange={(event) => setQuoteForm({ ...quoteForm, leadTime: event.target.value })} /></Field>
+          </div>
+          <Field label="Tier quote, one per line: quantity,price"><textarea rows={3} value={quoteForm.tiers} onChange={(event) => setQuoteForm({ ...quoteForm, tiers: event.target.value })} /></Field>
+          <label className="field"><span>Include shipping</span><input type="checkbox" checked={quoteForm.includeShipping} onChange={(event) => setQuoteForm({ ...quoteForm, includeShipping: event.target.checked })} /></label>
+          <button onClick={generateAndSaveQuote}>Generate and save quote</button>
+        </Panel>
+        <Panel title="Quote draft" description="Copy manually into WhatsApp after checking price, stock, lead time and freight.">
+          {quote ? (
+            <>
+              <textarea rows={10} value={quote.quoteText} readOnly />
+              <RiskWarnings items={quote.riskWarnings} />
+            </>
+          ) : <p className="empty-note">No quote generated yet.</p>}
+        </Panel>
+      </section>
+    );
+  }
+
+  function renderKnowledge() {
+    return (
+      <section className="customer-layout">
+        <Panel title="Knowledge base" description="Company policy and sales context for AI drafts.">
+          <FilterRow>
+            <input placeholder="Search" value={knowledgeFilters.q} onChange={(event) => setKnowledgeFilters({ ...knowledgeFilters, q: event.target.value })} />
+            <select value={knowledgeFilters.category} onChange={(event) => setKnowledgeFilters({ ...knowledgeFilters, category: event.target.value })}>
+              <option value="">All categories</option>
+              {KNOWLEDGE_BASE_CATEGORIES.map((item) => <option key={item}>{item}</option>)}
+            </select>
+            <select value={knowledgeFilters.language} onChange={(event) => setKnowledgeFilters({ ...knowledgeFilters, language: event.target.value })}>
+              <option value="">All languages</option>
+              {KNOWLEDGE_BASE_LANGUAGES.map((item) => <option key={item}>{item}</option>)}
+            </select>
+            <button onClick={() => loadKnowledgeBase(knowledgeFilters)}>Search</button>
+          </FilterRow>
+          <SimpleList items={knowledgeBase} render={(item) => (
+            <button className="customer-row" onClick={async () => {
+              setSelectedKnowledgeId(item.id);
+              setKnowledgeForm(toKnowledgeForm(await getKnowledgeBaseItem(item.id)));
+            }}>
+              <strong>{item.title}</strong>
+              <span>{item.category} · {item.language} · {item.enabled ? "enabled" : "disabled"}</span>
+            </button>
+          )} />
+        </Panel>
+        <Panel title="Knowledge editor" description="Knowledge never replaces salesperson confirmation.">
+          <div className="form-grid">
+            <Field label="Title"><input value={knowledgeForm.title} onChange={(event) => setKnowledgeForm({ ...knowledgeForm, title: event.target.value })} /></Field>
+            <SelectField label="Category" value={knowledgeForm.category} onChange={(value) => setKnowledgeForm({ ...knowledgeForm, category: value as KnowledgeBaseCategory })} options={KNOWLEDGE_BASE_CATEGORIES.map((item) => [item, item])} />
+            <SelectField label="Language" value={knowledgeForm.language} onChange={(value) => setKnowledgeForm({ ...knowledgeForm, language: value as KnowledgeBaseLanguage })} options={KNOWLEDGE_BASE_LANGUAGES.map((item) => [item, item])} />
+            <SelectField label="Product" value={knowledgeForm.productId} onChange={(value) => setKnowledgeForm({ ...knowledgeForm, productId: value })} options={products.map((item) => [item.id, item.name])} emptyLabel="No product" />
+          </div>
+          <Field label="Content"><textarea rows={8} value={knowledgeForm.content} onChange={(event) => setKnowledgeForm({ ...knowledgeForm, content: event.target.value })} /></Field>
+          <div className="detail-actions">
+            <button onClick={saveKnowledgeRecord}>Save</button>
+            <button className="secondary-button" onClick={() => selectedKnowledgeId && (knowledgeForm.enabled ? disableKnowledgeBaseItem(selectedKnowledgeId) : enableKnowledgeBaseItem(selectedKnowledgeId)).then(() => loadKnowledgeBase(knowledgeFilters))}>{knowledgeForm.enabled ? "Disable" : "Enable"}</button>
+            <button className="secondary-button" onClick={() => { setSelectedKnowledgeId(""); setKnowledgeForm(emptyKnowledgeForm); }}>New</button>
+            <button className="danger-button" onClick={() => selectedKnowledgeId && removeKnowledge(selectedKnowledgeId)}>Delete</button>
+          </div>
+        </Panel>
+      </section>
+    );
+  }
+
+  function renderMaterials() {
+    return (
+      <section className="customer-layout">
+        <Panel title="Material center" description="V2-B stores URLs only, not uploaded files.">
+          <FilterRow>
+            <input placeholder="Search" value={materialFilters.q} onChange={(event) => setMaterialFilters({ ...materialFilters, q: event.target.value })} />
+            <select value={materialFilters.type} onChange={(event) => setMaterialFilters({ ...materialFilters, type: event.target.value })}>
+              <option value="">All types</option>
+              {MATERIAL_TYPES.map((item) => <option key={item}>{item}</option>)}
+            </select>
+            <select value={materialFilters.language} onChange={(event) => setMaterialFilters({ ...materialFilters, language: event.target.value })}>
+              <option value="">All languages</option>
+              {MATERIAL_LANGUAGES.map((item) => <option key={item}>{item}</option>)}
+            </select>
+            <button onClick={() => loadMaterials(materialFilters)}>Search</button>
+          </FilterRow>
+          <SimpleList items={materials} render={(item) => (
+            <button className="customer-row" onClick={() => { setSelectedMaterialId(item.id); setMaterialForm(toMaterialForm(item)); }}>
+              <strong>{item.title}</strong>
+              <span>{item.type} · {item.language}</span>
+              <span>{item.url}</span>
+            </button>
+          )} />
+        </Panel>
+        <Panel title="Material editor" description="Generated material intro is draft only.">
+          <div className="form-grid">
+            <Field label="Title"><input value={materialForm.title} onChange={(event) => setMaterialForm({ ...materialForm, title: event.target.value })} /></Field>
+            <SelectField label="Type" value={materialForm.type} onChange={(value) => setMaterialForm({ ...materialForm, type: value as MaterialType })} options={MATERIAL_TYPES.map((item) => [item, item])} />
+            <SelectField label="Language" value={materialForm.language} onChange={(value) => setMaterialForm({ ...materialForm, language: value as MaterialLanguage })} options={MATERIAL_LANGUAGES.map((item) => [item, item])} />
+            <SelectField label="Product" value={materialForm.productId} onChange={(value) => setMaterialForm({ ...materialForm, productId: value })} options={products.map((item) => [item.id, item.name])} emptyLabel="No product" />
+          </div>
+          <Field label="URL"><input value={materialForm.url} onChange={(event) => setMaterialForm({ ...materialForm, url: event.target.value })} /></Field>
+          <Field label="Tags"><input value={materialForm.tags} onChange={(event) => setMaterialForm({ ...materialForm, tags: event.target.value })} /></Field>
+          <Field label="Description / generated draft"><textarea rows={6} value={materialForm.description} onChange={(event) => setMaterialForm({ ...materialForm, description: event.target.value })} /></Field>
+          <div className="detail-actions">
+            <button onClick={saveMaterialRecord}>Save</button>
+            <button className="secondary-button" onClick={() => generateMaterialDescription()}>Generate intro</button>
+            <button className="secondary-button" onClick={() => { setSelectedMaterialId(""); setMaterialForm(emptyMaterialForm); }}>New</button>
+            <button className="danger-button" onClick={() => selectedMaterialId && removeMaterial(selectedMaterialId)}>Delete</button>
+          </div>
+        </Panel>
+      </section>
+    );
+  }
+
+  function renderSamples() {
+    return (
+      <section className="customer-layout">
+        <Panel title="Sample orders" description="Sales process record only, no payment or logistics system.">
+          <SampleFilterBar />
+          <SimpleList items={sampleOrders} render={(item) => (
+            <button className="customer-row" onClick={async () => { setSelectedSampleOrderId(item.id); setSampleForm(toSampleForm(await getSampleOrder(item.id))); }}>
+              <strong>{item.sampleName}</strong>
+              <span>{item.customerName || item.customerId} · {item.paymentStatus} · {item.shippingStatus}</span>
+            </button>
+          )} />
+        </Panel>
+        <Panel title="Sample editor" description="Sample scripts are drafts only.">
+          {renderSampleForm()}
+        </Panel>
+      </section>
+    );
+  }
+
+  function renderSampleForm() {
+    return (
+      <>
+        <div className="form-grid">
+          <SelectField label="Customer" value={sampleForm.customerId} onChange={(value) => setSampleForm({ ...sampleForm, customerId: value })} options={customers.map((item) => [item.id, item.name])} />
+          <SelectField label="Product" value={sampleForm.productId} onChange={(value) => setSampleForm({ ...sampleForm, productId: value })} options={products.map((item) => [item.id, item.name])} emptyLabel="No product" />
+          <Field label="Sample name"><input value={sampleForm.sampleName} onChange={(event) => setSampleForm({ ...sampleForm, sampleName: event.target.value })} /></Field>
+          <Field label="Currency"><input value={sampleForm.currency} onChange={(event) => setSampleForm({ ...sampleForm, currency: event.target.value })} /></Field>
+          <Field label="Sample fee"><input value={sampleForm.sampleFee} onChange={(event) => setSampleForm({ ...sampleForm, sampleFee: event.target.value })} /></Field>
+          <Field label="Shipping cost"><input value={sampleForm.shippingCost} onChange={(event) => setSampleForm({ ...sampleForm, shippingCost: event.target.value })} /></Field>
+          <SelectField label="Payment status" value={sampleForm.paymentStatus} onChange={(value) => setSampleForm({ ...sampleForm, paymentStatus: value as SamplePaymentStatus })} options={SAMPLE_PAYMENT_STATUSES.map((item) => [item, item])} />
+          <SelectField label="Shipping status" value={sampleForm.shippingStatus} onChange={(value) => setSampleForm({ ...sampleForm, shippingStatus: value as SampleShippingStatus })} options={SAMPLE_SHIPPING_STATUSES.map((item) => [item, item])} />
+          <Field label="Tracking number"><input value={sampleForm.trackingNumber} onChange={(event) => setSampleForm({ ...sampleForm, trackingNumber: event.target.value })} /></Field>
+          <SelectField label="Feedback" value={sampleForm.feedbackStatus} onChange={(value) => setSampleForm({ ...sampleForm, feedbackStatus: value as SampleFeedbackStatus })} options={SAMPLE_FEEDBACK_STATUSES.map((item) => [item, item])} />
+          <Field label="Expected ship date"><input type="date" value={sampleForm.expectedShipDate} onChange={(event) => setSampleForm({ ...sampleForm, expectedShipDate: event.target.value })} /></Field>
+          <Field label="Expected delivery date"><input type="date" value={sampleForm.expectedDeliveryDate} onChange={(event) => setSampleForm({ ...sampleForm, expectedDeliveryDate: event.target.value })} /></Field>
+        </div>
+        <Field label="Notes / generated script"><textarea rows={6} value={sampleForm.notes} onChange={(event) => setSampleForm({ ...sampleForm, notes: event.target.value })} /></Field>
+        <div className="detail-actions">
+          <button onClick={saveSampleRecord}>Save</button>
+          {SAMPLE_SCRIPT_SCENARIOS.map((scenario) => <button className="secondary-button" key={scenario} onClick={() => generateSelectedSampleScript(scenario)}>{scenario}</button>)}
+          <button className="secondary-button" onClick={() => { setSelectedSampleOrderId(""); setSampleForm({ ...emptySampleForm, customerId: selectedCustomerId, productId: selectedProductId }); }}>New</button>
+          <button className="danger-button" onClick={() => selectedSampleOrderId && removeSample(selectedSampleOrderId)}>Delete</button>
+        </div>
+      </>
+    );
+  }
+
+  function renderCustom() {
+    return (
+      <section className="customer-layout">
+        <Panel title="Custom requests" description="Logo, packaging, color, size, material, OEM and ODM requirements.">
+          <CustomFilterBar />
+          <SimpleList items={customRequests} render={(item) => (
+            <button className="customer-row" onClick={async () => { setSelectedCustomRequestId(item.id); setCustomForm(toCustomForm(await getCustomRequest(item.id))); }}>
+              <strong>{item.customerName || item.customerId} · {item.requestType}</strong>
+              <span>{item.productName || "No product"} · {item.status}</span>
+              <span>MOQ {item.moq || "-"} · Qty {item.quantity || "-"}</span>
+            </button>
+          )} />
+        </Panel>
+        <Panel title="Custom editor" description="No production scheduling, payment or order system is created here.">
+          {renderCustomForm()}
+        </Panel>
+      </section>
+    );
+  }
+
+  function renderImportExport() {
+    return (
+      <section className="grid quote-layout">
+        <Panel title="CSV import" description="Upload UTF-8 CSV only. Dry run validates without writing data.">
+          <Field label="Data type">
+            <select value={importType} onChange={(event) => { setImportType(event.target.value as ImportExportType); setImportResult(null); }}>
+              {IMPORT_EXPORT_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+            </select>
+          </Field>
+          <Field label="CSV file">
+            <input type="file" accept=".csv,text/csv" onChange={(event) => setImportFile(event.target.files?.[0] || null)} />
+          </Field>
+          <div className="detail-actions">
+            <a className="secondary-button" href={templateCsvUrl(importType)}>Download template</a>
+            <button className="secondary-button" onClick={() => runCsvImport(true)}>Dry run</button>
+            <button onClick={() => runCsvImport(false)}>Confirm import</button>
+          </div>
+          <RiskWarnings items={[
+            "CSV only, max 5MB. Excel files are not supported in V2-F.",
+            "ownerId, createdBy, tokens, secrets and API keys are ignored and never imported.",
+            "Import/export is scoped to the current logged-in user only."
+          ]} />
+        </Panel>
+        <Panel title="CSV export and result" description="Export only current user data. Formula-like cells are escaped.">
+          <div className="list">
+            {IMPORT_EXPORT_TYPES.map((type) => (
+              <div className="list-item" key={type}>
+                <div>
+                  <strong>{type}</strong>
+                  <span>UTF-8 CSV, arrays use | separator</span>
+                </div>
+                <a className="secondary-button" href={exportCsvUrl(type)}>Export</a>
+              </div>
+            ))}
+          </div>
+          {importResult && (
+            <div className="quote-history">
+              <div className="risk-box">
+                <span>Total rows: {importResult.totalRows}</span>
+                <span>Success: {importResult.successCount}</span>
+                <span>Skipped: {importResult.skippedCount}</span>
+                <span>Failed rows: {importResult.failureCount}</span>
+                <span>Mode: {importResult.dryRun ? "dry run" : "write"}</span>
+              </div>
+              <RecordList title="Import errors" items={importResult.errors.map((error) => `row ${error.row} · ${error.field}: ${error.message}`)} />
+            </div>
+          )}
+        </Panel>
+      </section>
+    );
+  }
+
+  async function runCsvImport(dryRun: boolean) {
+    if (!importFile) return setStatus("Please choose a CSV file first.");
+    setLoading(true);
+    try {
+      const result = await importCsv(importType, importFile, { dryRun, skipDuplicates: true });
+      setImportResult(result);
+      setStatus(dryRun ? "Dry run completed. No data was written." : "CSV import completed.");
+      if (!dryRun) await refreshAll();
+    } catch {
+      setStatus("CSV import failed. Check file type, size and row errors.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function renderCustomForm() {
+    return (
+      <>
+        <div className="form-grid">
+          <SelectField label="Customer" value={customForm.customerId} onChange={(value) => setCustomForm({ ...customForm, customerId: value })} options={customers.map((item) => [item.id, item.name])} />
+          <SelectField label="Product" value={customForm.productId} onChange={(value) => setCustomForm({ ...customForm, productId: value })} options={products.map((item) => [item.id, item.name])} emptyLabel="No product" />
+          <SelectField label="Request type" value={customForm.requestType} onChange={(value) => setCustomForm({ ...customForm, requestType: value as CustomRequestType })} options={CUSTOM_REQUEST_TYPES.map((item) => [item, item])} />
+          <SelectField label="Status" value={customForm.status} onChange={(value) => setCustomForm({ ...customForm, status: value as CustomRequestStatus })} options={CUSTOM_REQUEST_STATUSES.map((item) => [item, item])} />
+          <Field label="Quantity"><input value={customForm.quantity} onChange={(event) => setCustomForm({ ...customForm, quantity: event.target.value })} /></Field>
+          <Field label="MOQ"><input value={customForm.moq} onChange={(event) => setCustomForm({ ...customForm, moq: event.target.value })} /></Field>
+          <Field label="Sample fee"><input value={customForm.sampleFee} onChange={(event) => setCustomForm({ ...customForm, sampleFee: event.target.value })} /></Field>
+          <Field label="Sample lead time"><input value={customForm.sampleLeadTime} onChange={(event) => setCustomForm({ ...customForm, sampleLeadTime: event.target.value })} /></Field>
+          <Field label="Bulk lead time"><input value={customForm.bulkLeadTime} onChange={(event) => setCustomForm({ ...customForm, bulkLeadTime: event.target.value })} /></Field>
+          <Field label="Color"><input value={customForm.colorRequirement} onChange={(event) => setCustomForm({ ...customForm, colorRequirement: event.target.value })} /></Field>
+          <Field label="Size"><input value={customForm.sizeRequirement} onChange={(event) => setCustomForm({ ...customForm, sizeRequirement: event.target.value })} /></Field>
+          <Field label="Material"><input value={customForm.materialRequirement} onChange={(event) => setCustomForm({ ...customForm, materialRequirement: event.target.value })} /></Field>
+        </div>
+        <div className="tag-picker">
+          <label className={customForm.logoRequired ? "checked" : ""}>
+            <input type="checkbox" checked={customForm.logoRequired} onChange={(event) => setCustomForm({ ...customForm, logoRequired: event.target.checked })} />
+            Logo required
+          </label>
+          <label className={customForm.packagingRequired ? "checked" : ""}>
+            <input type="checkbox" checked={customForm.packagingRequired} onChange={(event) => setCustomForm({ ...customForm, packagingRequired: event.target.checked })} />
+            Packaging required
+          </label>
+        </div>
+        <Field label="File URLs, one per line"><textarea rows={3} value={customForm.files} onChange={(event) => setCustomForm({ ...customForm, files: event.target.value })} /></Field>
+        <Field label="Notes / generated custom script"><textarea rows={8} value={customForm.notes} onChange={(event) => setCustomForm({ ...customForm, notes: event.target.value })} /></Field>
+        <RiskWarnings items={["Do not invent MOQ, sample fee, lead time, bulk lead time, production feasibility or return policy.", "All custom scripts are drafts only and will not be sent automatically."]} />
+        <div className="detail-actions">
+          <button onClick={saveCustomRecord}>Save</button>
+          {CUSTOM_SCRIPT_SCENARIOS.map((scenario) => <button className="secondary-button" key={scenario} onClick={() => generateSelectedCustomScript(scenario)}>{scenario}</button>)}
+          <button className="secondary-button" onClick={createCustomFollowUp}>Set follow-up</button>
+          <button className="secondary-button" onClick={() => { setSelectedCustomRequestId(""); setCustomForm({ ...emptyCustomForm, customerId: selectedCustomerId, productId: selectedProductId }); }}>New</button>
+          <button className="danger-button" onClick={() => selectedCustomRequestId && removeCustom(selectedCustomRequestId)}>Delete</button>
+        </div>
+      </>
+    );
+  }
+
+  function SampleFilterBar() {
+    return (
+      <FilterRow>
+        <input placeholder="Search" value={sampleFilters.q} onChange={(event) => setSampleFilters({ ...sampleFilters, q: event.target.value })} />
+        <select value={sampleFilters.paymentStatus} onChange={(event) => setSampleFilters({ ...sampleFilters, paymentStatus: event.target.value })}>
+          <option value="">All payment</option>
+          {SAMPLE_PAYMENT_STATUSES.map((item) => <option key={item}>{item}</option>)}
+        </select>
+        <select value={sampleFilters.shippingStatus} onChange={(event) => setSampleFilters({ ...sampleFilters, shippingStatus: event.target.value })}>
+          <option value="">All shipping</option>
+          {SAMPLE_SHIPPING_STATUSES.map((item) => <option key={item}>{item}</option>)}
+        </select>
+        <button onClick={() => loadSampleOrders(sampleFilters)}>Search</button>
+      </FilterRow>
+    );
+  }
+
+  function CustomFilterBar() {
+    return (
+      <FilterRow>
+        <input placeholder="Search customer, product, notes or file URL" value={customFilters.q} onChange={(event) => setCustomFilters({ ...customFilters, q: event.target.value })} />
+        <select value={customFilters.requestType} onChange={(event) => setCustomFilters({ ...customFilters, requestType: event.target.value })}>
+          <option value="">All types</option>
+          {CUSTOM_REQUEST_TYPES.map((item) => <option key={item}>{item}</option>)}
+        </select>
+        <select value={customFilters.status} onChange={(event) => setCustomFilters({ ...customFilters, status: event.target.value })}>
+          <option value="">All status</option>
+          {CUSTOM_REQUEST_STATUSES.map((item) => <option key={item}>{item}</option>)}
+        </select>
+        <button onClick={() => loadCustomRequests(customFilters)}>Search</button>
+      </FilterRow>
+    );
+  }
+
+  function TaskPanel({ title, tasks }: { title: string; tasks: FollowUpSummary[] }) {
+    return (
+      <Panel title={title} description="Manual task reminders only.">
+        <div className="task-list">
+          {tasks.length ? tasks.map((task) => (
+            <div className="task-card" key={task.id}>
+              <strong>{task.customerName}</strong>
+              <span>{task.taskType} · {formatDate(task.remindAt)}</span>
+              <textarea value={task.recommendedScript} readOnly />
+              <button onClick={() => markTaskDone(task.id)}>Complete</button>
+            </div>
+          )) : <p className="empty-note">No tasks.</p>}
+        </div>
+      </Panel>
+    );
+  }
+
+  function CustomerPanel({ title, customers: items }: { title: string; customers: CustomerSummary[] }) {
+    return (
+      <Panel title={title} description="Current user data only.">
+        <div className="list">
+          {items.length ? items.map((customer) => (
+            <div className="list-item" key={customer.id}>
+              <div>
+                <strong>{customer.name}</strong>
+                <span>{customer.stage} · intent {customer.intentScore ?? "-"}</span>
+              </div>
+              <button onClick={() => { setView("customers"); void selectCustomer(customer.id); }}>Open</button>
+            </div>
+          )) : <p className="empty-note">No customers.</p>}
+        </div>
+      </Panel>
+    );
+  }
+}
+
+function Panel({ title, description, children }: { title: string; description: string; children: ReactNode }) {
+  return (
+    <section className="panel">
+      <div className="panel-header">
+        <div>
+          <h3>{title}</h3>
+          <p>{description}</p>
+        </div>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return <label className="field"><span>{label}</span>{children}</label>;
+}
+
+function SelectField({ label, value, onChange, options, emptyLabel = "Select" }: { label: string; value: string; onChange: (value: string) => void; options: Array<[string, string]>; emptyLabel?: string }) {
+  return (
+    <Field label={label}>
+      <select value={value} onChange={(event) => onChange(event.target.value)}>
+        <option value="">{emptyLabel}</option>
+        {options.map(([optionValue, labelText]) => <option value={optionValue} key={optionValue}>{labelText}</option>)}
+      </select>
+    </Field>
+  );
+}
+
+function FilterRow({ children }: { children: ReactNode }) {
+  return <div className="filters">{children}</div>;
+}
+
+function SimpleList<T extends { id: string }>({ items, render }: { items: T[]; render: (item: T) => ReactNode }) {
+  return <div className="customer-list">{items.length ? items.map((item) => <div key={item.id}>{render(item)}</div>) : <p className="empty-note">No records.</p>}</div>;
 }
 
 function Metric({ label, value }: { label: string; value: number }) {
   return <div className="metric"><span>{label}</span><strong>{value}</strong></div>;
 }
 
-function FollowUpPanel({
-  title,
-  items,
-  empty,
-  onComplete,
-  onOpen
-}: {
-  title: string;
-  items: FollowUpSummary[];
-  empty: string;
-  onComplete: (task: FollowUpSummary) => void;
-  onOpen: (task: FollowUpSummary) => void;
-}) {
+function RecordList({ title, items }: { title: string; items: string[] }) {
   return (
-    <section className="panel dashboard-panel">
-      <PanelHeader title={title} desc="提醒只做任务提示和话术草稿" icon={<Clock3 size={20} />} />
-      {items.length === 0 ? <p className="empty-note">{empty}</p> : null}
-      <div className="task-list">
-        {items.map((task) => (
-          <article className="task-card" key={task.id}>
-            <div>
-              <strong>{task.customerName}</strong>
-              <span>{task.whatsappNumber || "未填写号码"} · {task.stage}</span>
-            </div>
-            <TagList values={task.tags} />
-            <p>{task.taskType} · {formatDateTime(task.remindAt)}</p>
-            <textarea readOnly rows={3} value={task.recommendedScript} />
-            <div className="detail-actions">
-              <button type="button" onClick={() => onComplete(task)}>
-                <Check size={16} />
-                标记完成
-              </button>
-              <button className="secondary-button" type="button" onClick={() => onOpen(task)}>
-                打开客户
-              </button>
-            </div>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function CustomerPanel({
-  title,
-  items,
-  empty,
-  onOpen
-}: {
-  title: string;
-  items: CustomerSummary[];
-  empty: string;
-  onOpen: (customer: CustomerSummary) => void;
-}) {
-  return (
-    <section className="panel dashboard-panel">
-      <PanelHeader title={title} desc="按当前登录账号隔离展示" icon={<Users size={20} />} />
-      {items.length === 0 ? <p className="empty-note">{empty}</p> : null}
-      <div className="task-list">
-        {items.map((customer) => (
-          <article className="task-card" key={customer.id}>
-            <div>
-              <strong>{customer.name}</strong>
-              <span>{customer.whatsappNumber || "未填写号码"} · {customer.country || "未填写国家"}</span>
-            </div>
-            <TagList values={customer.tags} />
-            <p>{customer.stage} · {customer.interestedProduct || "未记录意向产品"}</p>
-            <button className="secondary-button" type="button" onClick={() => onOpen(customer)}>
-              打开客户
-            </button>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function Field({ label, required, children }: { label: string; required?: boolean; children: ReactNode }) {
-  return <label className="field"><span>{label}{required ? " *" : ""}</span>{children}</label>;
-}
-
-function LanguageSelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  return (
-    <select value={value} onChange={(event) => onChange(event.target.value)}>
-      <option>English</option>
-      <option>Spanish</option>
-      <option>Portuguese</option>
-      <option>Arabic</option>
-      <option>Chinese</option>
-      <option>French</option>
-    </select>
-  );
-}
-
-function TagList({ values }: { values: string[] }) {
-  return <div className="tags">{values.map((value) => <span key={value}>{value}</span>)}</div>;
-}
-
-function ActionFooter({ status, onSave, onDelete, canDelete, loading }: { status: string; onSave: () => void; onDelete: () => void; canDelete: boolean; loading: boolean }) {
-  return (
-    <div className="footer-row">
-      <p>{status}</p>
-      <div className="detail-actions">
-        <button type="button" onClick={onSave} disabled={loading}><Save size={16} />保存</button>
-        <button className="danger-button" type="button" onClick={onDelete} disabled={!canDelete || loading}><Trash2 size={16} />删除</button>
+    <div>
+      <div className="section-subhead"><strong>{title}</strong><span>{items.length}</span></div>
+      <div className="quote-history-list">
+        {items.length ? items.map((item, index) => <div className="quote-history-item" key={`${title}-${index}`}><span>{item}</span></div>) : <p className="empty-note">No records.</p>}
       </div>
     </div>
   );
 }
 
-function toCustomerForm(customer: CustomerDetail | CustomerSummary): CustomerForm {
+function RiskWarnings({ items }: { items: string[] }) {
+  if (!items.length) return null;
+  return <div className="risk-box">{items.map((item) => <span key={item}>{item}</span>)}</div>;
+}
+
+function titleForView(view: View) {
+  const titles: Record<View, string> = {
+    dashboard: "Home workbench",
+    customers: "Customer CRM",
+    products: "Product library",
+    quotes: "Quote assistant",
+    knowledge: "AI company knowledge base",
+    materials: "Material center",
+    samples: "Sample order management",
+    custom: "Custom request management",
+    importExport: "CSV import / export"
+  };
+  return titles[view];
+}
+
+function toCustomerForm(customer: CustomerSummary): CustomerForm {
   return {
     name: customer.name || "",
     whatsappNumber: customer.whatsappNumber || "",
     country: customer.country || "",
     language: customer.language || "English",
-    tags: customer.tags || [],
+    tags: (customer.tags || []).join(", "),
     stage: customer.stage || "新线索",
     interestedProduct: customer.interestedProduct || "",
     latestSummary: customer.latestSummary || "",
-    nextFollowUpAt: toDateTimeLocal(customer.nextFollowUpAt),
+    nextFollowUpAt: toDatetimeLocal(customer.nextFollowUpAt),
     notes: customer.notes || ""
   };
 }
 
-function toProductForm(product: ProductDetail | ProductSummary): ProductForm {
+function toCustomerPayload(form: CustomerForm): CustomerUpsertRequest {
+  return {
+    name: form.name.trim(),
+    whatsappNumber: form.whatsappNumber || null,
+    country: form.country || null,
+    language: form.language || null,
+    tags: splitLinesOrComma(form.tags),
+    stage: form.stage || "新线索",
+    interestedProduct: form.interestedProduct || null,
+    latestSummary: form.latestSummary || null,
+    nextFollowUpAt: form.nextFollowUpAt ? new Date(form.nextFollowUpAt).toISOString() : null,
+    notes: form.notes || null
+  };
+}
+
+function toProductForm(product: ProductSummary): ProductForm {
   return {
     name: product.name || "",
     sku: product.sku || "",
     category: product.category || "",
-    images: listToText(product.images),
-    videos: listToText(product.videos),
-    colors: listToText(product.colors),
-    sizes: listToText(product.sizes),
-    material: product.material || "",
     moq: product.moq ? String(product.moq) : "",
     suggestedPrice: product.suggestedPrice || "",
     minPrice: product.minPrice || "",
     leadTime: product.leadTime || "",
-    sellingPoints: listToText(product.sellingPoints),
-    introEn: product.introEn || "",
-    introEs: product.introEs || "",
-    introPt: product.introPt || "",
-    introAr: product.introAr || ""
+    sellingPoints: (product.sellingPoints || []).join("\n"),
+    images: (product.images || []).join("\n"),
+    videos: (product.videos || []).join("\n")
   };
-}
-
-function toCustomerPayload(form: CustomerForm): CustomerUpsertRequest {
-  return { ...form, nextFollowUpAt: form.nextFollowUpAt ? new Date(form.nextFollowUpAt).toISOString() : null };
 }
 
 function toProductPayload(form: ProductForm): ProductUpsertRequest {
   return {
-    name: form.name,
-    sku: form.sku,
+    name: form.name.trim(),
+    sku: form.sku.trim(),
     category: form.category || null,
-    images: textToList(form.images),
-    videos: textToList(form.videos),
-    colors: textToList(form.colors),
-    sizes: textToList(form.sizes),
-    material: form.material || null,
-    moq: form.moq ? Number(form.moq) : null,
+    moq: optionalNumber(form.moq),
     suggestedPrice: form.suggestedPrice || null,
     minPrice: form.minPrice || null,
     leadTime: form.leadTime || null,
-    sellingPoints: textToList(form.sellingPoints),
-    introEn: form.introEn || null,
-    introEs: form.introEs || null,
-    introPt: form.introPt || null,
-    introAr: form.introAr || null
+    sellingPoints: splitLinesOrComma(form.sellingPoints),
+    images: splitLinesOrComma(form.images),
+    videos: splitLinesOrComma(form.videos)
   };
 }
 
 function toQuotePayload(form: QuoteForm): QuoteGenerateRequest {
   return {
-    customerId: form.customerId || null,
+    customerId: form.customerId,
     productId: form.productId,
-    quantity: Number(form.quantity),
+    quantity: Number(form.quantity || 0),
     unitPrice: form.unitPrice,
-    currency: form.currency,
+    currency: form.currency || "USD",
     shippingCost: form.shippingCost || null,
-    moq: form.moq ? Number(form.moq) : null,
+    moq: optionalNumber(form.moq),
     leadTime: form.leadTime || null,
     includeShipping: form.includeShipping,
     targetLanguage: form.targetLanguage,
     tiers: parseTiers(form.tiers),
-    stockKnown: form.stockKnown,
-    promiseStock: form.promiseStock,
-    attachmentSelected: false
+    stockKnown: false,
+    promiseStock: false,
+    useKnowledgeBase: true
   };
 }
 
-function toFollowUpPayload(form: FollowUpForm): FollowUpUpsertRequest {
+function toKnowledgeForm(item: KnowledgeBaseSummary): KnowledgeForm {
+  return {
+    title: item.title,
+    category: item.category,
+    content: item.content,
+    language: item.language,
+    productId: item.productId || "",
+    enabled: item.enabled
+  };
+}
+
+function toMaterialForm(item: MaterialSummary): MaterialForm {
+  return {
+    title: item.title,
+    type: item.type,
+    url: item.url,
+    description: item.description || "",
+    language: item.language,
+    productId: item.productId || "",
+    tags: (item.tags || []).join(", ")
+  };
+}
+
+function toSampleForm(item: SampleOrderSummary): SampleForm {
+  return {
+    customerId: item.customerId,
+    productId: item.productId || "",
+    sampleName: item.sampleName,
+    sampleFee: item.sampleFee || "",
+    shippingCost: item.shippingCost || "",
+    currency: item.currency || "USD",
+    paymentStatus: item.paymentStatus,
+    shippingStatus: item.shippingStatus,
+    trackingNumber: item.trackingNumber || "",
+    feedbackStatus: item.feedbackStatus,
+    expectedShipDate: item.expectedShipDate?.slice(0, 10) || "",
+    expectedDeliveryDate: item.expectedDeliveryDate?.slice(0, 10) || "",
+    notes: item.notes || ""
+  };
+}
+
+function toCustomForm(item: CustomRequestSummary): CustomForm {
+  return {
+    customerId: item.customerId,
+    productId: item.productId || "",
+    requestType: item.requestType,
+    logoRequired: item.logoRequired,
+    packagingRequired: item.packagingRequired,
+    colorRequirement: item.colorRequirement || "",
+    sizeRequirement: item.sizeRequirement || "",
+    materialRequirement: item.materialRequirement || "",
+    quantity: item.quantity ? String(item.quantity) : "",
+    moq: item.moq ? String(item.moq) : "",
+    sampleFee: item.sampleFee || "",
+    sampleLeadTime: item.sampleLeadTime || "",
+    bulkLeadTime: item.bulkLeadTime || "",
+    files: (item.files || []).join("\n"),
+    status: item.status,
+    notes: item.notes || ""
+  };
+}
+
+function toCustomPayload(form: CustomForm): CustomRequestUpsertRequest {
   return {
     customerId: form.customerId,
-    taskType: form.taskType,
-    remindAt: new Date(form.remindAt).toISOString(),
-    recommendedScript: form.recommendedScript || defaultFollowUpScript(form.taskType)
+    productId: form.productId || null,
+    requestType: form.requestType,
+    logoRequired: form.logoRequired,
+    packagingRequired: form.packagingRequired,
+    colorRequirement: form.colorRequirement || null,
+    sizeRequirement: form.sizeRequirement || null,
+    materialRequirement: form.materialRequirement || null,
+    quantity: optionalNumber(form.quantity),
+    moq: optionalNumber(form.moq),
+    sampleFee: form.sampleFee || null,
+    sampleLeadTime: form.sampleLeadTime || null,
+    bulkLeadTime: form.bulkLeadTime || null,
+    files: splitLinesOrComma(form.files),
+    status: form.status,
+    notes: form.notes || null
   };
 }
 
-function validateCustomerForm(form: CustomerForm) {
-  if (!form.name.trim()) return "客户名称不能为空";
-  if (form.whatsappNumber.length > 40) return "WhatsApp 号码不能超过 40 个字符";
-  return "";
+function splitLinesOrComma(value: string) {
+  return value.split(/[\n,]/).map((item) => item.trim()).filter(Boolean);
 }
 
-function validateFollowUpForm(form: FollowUpForm) {
-  if (!form.customerId) return "请先选择客户";
-  if (!form.taskType) return "请选择任务类型";
-  if (!form.remindAt || Number.isNaN(Date.parse(form.remindAt))) return "请填写正确的提醒时间";
-  if (form.recommendedScript.length > 2000) return "推荐话术不能超过 2000 个字符";
-  return "";
-}
-
-function defaultFollowUpScript(taskType: FollowUpTaskType) {
-  const scripts: Record<FollowUpTaskType, string> = {
-    报价后跟进:
-      "Hi, just checking if you had a chance to review the quotation. Would you like us to keep stock for you or adjust the quantity? This is only a draft; please confirm price, stock, lead time, and shipping before sending.",
-    催付款:
-      "Hi, may I confirm if the payment arrangement is ready? We will proceed after payment is confirmed. This is only a draft; please confirm payment method, account, price, stock, and lead time before sending.",
-    样品反馈:
-      "Hi, did you receive the sample and test it? Please let me know your feedback, and I can help adjust the product details if needed. This is only a draft and will not be sent automatically.",
-    老客户复购:
-      "Hi, hope everything is going well. Would you like to reorder the previous product or check the latest options? This is only a draft; please confirm price, stock, lead time, and shipping before sending.",
-    售后跟进:
-      "Hi, I am following up to check whether everything is working well after delivery. If you need support, please send details or photos. This is only a draft and will not be sent automatically.",
-    普通提醒:
-      "Hi, just following up on our previous conversation. Please let me know if you need any more details. This is only a draft; please confirm key information before sending."
-  };
-  return scripts[taskType];
-}
-
-function validateProductForm(form: ProductForm) {
-  if (!form.name.trim()) return "产品名称不能为空";
-  if (!form.sku.trim()) return "SKU 不能为空";
-  if (form.moq && Number(form.moq) < 0) return "MOQ 必须是非负数";
-  return "";
-}
-
-function validateQuoteForm(form: QuoteForm, requireCustomer: boolean) {
-  if (requireCustomer && !form.customerId) return "请先选择客户";
-  if (!form.productId) return "请先选择商品";
-  if (!Number(form.quantity)) return "数量必须大于 0";
-  if (!Number(form.unitPrice)) return "单价必须大于 0";
-  if (!form.currency.trim()) return "币种不能为空";
-  return "";
+function optionalNumber(value: string) {
+  if (!value.trim()) return null;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
 }
 
 function parseTiers(value: string) {
-  return value.split(/\n/).map((line) => {
-    const [quantity, unitPrice] = line.split(/,|\//).map((item) => item.trim());
-    return { quantity: Number(quantity), unitPrice };
-  }).filter((tier) => tier.quantity > 0 && Number(tier.unitPrice) > 0);
+  return value
+    .split("\n")
+    .map((line) => line.split(",").map((part) => part.trim()))
+    .filter(([quantity, unitPrice]) => quantity && unitPrice)
+    .map(([quantity, unitPrice]) => ({ quantity: Number(quantity), unitPrice }));
 }
 
-function toggleTag(tags: string[], tag: string) {
-  return tags.includes(tag) ? tags.filter((item) => item !== tag) : [...tags, tag];
-}
-
-function textToList(value: string) {
-  return Array.from(new Set(value.split(/\n|,/).map((item) => item.trim()).filter(Boolean)));
-}
-
-function listToText(value: string[]) {
-  return value.join("\n");
-}
-
-function toDateTimeLocal(value?: string | null) {
+function toDatetimeLocal(value?: string | null) {
   if (!value) return "";
   const date = new Date(value);
-  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  return offsetDate.toISOString().slice(0, 16);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 16);
 }
 
-function formatDateTime(value: string) {
-  return new Date(value).toLocaleString();
+function tomorrowIso() {
+  const date = new Date();
+  date.setDate(date.getDate() + 1);
+  return date.toISOString();
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return "-";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
