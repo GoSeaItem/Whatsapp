@@ -1521,8 +1521,8 @@ export function App() {
     return (
       <div className="auth-shell">
         <form className="auth-card" onSubmit={handleLogin}>
-          <h1>WhatsApp AI Sales Assistant</h1>
-          <p>Sign in to manage your own customers, products, quotes, follow-ups and V2 custom workflow.</p>
+          <h1>WhatsApp AI 销售助手</h1>
+          <p>登录后管理客户、产品、报价、跟进和团队协作功能。</p>
           <label className="field">
             <span>Email</span>
             <input value={loginForm.email} onChange={(event) => setLoginForm({ ...loginForm, email: event.target.value })} />
@@ -1544,34 +1544,34 @@ export function App() {
         <div className="brand">
           <div className="brand-mark">WA</div>
           <div>
-            <h1>AI Sales Assistant</h1>
-            <p>V2 internal build</p>
+            <h1>WhatsApp AI 销售助手</h1>
+            <p>V3 团队协作版</p>
           </div>
         </div>
         <nav className="nav-list">
-          {navButton("dashboard", "Home")}
-          {canManageSelectedOrganization && navButton("teamDashboard", "Team dashboard")}
-          {navButton("organizations", "Organizations")}
-          {navButton("roles", "Roles")}
-          {navButton("customers", "Customers")}
-          {navButton("products", "Products")}
-          {navButton("orgProducts", "Org products")}
-          {navButton("quotes", "Quotes")}
-          {navButton("knowledge", "Knowledge")}
-          {navButton("orgKnowledge", "Org knowledge")}
-          {navButton("orgScripts", "Org scripts")}
-          {navButton("materials", "Materials")}
-          {navButton("orgMaterials", "Org materials")}
-          {navButton("samples", "Samples")}
-          {navButton("custom", "Custom")}
-          {navButton("importExport", "Import / Export")}
-          {navButton("auditLogs", "Audit logs")}
+          {navButton("dashboard", "首页")}
+          {canManageSelectedOrganization && navButton("teamDashboard", "团队看板")}
+          {navButton("organizations", "组织")}
+          {navButton("roles", "角色")}
+          {navButton("customers", "客户")}
+          {navButton("products", "产品")}
+          {navButton("orgProducts", "公共产品库")}
+          {navButton("quotes", "报价")}
+          {navButton("knowledge", "个人知识库")}
+          {navButton("orgKnowledge", "公共知识库")}
+          {navButton("orgScripts", "公共话术库")}
+          {navButton("materials", "素材中心")}
+          {navButton("orgMaterials", "公共素材库")}
+          {navButton("samples", "样品单")}
+          {navButton("custom", "定制需求")}
+          {navButton("importExport", "导入/导出")}
+          {navButton("auditLogs", "审计日志")}
         </nav>
       </aside>
       <main className="workspace">
         <header className="topbar">
           <div>
-            <p className="eyebrow">Current user: {currentUser.email}</p>
+            <p className="eyebrow">当前用户：{currentUser.email}</p>
             <h2>{titleForView(view)}</h2>
             <p>{status}</p>
           </div>
@@ -2641,23 +2641,23 @@ function RiskWarnings({ items }: { items: string[] }) {
 
 function titleForView(view: View) {
   const titles: Record<View, string> = {
-    dashboard: "Home workbench",
-    teamDashboard: "Team dashboard",
-    organizations: "Organizations and members",
-    roles: "Role permissions",
-    customers: "Customer CRM",
-    products: "Product library",
-    orgProducts: "Organization products",
-    quotes: "Quote assistant",
-    knowledge: "AI company knowledge base",
-    orgKnowledge: "Organization knowledge base",
-    orgScripts: "Organization scripts",
-    materials: "Material center",
-    orgMaterials: "Organization materials",
-    samples: "Sample order management",
-    custom: "Custom request management",
-    importExport: "CSV import / export",
-    auditLogs: "Audit logs"
+    dashboard: "首页工作台",
+    teamDashboard: "团队看板",
+    organizations: "组织与成员",
+    roles: "角色权限",
+    customers: "客户 CRM",
+    products: "产品资料库",
+    orgProducts: "公共产品库",
+    quotes: "报价助手",
+    knowledge: "个人知识库",
+    orgKnowledge: "公共知识库",
+    orgScripts: "公共话术库",
+    materials: "素材中心",
+    orgMaterials: "公共素材库",
+    samples: "样品单管理",
+    custom: "定制需求管理",
+    importExport: "CSV 导入/导出",
+    auditLogs: "审计日志"
   };
   return titles[view];
 }
