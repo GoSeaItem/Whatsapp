@@ -59,8 +59,8 @@ describe("CSV import/export API", () => {
   it("supports dryRun preview without writing and then imports customers and products", async () => {
     const { app, db } = createTestApp();
     const customerCsv = [
-      "name,whatsappNumber,country,language,tags,nextFollowUpAt,ownerId,owner_id,created_by,OPENAI_API_KEY,api_key",
-      "Maria,+52155,Mexico,en,high|quote,2026-05-21T00:00:00.000Z,hacker,hacker2,hacker3,secret,secret2"
+      "name,whatsappNumber,email,socialLinks,country,language,tags,nextFollowUpAt,ownerId,owner_id,created_by,OPENAI_API_KEY,api_key",
+      "Maria,+52155,maria@example.com,https://instagram.com/maria,Mexico,en,high|quote,2026-05-21T00:00:00.000Z,hacker,hacker2,hacker3,secret,secret2"
     ].join("\n");
 
     const dryRun = await uploadCsv(app, "customers", customerCsv, "sales-1", true).expect(200);
@@ -94,19 +94,38 @@ describe("CSV import/export API", () => {
     expect(db._store.customRequests[0]).toMatchObject({ requestType: "logo", ownerId: "sales-1", customerId: "c1", productId: "p1" });
   });
 
-  it("skips duplicate whatsappNumber and SKU for the current user", async () => {
+  it("reports dryRun duplicates and skips duplicate whatsappNumber, email, social links, and SKU for the current user", async () => {
     const { app, db } = createTestApp({
-      customers: [makeCustomer({ id: "c1", ownerId: "sales-1", whatsappNumber: "+52155" })],
+      customers: [makeCustomer({ id: "c1", ownerId: "sales-1", whatsappNumber: "+52155", email: "dup@example.com", socialLinks: ["https://instagram.com/dup"] })],
       products: [makeProduct({ id: "p1", ownerId: "sales-1", sku: "BD-001" })]
     });
 
-    const customer = await uploadCsv(app, "customers", "name,whatsappNumber\nRepeat,+52155", "sales-1", false).expect(200);
+    const dryRun = await uploadCsv(app, "customers", "name,socialLinks\nRepeat,https://instagram.com/dup", "sales-1", true).expect(200);
+    const customer = await uploadCsv(app, "customers", "name,whatsappNumber,email,socialLinks\nRepeat,+52155,dup@example.com,https://instagram.com/dup", "sales-1", false).expect(200);
+    const customerNoSkip = await uploadCsv(app, "customers", "name,email\nRepeat,dup@example.com", "sales-1", false, "", false).expect(200);
     const product = await uploadCsv(app, "products", "name,sku\nRepeat,BD-001", "sales-1", false).expect(200);
 
+    expect(dryRun.body).toMatchObject({ successCount: 0, failureCount: 1, skippedCount: 0, dryRun: true });
+    expect(dryRun.body.errors[0].field).toContain("socialLinks");
     expect(customer.body).toMatchObject({ successCount: 0, skippedCount: 1, failureCount: 0 });
+    expect(customerNoSkip.body).toMatchObject({ successCount: 0, skippedCount: 0, failureCount: 1 });
     expect(product.body).toMatchObject({ successCount: 0, skippedCount: 1, failureCount: 0 });
     expect(db._store.customers).toHaveLength(1);
     expect(db._store.products).toHaveLength(1);
+    expect(db._store.duplicateLogs[0]).toMatchObject({ matchedCustomerId: "c1", source: "import-customers", action: "skipped" });
+  });
+
+  it("allows duplicate customers across organizations but rejects them inside the same organization", async () => {
+    const { app, db } = createTestApp({
+      customers: [makeCustomer({ id: "org-customer", ownerId: "manager", organizationId: "org-a", whatsappNumber: "+52155", socialLinks: ["https://facebook.com/maria"] })]
+    });
+
+    const sameOrg = await uploadCsv(app, "customers", "name,socialLinks\nRepeat,https://facebook.com/maria", "manager", true, "org-a").expect(200);
+    const otherOrg = await uploadCsv(app, "customers", "name,whatsappNumber,socialLinks\nRepeat,+52155,https://facebook.com/maria", "other", false, "org-b").expect(200);
+
+    expect(sameOrg.body).toMatchObject({ successCount: 0, failureCount: 1 });
+    expect(otherOrg.body).toMatchObject({ successCount: 1, failureCount: 0 });
+    expect(db._store.customers.find((customer) => customer.organizationId === "org-b")).toMatchObject({ ownerId: "other", assignedTo: "other" });
   });
 
   it("returns clear row errors for invalid enums, dates, numbers, and cross-user associations", async () => {
@@ -149,9 +168,12 @@ describe("CSV import/export API", () => {
   });
 });
 
-function uploadCsv(app: express.Express, type: ImportExportType, csv: string, userId: string, dryRun: boolean) {
+function uploadCsv(app: express.Express, type: ImportExportType, csv: string, userId: string, dryRun: boolean, organizationId = "", skipDuplicates = true) {
+  const query = new URLSearchParams({ dryRun: String(dryRun) });
+  if (organizationId) query.set("organizationId", organizationId);
+  if (!skipDuplicates) query.set("skipDuplicates", "false");
   return request(app)
-    .post(`/api/import/${type}?dryRun=${dryRun}`)
+    .post(`/api/import/${type}?${query.toString()}`)
     .set("x-user-id", userId)
     .attach("file", Buffer.from(csv, "utf8"), { filename: `${type}.csv`, contentType: "text/csv" });
 }
@@ -163,6 +185,7 @@ type MemoryDb = {
   materials: Row[];
   sampleOrders: Row[];
   customRequests: Row[];
+  duplicateLogs: Row[];
 };
 
 function createMemoryDb(seed: Partial<MemoryDb>) {
@@ -172,7 +195,8 @@ function createMemoryDb(seed: Partial<MemoryDb>) {
     knowledgeBase: [...(seed.knowledgeBase || [])],
     materials: [...(seed.materials || [])],
     sampleOrders: [...(seed.sampleOrders || [])],
-    customRequests: [...(seed.customRequests || [])]
+    customRequests: [...(seed.customRequests || [])],
+    duplicateLogs: [...(seed.duplicateLogs || [])]
   };
   let nextId = 1;
   const now = new Date("2026-05-20T00:00:00.000Z");
@@ -189,6 +213,24 @@ function createMemoryDb(seed: Partial<MemoryDb>) {
       async create(args: any) {
         const row = { id: `customer-${nextId++}`, createdAt: now, updatedAt: now, ...args.data };
         store.customers.push(row);
+        return row;
+      }
+    },
+    organizationMember: {
+      async findFirst(args: any) {
+        const members = [
+          { organizationId: "org-a", userId: "manager", role: "manager", status: "active" },
+          { organizationId: "org-a", userId: "sales-1", role: "sales", status: "active" },
+          { organizationId: "org-a", userId: "support", role: "support", status: "active" },
+          { organizationId: "org-b", userId: "other", role: "owner", status: "active" }
+        ];
+        return members.find((row) => matchesWhere(row, args.where)) || null;
+      }
+    },
+    customerDuplicateEventLog: {
+      async create(args: any) {
+        const row = { id: `duplicate-${nextId++}`, createdAt: now, ...args.data };
+        store.duplicateLogs.push(row);
         return row;
       }
     },
@@ -282,7 +324,15 @@ function fullSeed(): Partial<MemoryDb> {
 }
 
 function matchesWhere(row: Row, where: Row = {}) {
-  return Object.entries(where).every(([key, value]) => row[key] === value);
+  return Object.entries(where).every(([key, value]) => {
+    if (key === "OR" && Array.isArray(value)) {
+      return value.some((condition) => matchesWhere(row, condition));
+    }
+    if (value && typeof value === "object" && "hasSome" in value) {
+      return Array.isArray(row[key]) && value.hasSome.some((item: string) => row[key].includes(item));
+    }
+    return row[key] === value;
+  });
 }
 
 function withProduct(rows: Row[], products: Row[]) {
@@ -302,6 +352,8 @@ function makeCustomer(overrides: Row = {}) {
     id: "c",
     name: "Maria",
     whatsappNumber: "+52155",
+    email: "maria@example.com",
+    socialLinks: [],
     country: "Mexico",
     language: "en",
     tags: ["high"],
@@ -311,6 +363,9 @@ function makeCustomer(overrides: Row = {}) {
     nextFollowUpAt: new Date("2026-05-21T00:00:00.000Z"),
     notes: "note",
     ownerId: "sales-1",
+    organizationId: null,
+    assignedTo: null,
+    collaborators: [],
     createdAt: new Date("2026-05-20T00:00:00.000Z"),
     updatedAt: new Date("2026-05-20T00:00:00.000Z"),
     ...overrides

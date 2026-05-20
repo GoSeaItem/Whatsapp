@@ -10,6 +10,8 @@ type RawCustomer = {
   id: string;
   name: string;
   whatsappNumber: string | null;
+  email: string | null;
+  socialLinks?: string[];
   country: string | null;
   language: string | null;
   tags: string[];
@@ -18,6 +20,9 @@ type RawCustomer = {
   latestSummary: string | null;
   nextFollowUpAt: Date | null;
   ownerId: string | null;
+  organizationId?: string | null;
+  assignedTo?: string | null;
+  collaborators?: string[];
   notes: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -28,6 +33,8 @@ export function serializeCustomer(customer: RawCustomer): CustomerSummary | Cust
     id: customer.id,
     name: customer.name,
     whatsappNumber: customer.whatsappNumber,
+    email: customer.email,
+    socialLinks: customer.socialLinks || [],
     country: customer.country,
     language: customer.language,
     tags: customer.tags,
@@ -36,6 +43,9 @@ export function serializeCustomer(customer: RawCustomer): CustomerSummary | Cust
     latestSummary: customer.latestSummary,
     nextFollowUpAt: customer.nextFollowUpAt?.toISOString() || null,
     ownerId: customer.ownerId,
+    organizationId: customer.organizationId || null,
+    assignedTo: customer.assignedTo || null,
+    collaborators: customer.collaborators || [],
     notes: customer.notes,
     createdAt: customer.createdAt.toISOString(),
     updatedAt: customer.updatedAt.toISOString()
@@ -59,6 +69,19 @@ export function validateCustomerPayload(input: Partial<CustomerUpsertRequest>, o
   const whatsappNumber = cleanString(input.whatsappNumber);
   if (whatsappNumber && whatsappNumber.length > 40) {
     errors.push({ field: "whatsappNumber", message: "WhatsApp 号码不能超过 40 个字符" });
+  }
+
+  const email = cleanString(input.email);
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errors.push({ field: "email", message: "email format is invalid" });
+  }
+
+  const socialLinks = normalizeStringArray(input.socialLinks);
+  if (socialLinks.length > 12) {
+    errors.push({ field: "socialLinks", message: "socialLinks cannot exceed 12 items" });
+  }
+  if (socialLinks.some((link) => !/^https?:\/\/\S+$/i.test(link))) {
+    errors.push({ field: "socialLinks", message: "socialLinks must be http/https URLs" });
   }
 
   const stage = cleanString(input.stage);
@@ -86,6 +109,8 @@ export function toCustomerCreateData(input: CustomerUpsertRequest) {
   return {
     name: cleanString(input.name),
     whatsappNumber: cleanString(input.whatsappNumber) || null,
+    email: cleanString(input.email) || null,
+    socialLinks: normalizeStringArray(input.socialLinks),
     country: cleanString(input.country) || null,
     language: cleanString(input.language) || "English",
     tags: normalizeTags(input.tags),
@@ -102,6 +127,8 @@ export function toCustomerUpdateData(input: Partial<CustomerUpsertRequest>) {
 
   setIfPresent(data, "name", input.name, cleanString);
   setIfPresent(data, "whatsappNumber", input.whatsappNumber, nullableString);
+  setIfPresent(data, "email", input.email, nullableString);
+  if (input.socialLinks !== undefined) data.socialLinks = normalizeStringArray(input.socialLinks);
   setIfPresent(data, "country", input.country, nullableString);
   setIfPresent(data, "language", input.language, (value) => cleanString(value) || "English");
   if (input.tags !== undefined) data.tags = normalizeTags(input.tags);
@@ -115,6 +142,11 @@ export function toCustomerUpdateData(input: Partial<CustomerUpsertRequest>) {
 }
 
 export function normalizeTags(value: unknown) {
+  const raw = Array.isArray(value) ? value : typeof value === "string" ? value.split(",") : [];
+  return Array.from(new Set(raw.map((item) => cleanString(item)).filter(Boolean)));
+}
+
+export function normalizeStringArray(value: unknown) {
   const raw = Array.isArray(value) ? value : typeof value === "string" ? value.split(",") : [];
   return Array.from(new Set(raw.map((item) => cleanString(item)).filter(Boolean)));
 }

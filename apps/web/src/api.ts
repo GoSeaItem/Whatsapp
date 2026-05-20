@@ -1,6 +1,12 @@
 import type {
   AuthResponse,
   AuthUser,
+  AuditLogDetail,
+  AuditLogListQuery,
+  AuditLogSummary,
+  CustomerAssignRequest,
+  CustomerDuplicateCheckRequest,
+  CustomerDuplicateCheckResponse,
   CustomerDetail,
   CustomRequestDetail,
   CustomRequestListQuery,
@@ -21,6 +27,10 @@ import type {
   GenerateDraftResponse,
   KnowledgeBaseDetail,
   KnowledgeBaseListQuery,
+  KnowledgeBaseOrgDetail,
+  KnowledgeBaseOrgListQuery,
+  KnowledgeBaseOrgSummary,
+  KnowledgeBaseOrgUpsertRequest,
   KnowledgeBaseSummary,
   KnowledgeBaseUpsertRequest,
   MaterialDetail,
@@ -29,6 +39,20 @@ import type {
   MaterialListQuery,
   MaterialSummary,
   MaterialUpsertRequest,
+  OrganizationDetail,
+  OrganizationMemberSummary,
+  OrganizationMemberUpdateRequest,
+  OrganizationMemberUpsertRequest,
+  OrganizationMaterialCreateRequest,
+  OrganizationMaterialDetail,
+  OrganizationMaterialListQuery,
+  OrganizationMaterialSummary,
+  OrganizationProductCreateRequest,
+  OrganizationProductDetail,
+  OrganizationProductListQuery,
+  OrganizationProductSummary,
+  OrganizationSummary,
+  OrganizationUpsertRequest,
   ProductDetail,
   ProductListQuery,
   ProductSummary,
@@ -36,6 +60,9 @@ import type {
   QuoteGenerateRequest,
   QuoteResponse,
   QuoteSaveRequest,
+  RoleSummary,
+  RoleUpdateRequest,
+  RoleUpsertRequest,
   SampleFeedbackStatus,
   SampleOrderDetail,
   SampleOrderListQuery,
@@ -45,6 +72,11 @@ import type {
   SampleScriptRequest,
   SampleScriptResponse,
   SampleShippingStatus,
+  ScriptOrgDetail,
+  ScriptOrgListQuery,
+  ScriptOrgSummary,
+  ScriptOrgUpsertRequest,
+  TeamDashboardSummary,
   WorkbenchDashboard
 } from "@wa-ai/shared";
 
@@ -110,7 +142,7 @@ function toQuery(params: Record<string, string | undefined>) {
 
 export function getCustomers(query: CustomerListQuery = {}) {
   return request<CustomerSummary[]>(
-    `/api/customers${toQuery({ tag: query.tag, stage: query.stage, q: query.q, sort: query.sort, intentLevel: query.intentLevel })}`
+    `/api/customers${toQuery({ tag: query.tag, stage: query.stage, q: query.q, sort: query.sort, intentLevel: query.intentLevel, organizationId: query.organizationId })}`
   );
 }
 
@@ -132,6 +164,14 @@ export function getHighIntentCustomers(limit = 10) {
   return request<CustomerSummary[]>(`/api/dashboard/high-intent-customers${toQuery({ limit: String(limit) })}`);
 }
 
+export function getTeamSummary(organizationId: string) {
+  return request<TeamDashboardSummary>(`/api/dashboard/team-summary${toQuery({ organizationId })}`);
+}
+
+export function teamSummaryCsvUrl(organizationId: string) {
+  return `${API_BASE_URL}/api/dashboard/team-summary${toQuery({ organizationId, format: "csv" })}`;
+}
+
 export function createCustomer(payload: CustomerUpsertRequest) {
   return request<CustomerDetail>("/api/customers", {
     method: "POST",
@@ -142,6 +182,20 @@ export function createCustomer(payload: CustomerUpsertRequest) {
 export function updateCustomer(id: string, payload: Partial<CustomerUpsertRequest>) {
   return request<CustomerDetail>(`/api/customers/${id}`, {
     method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function assignCustomer(id: string, payload: CustomerAssignRequest) {
+  return request<CustomerDetail>(`/api/customers/${id}/assign`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function checkCustomerDuplicate(payload: CustomerDuplicateCheckRequest) {
+  return request<CustomerDuplicateCheckResponse>("/api/customers/check-duplicate", {
+    method: "POST",
     body: JSON.stringify(payload)
   });
 }
@@ -159,6 +213,157 @@ export function deleteCustomer(id: string) {
 
 export function getProducts(query: ProductListQuery = {}) {
   return request<ProductSummary[]>(`/api/products${toQuery({ q: query.q, category: query.category })}`);
+}
+
+export function getOrganizationProducts(query: OrganizationProductListQuery) {
+  return request<OrganizationProductSummary[]>(`/api/products/org${toQuery({ organizationId: query.organizationId, q: query.q, category: query.category })}`);
+}
+
+export function getOrganizationProduct(id: string) {
+  return request<OrganizationProductDetail>(`/api/products/org/${id}`);
+}
+
+export function createOrganizationProduct(payload: OrganizationProductCreateRequest) {
+  return request<OrganizationProductDetail>("/api/products/org", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateOrganizationProduct(id: string, payload: Partial<ProductUpsertRequest>) {
+  return request<OrganizationProductDetail>(`/api/products/org/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function deleteOrganizationProduct(id: string) {
+  return fetch(`${API_BASE_URL}/api/products/org/${id}`, {
+    credentials: "include",
+    method: "DELETE"
+  }).then((response) => {
+    if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+  });
+}
+
+export function getOrganizations() {
+  return request<OrganizationSummary[]>("/api/organizations");
+}
+
+export function getOrganization(id: string) {
+  return request<OrganizationDetail>(`/api/organizations/${id}`);
+}
+
+export function createOrganization(payload: OrganizationUpsertRequest) {
+  return request<OrganizationDetail>("/api/organizations", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateOrganization(id: string, payload: OrganizationUpsertRequest) {
+  return request<OrganizationDetail>(`/api/organizations/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function deleteOrganization(id: string) {
+  return fetch(`${API_BASE_URL}/api/organizations/${id}`, {
+    credentials: "include",
+    method: "DELETE"
+  }).then((response) => {
+    if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+  });
+}
+
+export function getOrganizationMembers(id: string, q = "") {
+  return request<OrganizationMemberSummary[]>(`/api/organizations/${id}/members${toQuery({ q })}`);
+}
+
+export function addOrganizationMember(id: string, payload: OrganizationMemberUpsertRequest) {
+  return request<OrganizationMemberSummary>(`/api/organizations/${id}/members`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateOrganizationMember(id: string, memberId: string, payload: OrganizationMemberUpdateRequest) {
+  return request<OrganizationMemberSummary>(`/api/organizations/${id}/members/${memberId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function deleteOrganizationMember(id: string, memberId: string) {
+  return fetch(`${API_BASE_URL}/api/organizations/${id}/members/${memberId}`, {
+    credentials: "include",
+    method: "DELETE"
+  }).then((response) => {
+    if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+  });
+}
+
+export function getRoles(organizationId: string, q = "") {
+  return request<RoleSummary[]>(`/api/roles${toQuery({ organizationId, q })}`);
+}
+
+export function getAuditLogs(query: AuditLogListQuery) {
+  return request<{ items: AuditLogSummary[]; page: number; pageSize: number }>(
+    `/api/audit-logs${toQuery({
+      organizationId: query.organizationId,
+      entityType: query.entityType,
+      userId: query.userId,
+      action: query.action,
+      from: query.from,
+      to: query.to,
+      page: query.page ? String(query.page) : undefined,
+      pageSize: query.pageSize ? String(query.pageSize) : undefined
+    })}`
+  );
+}
+
+export function getAuditLog(id: string) {
+  return request<AuditLogDetail>(`/api/audit-logs/${id}`);
+}
+
+export function auditLogsCsvUrl(query: AuditLogListQuery) {
+  return `${API_BASE_URL}/api/audit-logs${toQuery({
+    organizationId: query.organizationId,
+    entityType: query.entityType,
+    userId: query.userId,
+    action: query.action,
+    from: query.from,
+    to: query.to,
+    format: "csv"
+  })}`;
+}
+
+export function getRole(id: string) {
+  return request<RoleSummary>(`/api/roles/${id}`);
+}
+
+export function createRole(payload: RoleUpsertRequest) {
+  return request<RoleSummary>("/api/roles", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateRole(id: string, payload: RoleUpdateRequest) {
+  return request<RoleSummary>(`/api/roles/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function deleteRole(id: string) {
+  return fetch(`${API_BASE_URL}/api/roles/${id}`, {
+    credentials: "include",
+    method: "DELETE"
+  }).then((response) => {
+    if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+  });
 }
 
 export function getProduct(id: string) {
@@ -330,10 +535,109 @@ export function deleteKnowledgeBaseItem(id: string) {
   });
 }
 
+export function getOrgKnowledgeBase(query: KnowledgeBaseOrgListQuery) {
+  return request<KnowledgeBaseOrgSummary[]>(
+    `/api/knowledge-base/org${toQuery({ organizationId: query.organizationId, category: query.category, language: query.language, q: query.q })}`
+  );
+}
+
+export function getOrgKnowledgeBaseItem(id: string) {
+  return request<KnowledgeBaseOrgDetail>(`/api/knowledge-base/org/${id}`);
+}
+
+export function createOrgKnowledgeBaseItem(payload: KnowledgeBaseOrgUpsertRequest) {
+  return request<KnowledgeBaseOrgDetail>("/api/knowledge-base/org", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateOrgKnowledgeBaseItem(id: string, payload: Partial<KnowledgeBaseOrgUpsertRequest>) {
+  return request<KnowledgeBaseOrgDetail>(`/api/knowledge-base/org/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function deleteOrgKnowledgeBaseItem(id: string) {
+  return fetch(`${API_BASE_URL}/api/knowledge-base/org/${id}`, {
+    credentials: "include",
+    method: "DELETE"
+  }).then((response) => {
+    if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+  });
+}
+
+export function getOrgScripts(query: ScriptOrgListQuery) {
+  return request<ScriptOrgSummary[]>(
+    `/api/scripts/org${toQuery({ organizationId: query.organizationId, category: query.category, language: query.language, q: query.q })}`
+  );
+}
+
+export function getOrgScript(id: string) {
+  return request<ScriptOrgDetail>(`/api/scripts/org/${id}`);
+}
+
+export function createOrgScript(payload: ScriptOrgUpsertRequest) {
+  return request<ScriptOrgDetail>("/api/scripts/org", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateOrgScript(id: string, payload: Partial<ScriptOrgUpsertRequest>) {
+  return request<ScriptOrgDetail>(`/api/scripts/org/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function deleteOrgScript(id: string) {
+  return fetch(`${API_BASE_URL}/api/scripts/org/${id}`, {
+    credentials: "include",
+    method: "DELETE"
+  }).then((response) => {
+    if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+  });
+}
+
 export function getMaterials(query: MaterialListQuery = {}) {
   return request<MaterialSummary[]>(
     `/api/materials${toQuery({ q: query.q, type: query.type, language: query.language, productId: query.productId, tag: query.tag })}`
   );
+}
+
+export function getOrganizationMaterials(query: OrganizationMaterialListQuery) {
+  return request<OrganizationMaterialSummary[]>(
+    `/api/materials/org${toQuery({ organizationId: query.organizationId, q: query.q, type: query.type, productSku: query.productSku })}`
+  );
+}
+
+export function getOrganizationMaterial(id: string) {
+  return request<OrganizationMaterialDetail>(`/api/materials/org/${id}`);
+}
+
+export function createOrganizationMaterial(payload: OrganizationMaterialCreateRequest) {
+  return request<OrganizationMaterialDetail>("/api/materials/org", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateOrganizationMaterial(id: string, payload: Partial<MaterialUpsertRequest>) {
+  return request<OrganizationMaterialDetail>(`/api/materials/org/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function deleteOrganizationMaterial(id: string) {
+  return fetch(`${API_BASE_URL}/api/materials/org/${id}`, {
+    credentials: "include",
+    method: "DELETE"
+  }).then((response) => {
+    if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+  });
 }
 
 export function getMaterial(id: string) {
@@ -466,13 +770,14 @@ export type CsvImportResult = {
   errors: Array<{ row: number; field: string; message: string }>;
 };
 
-export function importCsv(type: ImportExportType, file: File, options: { dryRun?: boolean; skipDuplicates?: boolean } = {}) {
+export function importCsv(type: ImportExportType, file: File, options: { dryRun?: boolean; skipDuplicates?: boolean; organizationId?: string } = {}) {
   const form = new FormData();
   form.append("file", file);
   return fetch(
     `${API_BASE_URL}/api/import/${type}${toQuery({
       dryRun: options.dryRun ? "true" : "false",
-      skipDuplicates: options.skipDuplicates === false ? "false" : "true"
+      skipDuplicates: options.skipDuplicates === false ? "false" : "true",
+      organizationId: options.organizationId
     })}`,
     { method: "POST", credentials: "include", body: form }
   ).then(async (response) => {

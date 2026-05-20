@@ -2,6 +2,78 @@
 
 Current release target: `v0.4-v2-sales-enhancement`.
 
+Current development track: `V3-H Manager team dashboard`.
+
+## V3-H Manager Team Dashboard
+
+- Team dashboard is scoped to one selected organization and is visible only to `owner` / `manager`.
+- KPI data is generated live from existing customer, quote, follow-up, and member records; there is no cached analytics table yet.
+- `quotedNoFollowUpCustomers` currently means the customer has quote records and no pending follow-up task. It is not a true WhatsApp read/unread or reply-status signal.
+- Team high-intent rows intentionally hide WhatsApp numbers and email addresses.
+- This is not a finance, profit, performance-pay, order, procurement, or boss-dashboard module.
+
+## V3-G Audit Logs
+
+- Audit logs are organization scoped. Legacy personal-only V1/V2 operations without `organizationId` are intentionally not written into organization audit logs.
+- `actorId` is kept for compatibility with V3-E/V3-F records; new writes also set `userId`.
+- Audit CSV export is available from `/api/audit-logs?organizationId=...&format=csv` and only includes rows visible to the current role.
+- Logs are read-only in V3-G. Retention policies, tamper-proof storage, advanced diff views, and full compliance reporting are later tasks.
+- V3-G does not add WhatsApp automation, bulk sending, simulated send-button clicking, billing, payment, finance, order management, or boss dashboard features.
+
+## V3-F Organization Shared Products and Materials
+
+- Shared products/materials are links to existing personal records. Adding a shared resource requires the current user to own the underlying product/material.
+- `owner` / `manager` can update the underlying shared product/material through the organization page; `sales` / `support` are read-only.
+- Quote generation can use organization-shared products when `organizationId` is provided. Full organization-scoped quote records are still a later V3 task.
+- Shared material integration is available through Web API/page. Chrome sidebar organization resource pickers are still a later UX improvement.
+- V3-F still uses URL text for materials and does not add true file upload, object storage, inventory, procurement, finance, order management, payment, or WhatsApp automation.
+
+## V3-E Organization Shared Knowledge and Scripts
+
+- Organization shared knowledge and scripts are scoped by `organizationId`; `owner` / `manager` can write, while `sales` / `support` are read-only.
+- AI reply lookup can reference enabled organization knowledge when `organizationId` is provided, and returns `[Org]` in `knowledgeUsed`.
+- Shared script records are currently managed and searchable, but full script recommendation/ranking inside the AI reply flow is still a later improvement.
+- `AuditLog` now records organization knowledge/script create, update, and delete events with before/after JSON; full compliance retention and immutable storage are later tasks.
+- V3-E does not add billing, payment, order management, finance, boss dashboard, WhatsApp official API integration, automatic WhatsApp sending, bulk sending, or simulated send-button clicking.
+
+## V3-D Duplicate Customer Collision Detection
+
+- Duplicate checks are exact-match only for WhatsApp number, email, and social links. Phone normalization, fuzzy matching, nickname matching, and merge suggestions are not implemented yet.
+- Cross-organization duplicate customers are allowed by design. V3-D only blocks duplicates within the same personal scope or same organization.
+- `CustomerDuplicateEventLog` records duplicate checks, blocked saves, and skipped imports, but it is not a complete audit log or merge history.
+- Formal customer CSV import defaults to `skipDuplicates=true`; `skipDuplicates=false` reports duplicate rows as errors but still does not overwrite other users' customers.
+- The Web duplicate prompt shows owner/assigned user IDs. A richer member-name display is a later UX improvement.
+- V3-D does not add automatic assignment, customer pool, lead claiming, customer merge, billing, payment, order management, finance, boss dashboard, or WhatsApp automation.
+
+## V3-C Customer Ownership and Assignment
+
+- V3-C keeps `Customer.organizationId` optional for backward compatibility with existing V1/V2 personal customers; organization-scoped customers are created by passing `organizationId`.
+- Customer ownership and assignment constraints are enforced in the API layer. The database stores references and indexes, but business-role checks remain application logic.
+- `assignedTo` and `collaborators` currently use user IDs in the Web form; a member picker with names/emails is a later UX improvement.
+- Assignment history is recorded in `CustomerAssignmentLog`; V3-G also records organization-context customer create/update/delete snapshots. Personal-only customer edits remain outside organization audit logs.
+- `support` and collaborators can view assigned customer records but cannot edit or delete them in V3-C.
+- Duplicate collision checks cover WhatsApp number, email, and social links within the current personal or organization scope; fuzzy matching and merge workflows are not implemented yet.
+- Related quote/follow-up/sample/custom records still mostly follow their existing personal ownership rules. Full organization-shared downstream records are a later V3 task.
+- V3-C does not add automatic customer assignment, customer pool, lead claiming, team analytics, payments, orders, finance, or WhatsApp automation.
+
+## V3-B Role Permission Management
+
+- V3-B role checks apply when a request carries organization context through `organizationId` query/body or `x-organization-id` header.
+- Existing V1/V2 personal data APIs remain personally isolated when no organization context is provided; V3-B does not yet convert those records into organization-shared resources.
+- `Role` stores role descriptions and fixed role names only. It is not yet a custom permission matrix.
+- `sales` and `support` are read-only for organization-context resource writes; frontend hides/disables actions, but API middleware is the source of truth.
+- Role deletion is owner-only. Default roles can be recreated by listing roles for the organization if missing.
+- V3-B still does not implement billing, payment, order management, department hierarchy, advanced audit retention, or WhatsApp automation.
+
+## V3-A Organization and Team Members
+
+- V3-A only adds the organization/member foundation. Customer, product, quote, follow-up, knowledge base, material, sample order, custom request, import, and export data remain personally isolated by the current logged-in user.
+- Organization data sharing rules are not implemented yet. Future V3 work needs explicit sharing fields and query rules before any V1/V2 records can become organization-shared.
+- Member invitations by email are not implemented. V3-A adds existing users by `userId` only.
+- Team/department hierarchy, advanced audit retention, approval workflows, team dashboards, billing, payment, and order management remain out of scope.
+- Organization owner deletion currently deletes the organization and its membership rows. It does not delete personal customer/product/business records.
+- No WhatsApp automatic sending, bulk sending, or simulated send-button clicking is introduced by V3-A.
+
 ## V2-G 全链路联调
 - V2-G 只做全链路联调、版本标记、稳定性检查和文档收尾，不新增新模块。
 - 当前项目仍是个人账号隔离，不做团队、角色、部门权限。

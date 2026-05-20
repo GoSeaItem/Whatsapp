@@ -28,6 +28,7 @@ export type KnowledgeContextItem = {
   content: string;
   language: KnowledgeBaseLanguage;
   productId?: string | null;
+  source?: "Org" | "Personal" | "Default";
 };
 
 const categorySet = new Set<string>(KNOWLEDGE_BASE_CATEGORIES);
@@ -167,7 +168,7 @@ export function rankKnowledgeItems(
 
 export function formatKnowledgeContext(items: KnowledgeContextItem[]) {
   return items
-    .map((item, index) => `${index + 1}. [${item.category}/${item.language}] ${item.title}: ${item.content}`)
+    .map((item, index) => `${index + 1}. [${item.source || "Personal"}/${item.category}/${item.language}] ${item.title}: ${item.content}`)
     .join("\n");
 }
 

@@ -74,6 +74,8 @@ export type CustomerSummary = {
   id: string;
   name: string;
   whatsappNumber?: string | null;
+  email?: string | null;
+  socialLinks?: string[];
   country?: string | null;
   language?: string | null;
   tags: string[];
@@ -82,6 +84,9 @@ export type CustomerSummary = {
   latestSummary?: string | null;
   nextFollowUpAt?: string | null;
   ownerId?: string | null;
+  organizationId?: string | null;
+  assignedTo?: string | null;
+  collaborators?: string[];
   notes?: string | null;
   intentScore?: number;
   intentLevel?: IntentLevel;
@@ -90,8 +95,39 @@ export type CustomerSummary = {
   updatedAt: string;
 };
 
-export type CustomerDetail = CustomerSummary;
-export type CustomerListQuery = { tag?: string; stage?: string; q?: string; sort?: "intentScore" | ""; intentLevel?: IntentLevel | "" };
+export type CustomerAssignmentLogSummary = {
+  id: string;
+  customerId: string;
+  organizationId: string;
+  fromUserId?: string | null;
+  toUserId?: string | null;
+  operatedBy: string;
+  note?: string | null;
+  createdAt: string;
+};
+
+export type CustomerDetail = CustomerSummary & {
+  assignmentLogs?: CustomerAssignmentLogSummary[];
+};
+export type CustomerListQuery = { tag?: string; stage?: string; q?: string; sort?: "intentScore" | ""; intentLevel?: IntentLevel | ""; organizationId?: string };
+
+export type CustomerDuplicateCheckRequest = Partial<CustomerUpsertRequest> & {
+  customerId?: string | null;
+};
+
+export type CustomerDuplicateMatch = {
+  customerId: string;
+  name: string;
+  ownerId?: string | null;
+  assignedTo?: string | null;
+  organizationId?: string | null;
+  matchedFields: string[];
+};
+
+export type CustomerDuplicateCheckResponse = {
+  hasDuplicate: boolean;
+  matches: CustomerDuplicateMatch[];
+};
 
 export type IntentLevel = "low" | "medium" | "high";
 
@@ -107,6 +143,11 @@ export type CustomerIntentResponse = {
 export type CustomerUpsertRequest = {
   name: string;
   whatsappNumber?: string | null;
+  email?: string | null;
+  socialLinks?: string[];
+  organizationId?: string | null;
+  assignedTo?: string | null;
+  collaborators?: string[];
   country?: string | null;
   language?: string | null;
   tags?: string[];
@@ -115,6 +156,11 @@ export type CustomerUpsertRequest = {
   latestSummary?: string | null;
   nextFollowUpAt?: string | null;
   notes?: string | null;
+};
+
+export type CustomerAssignRequest = {
+  assignedTo: string;
+  note?: string | null;
 };
 
 export type CustomerValidationError = { field: string; message: string };
@@ -164,6 +210,29 @@ export type ProductUpsertRequest = {
   introEs?: string | null;
   introPt?: string | null;
   introAr?: string | null;
+};
+
+export type OrganizationProductSummary = {
+  id: string;
+  organizationId: string;
+  productId: string;
+  createdBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  product: ProductSummary;
+};
+
+export type OrganizationProductDetail = OrganizationProductSummary;
+
+export type OrganizationProductListQuery = {
+  organizationId: string;
+  q?: string;
+  category?: string;
+};
+
+export type OrganizationProductCreateRequest = {
+  organizationId: string;
+  productId: string;
 };
 
 export type ProductIntroRequest = {
@@ -235,6 +304,30 @@ export type MaterialUpsertRequest = {
   tags?: string[];
 };
 
+export type OrganizationMaterialSummary = {
+  id: string;
+  organizationId: string;
+  materialId: string;
+  createdBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  material: MaterialSummary;
+};
+
+export type OrganizationMaterialDetail = OrganizationMaterialSummary;
+
+export type OrganizationMaterialListQuery = {
+  organizationId: string;
+  q?: string;
+  type?: MaterialType | "";
+  productSku?: string;
+};
+
+export type OrganizationMaterialCreateRequest = {
+  organizationId: string;
+  materialId: string;
+};
+
 export type MaterialIntroRequest = {
   productContext?: string | null;
   customerLanguage?: string | null;
@@ -257,6 +350,7 @@ export type QuoteTierInput = {
 export type QuoteGenerateRequest = {
   customerId?: string | null;
   productId: string;
+  organizationId?: string | null;
   quantity: number;
   unitPrice: number | string;
   currency: string;
@@ -471,6 +565,102 @@ export type CustomScriptResponse = {
   knowledgeUsed?: string[];
 };
 
+export const ORGANIZATION_ROLES = ["owner", "manager", "sales", "support"] as const;
+export type OrganizationRole = typeof ORGANIZATION_ROLES[number];
+
+export const ORGANIZATION_MEMBER_STATUSES = ["active", "inactive"] as const;
+export type OrganizationMemberStatus = typeof ORGANIZATION_MEMBER_STATUSES[number];
+
+export type OrganizationMemberSummary = {
+  id: string;
+  organizationId: string;
+  userId: string;
+  role: OrganizationRole;
+  status: OrganizationMemberStatus;
+  userName?: string | null;
+  userEmail?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type OrganizationSummary = {
+  id: string;
+  name: string;
+  ownerId: string;
+  currentUserRole?: OrganizationRole | null;
+  currentUserStatus?: OrganizationMemberStatus | null;
+  memberCount?: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type OrganizationDetail = OrganizationSummary & {
+  members: OrganizationMemberSummary[];
+};
+
+export type OrganizationUpsertRequest = {
+  name: string;
+};
+
+export type OrganizationMemberUpsertRequest = {
+  userId: string;
+  role: OrganizationRole;
+  status?: OrganizationMemberStatus;
+};
+
+export type OrganizationMemberUpdateRequest = {
+  role?: OrganizationRole;
+  status?: OrganizationMemberStatus;
+};
+
+export type RoleSummary = {
+  id: string;
+  organizationId: string;
+  name: OrganizationRole;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type RoleUpsertRequest = {
+  organizationId: string;
+  name: OrganizationRole;
+  description: string;
+};
+
+export type RoleUpdateRequest = {
+  description?: string;
+};
+
+export type AuditLogAction = "create" | "update" | "delete";
+
+export type AuditLogSummary = {
+  id: string;
+  organizationId?: string | null;
+  userId?: string | null;
+  actorId?: string | null;
+  action: AuditLogAction | string;
+  entityType: string;
+  entityId?: string | null;
+  before?: unknown;
+  after?: unknown;
+  metadata?: unknown;
+  createdAt: string;
+};
+
+export type AuditLogDetail = AuditLogSummary;
+
+export type AuditLogListQuery = {
+  organizationId: string;
+  entityType?: string;
+  userId?: string;
+  action?: AuditLogAction | "";
+  from?: string;
+  to?: string;
+  page?: number;
+  pageSize?: number;
+};
+
 export type FollowUpSummary = {
   id: string;
   customerId: string;
@@ -512,6 +702,45 @@ export type WorkbenchDashboard = {
   recentCustomers: CustomerSummary[];
 };
 
+export type TeamDashboardKpis = {
+  todayNewCustomers: number;
+  todayFollowUpCustomers: number;
+  overdueFollowUpCustomers: number;
+  highIntentCustomers: number;
+  quotedNoFollowUpCustomers: number;
+};
+
+export type TeamMemberKpi = {
+  userId: string;
+  userName?: string | null;
+  userEmail?: string | null;
+  role: OrganizationRole;
+  status: OrganizationMemberStatus;
+  customerCount: number;
+  completedFollowUps: number;
+  quoteCount: number;
+};
+
+export type TeamDashboardCustomer = {
+  id: string;
+  name: string;
+  tags: string[];
+  stage: string;
+  assignedTo?: string | null;
+  ownerId?: string | null;
+  intentScore: number;
+  intentLevel: IntentLevel;
+  recommendedAction: string;
+};
+
+export type TeamDashboardSummary = {
+  organizationId: string;
+  generatedAt: string;
+  kpis: TeamDashboardKpis;
+  memberStats: TeamMemberKpi[];
+  highIntentCustomers: TeamDashboardCustomer[];
+};
+
 export type DraftIntent = "reply" | "translate" | "quote";
 
 export type GenerateDraftRequest = {
@@ -547,6 +776,7 @@ export type AiReplyRequest = {
   productContext?: string;
   customerId?: string | null;
   productId?: string | null;
+  organizationId?: string | null;
   useKnowledgeBase?: boolean;
   knowledgeContext?: string;
   knowledgeUsed?: string[];
@@ -609,5 +839,84 @@ export type KnowledgeBaseUpsertRequest = {
   content: string;
   language?: KnowledgeBaseLanguage | null;
   productId?: string | null;
+  enabled?: boolean;
+};
+
+export type KnowledgeBaseOrgSummary = {
+  id: string;
+  organizationId: string;
+  title: string;
+  category: KnowledgeBaseCategory;
+  content: string;
+  language: KnowledgeBaseLanguage;
+  enabled: boolean;
+  createdBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type KnowledgeBaseOrgDetail = KnowledgeBaseOrgSummary;
+
+export type KnowledgeBaseOrgListQuery = {
+  organizationId: string;
+  category?: KnowledgeBaseCategory | "";
+  language?: KnowledgeBaseLanguage | "";
+  q?: string;
+};
+
+export type KnowledgeBaseOrgUpsertRequest = {
+  organizationId: string;
+  title: string;
+  category: KnowledgeBaseCategory;
+  content: string;
+  language?: KnowledgeBaseLanguage | null;
+  enabled?: boolean;
+};
+
+export const SCRIPT_ORG_CATEGORIES = [
+  "price",
+  "moq",
+  "shipping",
+  "discount",
+  "sample",
+  "payment",
+  "follow_up",
+  "product_intro",
+  "quote",
+  "after_sales",
+  "custom",
+  "general"
+] as const;
+
+export type ScriptOrgCategory = typeof SCRIPT_ORG_CATEGORIES[number];
+
+export type ScriptOrgSummary = {
+  id: string;
+  organizationId: string;
+  title: string;
+  category: ScriptOrgCategory;
+  content: string;
+  language: KnowledgeBaseLanguage;
+  enabled: boolean;
+  createdBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ScriptOrgDetail = ScriptOrgSummary;
+
+export type ScriptOrgListQuery = {
+  organizationId: string;
+  category?: ScriptOrgCategory | "";
+  language?: KnowledgeBaseLanguage | "";
+  q?: string;
+};
+
+export type ScriptOrgUpsertRequest = {
+  organizationId: string;
+  title: string;
+  category: ScriptOrgCategory;
+  content: string;
+  language?: KnowledgeBaseLanguage | null;
   enabled?: boolean;
 };

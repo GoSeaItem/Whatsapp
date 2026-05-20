@@ -215,14 +215,26 @@ button:disabled {
   padding: 16px;
 }
 
-.metric span {
+.metric-card {
+  background: #ffffff;
+  border: 1px solid #dfe7e1;
+  border-radius: 8px;
+  color: #143528;
+  cursor: pointer;
+  padding: 16px;
+  text-align: left;
+}
+
+.metric span,
+.metric-card span {
   color: #63736b;
   display: block;
   font-size: 13px;
   margin-bottom: 8px;
 }
 
-.metric strong {
+.metric strong,
+.metric-card strong {
   font-size: 28px;
 }
 
@@ -267,6 +279,23 @@ button:disabled {
 }
 
 .field span {
+  color: #43534b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.checkbox-line {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.checkbox-line input {
+  width: auto;
+}
+
+.checkbox-line span {
   color: #43534b;
   font-size: 13px;
   font-weight: 700;

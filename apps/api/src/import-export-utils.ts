@@ -25,7 +25,7 @@ export const MAX_CSV_BYTES = 5 * 1024 * 1024;
 
 type Row = Record<string, string>;
 type ValidationError = { row: number; field: string; message: string };
-type ImportContext = { db: ImportExportDb; ownerId: string; dryRun: boolean; skipDuplicates: boolean };
+type ImportContext = { db: ImportExportDb; ownerId: string; organizationId?: string; dryRun: boolean; skipDuplicates: boolean };
 type BuildResult = { data?: Record<string, unknown>; skipped?: boolean; errors: ValidationError[] };
 
 export type ImportResult = {
@@ -41,6 +41,9 @@ export type ImportExportDb = {
   customer: {
     findMany(args: Record<string, unknown>): Promise<unknown[]>;
     findFirst(args: Record<string, unknown>): Promise<any | null>;
+    create(args: Record<string, unknown>): Promise<unknown>;
+  };
+  customerDuplicateEventLog?: {
     create(args: Record<string, unknown>): Promise<unknown>;
   };
   product: {
@@ -67,7 +70,7 @@ export type ImportExportDb = {
 };
 
 export const EXPORT_HEADERS: Record<ImportExportType, string[]> = {
-  customers: ["name", "whatsappNumber", "country", "language", "tags", "stage", "interestedProduct", "latestSummary", "nextFollowUpAt", "notes", "createdAt", "updatedAt"],
+  customers: ["name", "whatsappNumber", "email", "socialLinks", "country", "language", "tags", "stage", "interestedProduct", "latestSummary", "nextFollowUpAt", "notes", "createdAt", "updatedAt"],
   products: ["name", "sku", "category", "images", "videos", "colors", "sizes", "material", "moq", "suggestedPrice", "minPrice", "leadTime", "sellingPoints", "introEn", "introEs", "introPt", "introAr", "createdAt", "updatedAt"],
   "knowledge-base": ["title", "category", "content", "language", "productSku", "enabled", "createdAt", "updatedAt"],
   materials: ["title", "type", "url", "description", "language", "productSku", "tags", "createdAt", "updatedAt"],
@@ -79,6 +82,8 @@ export const TEMPLATE_ROWS: Record<ImportExportType, Row> = {
   customers: {
     name: "Maria Buyer",
     whatsappNumber: "+5215512345678",
+    email: "maria@example.com",
+    socialLinks: "https://instagram.com/maria.shop|https://facebook.com/maria.shop",
     country: "Mexico",
     language: "English",
     tags: "new|high_intent",
@@ -175,10 +180,10 @@ export async function exportCsv(db: ImportExportDb, type: ImportExportType, owne
   return stringifyCsv(rows, EXPORT_HEADERS[type]);
 }
 
-export async function importCsv(db: ImportExportDb, type: ImportExportType, ownerId: string, csvText: string, options: { dryRun?: boolean; skipDuplicates?: boolean } = {}): Promise<ImportResult> {
+export async function importCsv(db: ImportExportDb, type: ImportExportType, ownerId: string, csvText: string, options: { dryRun?: boolean; skipDuplicates?: boolean; organizationId?: string } = {}): Promise<ImportResult> {
   const parsed = parseCsv(csvText);
   const rows = parsed.rows.map(stripSensitiveFields);
-  const ctx: ImportContext = { db, ownerId, dryRun: Boolean(options.dryRun), skipDuplicates: options.skipDuplicates !== false };
+  const ctx: ImportContext = { db, ownerId, organizationId: options.organizationId, dryRun: Boolean(options.dryRun), skipDuplicates: options.skipDuplicates !== false };
   let successCount = 0;
   let skippedCount = 0;
   const errors: ValidationError[] = [];
@@ -278,6 +283,8 @@ async function loadExportRows(db: ImportExportDb, type: ImportExportType, ownerI
     return items.map((item) => ({
       name: item.name,
       whatsappNumber: item.whatsappNumber,
+      email: item.email,
+      socialLinks: joinArray(item.socialLinks),
       country: item.country,
       language: item.language,
       tags: joinArray(item.tags),
@@ -379,15 +386,34 @@ async function buildImportData(type: ImportExportType, row: Row, rowNumber: numb
 async function buildCustomer(row: Row, rowNumber: number, ctx: ImportContext): Promise<BuildResult> {
   const errors = requireFields(row, rowNumber, ["name"]);
   const nextFollowUpAt = parseOptionalDate(row.nextFollowUpAt, "nextFollowUpAt", rowNumber, errors);
-  if (row.whatsappNumber && ctx.skipDuplicates) {
-    const existing = await ctx.db.customer.findFirst({ where: { ownerId: ctx.ownerId, whatsappNumber: row.whatsappNumber } });
-    if (existing) return { skipped: true, errors: [] };
+  const socialLinks = splitArray(row.socialLinks);
+  if (socialLinks.some((link) => !/^https?:\/\/\S+$/i.test(link))) {
+    errors.push({ row: rowNumber, field: "socialLinks", message: "socialLinks must be http/https URLs" });
+  }
+  const duplicate = await findDuplicateImportCustomer(ctx, {
+    whatsappNumber: row.whatsappNumber,
+    email: row.email,
+    socialLinks
+  });
+  if (duplicate) {
+    if (ctx.dryRun || !ctx.skipDuplicates) {
+      errors.push({
+        row: rowNumber,
+        field: duplicate.fields.join("|"),
+        message: `duplicate customer detected: ${duplicate.customer.name || duplicate.customer.id}, owner=${duplicate.customer.ownerId || ""}, assignedTo=${duplicate.customer.assignedTo || ""}`
+      });
+    } else {
+      await recordImportDuplicate(ctx, duplicate, "skipped");
+      return { skipped: true, errors: [] };
+    }
   }
   return {
     errors,
     data: {
       name: row.name,
       whatsappNumber: emptyToNull(row.whatsappNumber),
+      email: emptyToNull(row.email),
+      socialLinks,
       country: emptyToNull(row.country),
       language: emptyToNull(row.language),
       tags: splitArray(row.tags),
@@ -396,7 +422,10 @@ async function buildCustomer(row: Row, rowNumber: number, ctx: ImportContext): P
       latestSummary: emptyToNull(row.latestSummary),
       nextFollowUpAt,
       notes: emptyToNull(row.notes),
-      ownerId: ctx.ownerId
+      ownerId: ctx.ownerId,
+      organizationId: ctx.organizationId || null,
+      assignedTo: ctx.organizationId ? ctx.ownerId : null,
+      collaborators: []
     }
   };
 }
@@ -434,6 +463,58 @@ async function buildProduct(row: Row, rowNumber: number, ctx: ImportContext): Pr
       ownerId: ctx.ownerId
     }
   };
+}
+
+async function findDuplicateImportCustomer(
+  ctx: ImportContext,
+  input: { whatsappNumber?: string; email?: string; socialLinks?: string[] }
+) {
+  const fields: string[] = [];
+  const OR: Record<string, unknown>[] = [];
+  if (input.whatsappNumber) {
+    fields.push("whatsappNumber");
+    OR.push({ whatsappNumber: input.whatsappNumber });
+  }
+  if (input.email) {
+    fields.push("email");
+    OR.push({ email: input.email });
+  }
+  const socialLinks = splitArray(input.socialLinks);
+  if (socialLinks.length) {
+    fields.push("socialLinks");
+    OR.push({ socialLinks: { hasSome: socialLinks } });
+  }
+  if (!OR.length) return null;
+  const where = ctx.organizationId
+    ? { organizationId: ctx.organizationId, OR }
+    : { ownerId: ctx.ownerId, OR };
+  const customer = await ctx.db.customer.findFirst({ where });
+  if (!customer) return null;
+  const matchedFields = fields.filter((field) => {
+    if (field === "whatsappNumber") return customer.whatsappNumber === input.whatsappNumber;
+    if (field === "email") return customer.email === input.email;
+    if (field === "socialLinks") return socialLinks.some((link) => (customer.socialLinks || []).includes(link));
+    return false;
+  });
+  return { customer, fields: matchedFields.length ? matchedFields : fields };
+}
+
+async function recordImportDuplicate(
+  ctx: ImportContext,
+  duplicate: { customer: any; fields: string[] },
+  action: string
+) {
+  await ctx.db.customerDuplicateEventLog?.create({
+    data: {
+      organizationId: ctx.organizationId || null,
+      ownerId: duplicate.customer.ownerId || ctx.ownerId,
+      attemptedBy: ctx.ownerId,
+      matchedCustomerId: duplicate.customer.id,
+      fields: duplicate.fields,
+      source: "import-customers",
+      action
+    }
+  });
 }
 
 async function buildKnowledge(row: Row, rowNumber: number, ctx: ImportContext): Promise<BuildResult> {
@@ -622,8 +703,9 @@ function parseBoolean(value: string | undefined, fallback: boolean) {
   return ["true", "1", "yes", "y"].includes(value.toLowerCase());
 }
 
-function splitArray(value?: string) {
-  return value ? value.split("|").map((item) => item.trim()).filter(Boolean) : [];
+function splitArray(value?: string | string[]) {
+  const raw = Array.isArray(value) ? value : value ? value.split("|") : [];
+  return raw.map((item) => item.trim()).filter(Boolean);
 }
 
 function joinArray(value?: unknown[]) {

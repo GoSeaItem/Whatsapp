@@ -1,7 +1,9 @@
 import { Router } from "express";
 import type { QuoteGenerateRequest, QuoteSaveRequest } from "@wa-ai/shared";
 import { prisma } from "./db.js";
+import { writeAuditLog } from "./audit-log-utils.js";
 import { findKnowledgeForAi } from "./knowledge-base-service.js";
+import { canReadOrganization, getActiveOrganizationRole } from "./organization-permissions.js";
 import { serializeProduct } from "./product-utils.js";
 import {
   buildQuoteCreateData,
@@ -10,7 +12,8 @@ import {
   validateQuotePayload
 } from "./quote-utils.js";
 
-type QuoteDb = Pick<typeof prisma, "quote" | "customer" | "product" | "knowledgeBase">;
+type QuoteDb = Pick<typeof prisma, "quote" | "customer" | "product" | "knowledgeBase" | "organizationMember" | "organizationProduct"> &
+  Partial<Pick<typeof prisma, "knowledgeBaseOrg" | "scriptOrg" | "auditLog">>;
 
 export function createQuotesRouter(db: QuoteDb = prisma) {
   const quotesRouter = Router();
@@ -24,19 +27,24 @@ export function createQuotesRouter(db: QuoteDb = prisma) {
         return;
       }
 
-      const product = await findOwnedProduct(db, body.productId, req.user!.id);
-      if (!product) {
+      const productResult = await findAccessibleProduct(db, body.productId, req.user!.id, body.organizationId);
+      if (productResult.forbidden) {
+        res.status(403).json({ message: "organization membership required" });
+        return;
+      }
+      if (!productResult.product) {
         res.status(404).json({ message: "product not found" });
         return;
       }
 
       const knowledge = body.useKnowledgeBase === false ? { items: [] } : await findKnowledgeForAi(db, {
         ownerId: req.user!.id,
+        organizationId: body.organizationId,
         targetLanguage: body.targetLanguage,
         productId: body.productId,
         mode: "quote"
       });
-      res.json(buildQuoteResponse({ ...body, createdBy: req.user!.id }, product, knowledge.items));
+      res.json(buildQuoteResponse({ ...body, createdBy: req.user!.id }, productResult.product, knowledge.items));
     } catch (error) {
       next(error);
     }
@@ -51,11 +59,15 @@ export function createQuotesRouter(db: QuoteDb = prisma) {
         return;
       }
 
-      const [product, customer] = await Promise.all([
-        findOwnedProduct(db, body.productId, req.user!.id),
+      const [productResult, customer] = await Promise.all([
+        findAccessibleProduct(db, body.productId, req.user!.id, body.organizationId),
         findOwnedCustomer(db, body.customerId, req.user!.id)
       ]);
-      if (!product) {
+      if (productResult.forbidden) {
+        res.status(403).json({ message: "organization membership required" });
+        return;
+      }
+      if (!productResult.product) {
         res.status(404).json({ message: "product not found" });
         return;
       }
@@ -66,11 +78,12 @@ export function createQuotesRouter(db: QuoteDb = prisma) {
 
       const knowledge = body.useKnowledgeBase === false ? { items: [] } : await findKnowledgeForAi(db, {
         ownerId: req.user!.id,
+        organizationId: body.organizationId,
         targetLanguage: body.targetLanguage,
         productId: body.productId,
         mode: "quote"
       });
-      const response = buildQuoteResponse({ ...body, createdBy: req.user!.id }, product, knowledge.items);
+      const response = buildQuoteResponse({ ...body, createdBy: req.user!.id }, productResult.product, knowledge.items);
       const quote = await db.quote.create({
         data: {
           ...buildQuoteCreateData(response),
@@ -78,6 +91,7 @@ export function createQuotesRouter(db: QuoteDb = prisma) {
           createdBy: req.user!.id
         }
       });
+      await writeAuditLog(db, { organizationId: (customer as any).organizationId, userId: req.user!.id, action: "create", entityType: "Quote", entityId: quote.id, before: null, after: quote });
       res.status(201).json({
         ...serializeQuote(quote),
         riskWarnings: response.riskWarnings,
@@ -162,15 +176,20 @@ export function createQuotesRouter(db: QuoteDb = prisma) {
 
       const nextCustomerId = req.body.customerId || existing.customerId;
       const nextProductId = req.body.productId || existing.productId;
-      const [customer, product] = await Promise.all([
+      const organizationId = req.body.organizationId;
+      const [customer, productResult] = await Promise.all([
         findOwnedCustomer(db, nextCustomerId, req.user!.id),
-        findOwnedProduct(db, nextProductId, req.user!.id)
+        findAccessibleProduct(db, nextProductId, req.user!.id, organizationId)
       ]);
       if (!customer) {
         res.status(404).json({ message: "customer not found" });
         return;
       }
-      if (!product) {
+      if (productResult.forbidden) {
+        res.status(403).json({ message: "organization membership required" });
+        return;
+      }
+      if (!productResult.product) {
         res.status(404).json({ message: "product not found" });
         return;
       }
@@ -192,15 +211,17 @@ export function createQuotesRouter(db: QuoteDb = prisma) {
         stockKnown: req.body.stockKnown,
         promiseStock: req.body.promiseStock,
         attachmentSelected: req.body.attachmentSelected,
+        organizationId,
         quoteText: req.body.quoteText !== undefined ? req.body.quoteText : existing.quoteText
       };
       const knowledge = merged.useKnowledgeBase === false ? { items: [] } : await findKnowledgeForAi(db, {
         ownerId: req.user!.id,
+        organizationId,
         targetLanguage: merged.targetLanguage,
         productId: nextProductId,
         mode: "quote"
       });
-      const response = buildQuoteResponse(merged, product, knowledge.items);
+      const response = buildQuoteResponse(merged, productResult.product, knowledge.items);
       const quote = await db.quote.update({
         where: { id: req.params.id },
         data: {
@@ -209,6 +230,7 @@ export function createQuotesRouter(db: QuoteDb = prisma) {
           createdBy: req.user!.id
         }
       });
+      await writeAuditLog(db, { organizationId: (customer as any).organizationId, userId: req.user!.id, action: "update", entityType: "Quote", entityId: quote.id, before: existing, after: quote });
       res.json({
         ...serializeQuote(quote),
         riskWarnings: response.riskWarnings,
@@ -221,6 +243,12 @@ export function createQuotesRouter(db: QuoteDb = prisma) {
 
   quotesRouter.delete("/:id", async (req, res, next) => {
     try {
+      const existing = await findOwnedQuote(db, req.params.id, req.user!.id);
+      if (!existing) {
+        res.status(404).json({ message: "quote not found" });
+        return;
+      }
+      const customer = await findOwnedCustomer(db, existing.customerId, req.user!.id);
       const result = await db.quote.deleteMany({
         where: { id: req.params.id, ownerId: req.user!.id, createdBy: req.user!.id }
       });
@@ -228,6 +256,7 @@ export function createQuotesRouter(db: QuoteDb = prisma) {
         res.status(404).json({ message: "quote not found" });
         return;
       }
+      await writeAuditLog(db, { organizationId: (customer as any)?.organizationId, userId: req.user!.id, action: "delete", entityType: "Quote", entityId: existing.id, before: existing, after: null });
       res.status(204).send();
     } catch (error) {
       next(error);
@@ -242,6 +271,22 @@ export const quotesRouter = createQuotesRouter();
 async function findOwnedProduct(db: QuoteDb, productId: string, ownerId: string) {
   const product = await db.product.findFirst({ where: { id: productId, ownerId } });
   return product ? serializeProduct(product) : null;
+}
+
+async function findAccessibleProduct(db: QuoteDb, productId: string, ownerId: string, organizationId?: string | null) {
+  const cleanOrganizationId = typeof organizationId === "string" ? organizationId.trim() : "";
+  if (!cleanOrganizationId) {
+    return { product: await findOwnedProduct(db, productId, ownerId), forbidden: false };
+  }
+
+  const role = await getActiveOrganizationRole(db, cleanOrganizationId, ownerId);
+  if (!canReadOrganization(role)) return { product: null, forbidden: true };
+
+  const link = await db.organizationProduct.findFirst({
+    where: { organizationId: cleanOrganizationId, productId },
+    include: { product: true }
+  });
+  return { product: link?.product ? serializeProduct(link.product) : null, forbidden: false };
 }
 
 async function findOwnedCustomer(db: QuoteDb, customerId: string, ownerId: string) {

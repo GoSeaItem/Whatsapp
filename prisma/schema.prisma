@@ -22,6 +22,9 @@ model User {
   passwordHash  String
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
+  ownedOrganizations Organization[] @relation("OrganizationOwner")
+  organizationMemberships OrganizationMember[]
+  assignedCustomers Customer[] @relation("AssignedCustomer")
   sessions      AuthSession[]
   customers     Customer[]
   products      Product[]
@@ -32,6 +35,61 @@ model User {
   followUps     FollowUpTask[]
   messageDrafts MessageDraft[]
   knowledgeBases KnowledgeBase[]
+  createdOrgKnowledgeBases KnowledgeBaseOrg[] @relation("KnowledgeBaseOrgCreator")
+  createdOrgScripts ScriptOrg[] @relation("ScriptOrgCreator")
+  createdOrgProducts OrganizationProduct[] @relation("OrganizationProductCreator")
+  createdOrgMaterials OrganizationMaterial[] @relation("OrganizationMaterialCreator")
+  auditLogs     AuditLog[] @relation("AuditLogActor")
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  ownerId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  owner     User     @relation("OrganizationOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members   OrganizationMember[]
+  roles     Role[]
+  customers Customer[]
+  orgKnowledgeBases KnowledgeBaseOrg[]
+  orgScripts ScriptOrg[]
+  orgProducts OrganizationProduct[]
+  orgMaterials OrganizationMaterial[]
+  auditLogs AuditLog[]
+
+  @@index([ownerId])
+}
+
+model Role {
+  id             String       @id @default(cuid())
+  organizationId String
+  name           String
+  description    String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+}
+
+model OrganizationMember {
+  id             String       @id @default(cuid())
+  organizationId String
+  userId         String
+  role           String
+  status         String       @default("active")
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+  @@index([userId])
+  @@index([organizationId, role])
+  @@index([organizationId, status])
 }
 
 model AuthSession {
@@ -50,6 +108,8 @@ model Customer {
   id                String         @id @default(cuid())
   name              String
   whatsappNumber    String?
+  email             String?
+  socialLinks       String[]       @default([])
   country           String?
   language          String?        @default("English")
   tags              String[]       @default([])
@@ -58,17 +118,60 @@ model Customer {
   latestSummary     String?
   nextFollowUpAt    DateTime?
   ownerId           String
+  organizationId    String?
+  assignedTo        String?
+  collaborators     String[]       @default([])
   notes             String?
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
   owner             User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  organization      Organization?  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assignedUser      User?          @relation("AssignedCustomer", fields: [assignedTo], references: [id], onDelete: SetNull)
   quotes            Quote[]
   followUps         FollowUpTask[]
   messageDrafts     MessageDraft[]
   sampleOrders      SampleOrder[]
   customRequests    CustomRequest[]
+  assignmentLogs    CustomerAssignmentLog[]
+  duplicateEvents   CustomerDuplicateEventLog[]
 
   @@index([ownerId])
+  @@index([assignedTo])
+  @@index([organizationId])
+}
+
+model CustomerDuplicateEventLog {
+  id                String   @id @default(cuid())
+  organizationId    String?
+  ownerId           String
+  attemptedBy       String
+  matchedCustomerId String
+  fields            String[] @default([])
+  source            String
+  action            String
+  createdAt         DateTime @default(now())
+  matchedCustomer   Customer @relation(fields: [matchedCustomerId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([ownerId])
+  @@index([attemptedBy])
+  @@index([matchedCustomerId])
+}
+
+model CustomerAssignmentLog {
+  id             String   @id @default(cuid())
+  customerId     String
+  organizationId String
+  fromUserId     String?
+  toUserId       String?
+  operatedBy     String
+  note           String?
+  createdAt      DateTime @default(now())
+  customer       Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([organizationId])
+  @@index([operatedBy])
 }
 
 model Product {
@@ -99,6 +202,7 @@ model Product {
   materials      Material[]
   sampleOrders   SampleOrder[]
   customRequests CustomRequest[]
+  organizationProducts OrganizationProduct[]
 
   @@unique([ownerId, sku])
   @@index([ownerId])
@@ -125,6 +229,68 @@ model KnowledgeBase {
   @@index([ownerId, enabled])
 }
 
+model KnowledgeBaseOrg {
+  id             String       @id @default(cuid())
+  organizationId String
+  title          String
+  category       String
+  content        String
+  language       String       @default("other")
+  enabled        Boolean      @default(true)
+  createdBy      String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  creator        User         @relation("KnowledgeBaseOrgCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([organizationId, category])
+  @@index([organizationId, language])
+  @@index([organizationId, enabled])
+}
+
+model ScriptOrg {
+  id             String       @id @default(cuid())
+  organizationId String
+  title          String
+  category       String
+  content        String
+  language       String       @default("other")
+  enabled        Boolean      @default(true)
+  createdBy      String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  creator        User         @relation("ScriptOrgCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([organizationId, category])
+  @@index([organizationId, language])
+  @@index([organizationId, enabled])
+}
+
+model AuditLog {
+  id             String        @id @default(cuid())
+  organizationId String?
+  actorId        String
+  userId         String?
+  action         String
+  entityType     String
+  entityId       String?
+  before         Json?
+  after          Json?
+  metadata       Json?
+  createdAt      DateTime      @default(now())
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor          User          @relation("AuditLogActor", fields: [actorId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([actorId])
+  @@index([userId])
+  @@index([entityType])
+  @@index([entityType, entityId])
+}
+
 model Material {
   id          String   @id @default(cuid())
   title       String
@@ -139,11 +305,46 @@ model Material {
   updatedAt   DateTime @updatedAt
   owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  organizationMaterials OrganizationMaterial[]
 
   @@index([ownerId])
   @@index([ownerId, type])
   @@index([ownerId, language])
   @@index([ownerId, productId])
+}
+
+model OrganizationProduct {
+  id             String       @id @default(cuid())
+  organizationId String
+  productId      String
+  createdBy      String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  product        Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  creator        User         @relation("OrganizationProductCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, productId])
+  @@index([organizationId])
+  @@index([productId])
+  @@index([createdBy])
+}
+
+model OrganizationMaterial {
+  id             String       @id @default(cuid())
+  organizationId String
+  materialId     String
+  createdBy      String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  material       Material     @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  creator        User         @relation("OrganizationMaterialCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, materialId])
+  @@index([organizationId])
+  @@index([materialId])
+  @@index([createdBy])
 }
 
 model Quote {

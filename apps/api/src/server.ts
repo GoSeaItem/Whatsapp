@@ -7,6 +7,7 @@ import { generateAiReply } from "./ai-reply.js";
 import { generateDraft } from "./ai-draft.js";
 import { authRouter } from "./auth-api.js";
 import { optionalAuth, requireAuth } from "./auth.js";
+import { auditLogsRouter } from "./audit-logs-api.js";
 import { customersRouter } from "./customers-api.js";
 import { customRequestsRouter } from "./custom-requests-api.js";
 import { dashboardRouter } from "./dashboard-api.js";
@@ -15,9 +16,14 @@ import { followUpsRouter } from "./follow-ups-api.js";
 import { exportRouter, importRouter } from "./import-export-api.js";
 import { knowledgeBaseRouter } from "./knowledge-base-api.js";
 import { materialsRouter } from "./materials-api.js";
+import { organizationsRouter } from "./organizations-api.js";
+import { canReadOrganization, getActiveOrganizationRole, requireOrganizationResourcePermission } from "./organization-permissions.js";
+import { knowledgeBaseOrgRouter, scriptOrgRouter } from "./org-content-api.js";
+import { organizationMaterialsRouter, organizationProductsRouter } from "./org-resource-api.js";
 import { buildKnowledgeContext, findKnowledgeForAi } from "./knowledge-base-service.js";
 import { productsRouter } from "./products-api.js";
 import { quotesRouter } from "./quotes-api.js";
+import { rolesRouter } from "./roles-api.js";
 import { sampleOrdersRouter } from "./sample-orders-api.js";
 
 export const app = express();
@@ -71,15 +77,23 @@ app.get("/health", healthHandler);
 app.get("/api/health", healthHandler);
 
 app.use("/api/auth", authRouter);
+const organizationResourcePermission = requireOrganizationResourcePermission(prisma);
 app.use("/api/customers", requireAuth, customersRouter);
-app.use("/api/products", requireAuth, productsRouter);
+app.use("/api/products/org", requireAuth, organizationProductsRouter);
+app.use("/api/products", requireAuth, organizationResourcePermission, productsRouter);
 app.use("/api/quotes", requireAuth, quotesRouter);
 app.use("/api/sample-orders", requireAuth, sampleOrdersRouter);
 app.use("/api/custom-requests", requireAuth, customRequestsRouter);
 app.use("/api/follow-ups", requireAuth, followUpsRouter);
 app.use("/api/dashboard", requireAuth, dashboardRouter);
-app.use("/api/knowledge-base", requireAuth, knowledgeBaseRouter);
-app.use("/api/materials", requireAuth, materialsRouter);
+app.use("/api/knowledge-base/org", requireAuth, knowledgeBaseOrgRouter);
+app.use("/api/knowledge-base", requireAuth, organizationResourcePermission, knowledgeBaseRouter);
+app.use("/api/scripts/org", requireAuth, scriptOrgRouter);
+app.use("/api/materials/org", requireAuth, organizationMaterialsRouter);
+app.use("/api/materials", requireAuth, organizationResourcePermission, materialsRouter);
+app.use("/api/organizations", requireAuth, organizationsRouter);
+app.use("/api/roles", requireAuth, rolesRouter);
+app.use("/api/audit-logs", requireAuth, auditLogsRouter);
 app.use("/api/export", requireAuth, exportRouter);
 app.use("/api/import", requireAuth, importRouter);
 
@@ -119,8 +133,17 @@ app.post("/api/ai/reply", optionalAuth, async (req, res, next) => {
     }
 
     if (req.user && body.useKnowledgeBase !== false) {
+      const organizationId = typeof body.organizationId === "string" ? body.organizationId.trim() : "";
+      if (organizationId) {
+        const role = await getActiveOrganizationRole(prisma, organizationId, req.user.id);
+        if (!canReadOrganization(role)) {
+          res.status(403).json({ message: "organization membership required" });
+          return;
+        }
+      }
       const lookup = await findKnowledgeForAi(prisma, {
         ownerId: req.user.id,
+        organizationId,
         targetLanguage: body.targetLanguage,
         productId: body.productId,
         scenario: body.scenario,

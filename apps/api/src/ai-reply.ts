@@ -336,15 +336,16 @@ function parseKnowledgeItems(input: AiReplyRequest): KnowledgeContextItem[] {
 function parseStructuredKnowledgeContext(context: string, productId: string | null): KnowledgeContextItem[] {
   return context
     .split(/\r?\n/)
-    .map((line) => line.match(/^\s*\d+\.\s+\[([^/\]]+)\/([^\]]+)\]\s+([^:]+):\s*(.+)$/))
+    .map((line) => line.match(/^\s*\d+\.\s+\[(?:(Org|Personal|Default)\/)?([^/\]]+)\/([^\]]+)\]\s+([^:]+):\s*(.+)$/))
     .filter((match): match is RegExpMatchArray => Boolean(match))
     .map((match) => ({
-      id: match[3].trim(),
-      title: match[3].trim(),
-      category: match[1].trim() as KnowledgeContextItem["category"],
-      language: match[2].trim() as KnowledgeContextItem["language"],
-      content: match[4].trim(),
-      productId
+      id: match[4].trim(),
+      title: match[4].trim(),
+      category: match[2].trim() as KnowledgeContextItem["category"],
+      language: match[3].trim() as KnowledgeContextItem["language"],
+      content: match[5].trim(),
+      productId,
+      source: (match[1] || undefined) as KnowledgeContextItem["source"]
     }));
 }
 

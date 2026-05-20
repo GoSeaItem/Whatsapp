@@ -1,5 +1,240 @@
 # Changelog
 
+## Unreleased - V3-H Manager team dashboard
+
+### Added
+
+- Added organization team dashboard API: `GET /api/dashboard/team-summary`.
+- Organization-scoped `GET /api/dashboard/high-intent-customers?organizationId=...` now returns sanitized team high-intent customers for owner/manager.
+- Added team KPI summary:
+  - today new customers
+  - today follow-up customers
+  - overdue follow-up customers
+  - high-intent customers
+  - quoted customers without pending follow-up
+- Added salesperson stats: customer count, completed follow-ups, and quote count.
+- Added Web backend navigation entry: `Team dashboard`, visible only for selected organization owner/manager.
+- Added CSV export for visible team dashboard data.
+
+### Security
+
+- Team dashboard requires active organization membership and `owner` / `manager` role.
+- `sales` and `support` receive `403` for team dashboard APIs.
+- Cross-organization access is rejected.
+- Team high-intent lists omit contact fields such as WhatsApp number and email.
+- CSV export escapes formula-like cells.
+- No WhatsApp official API integration, automatic WhatsApp sending, bulk sending, simulated send-button clicking, payments, pricing, order-system, finance, or boss-dashboard logic was added.
+
+### Tests
+
+- Added team dashboard API tests for owner/manager access, sales/support rejection, KPI accuracy, member stats, high-intent sanitization, CSV export, and cross-organization rejection.
+
+## Unreleased - V3-G Audit logs
+
+### Added
+
+- Upgraded `AuditLog` with `userId`, `before`, and `after` fields while keeping `actorId` for compatibility.
+- Added protected audit log APIs:
+  - `GET /api/audit-logs`
+  - `GET /api/audit-logs/:id`
+- Audit log list supports organization scope, entity type, user, action, time-range filters, pagination, and CSV export through `format=csv`.
+- Added Web backend navigation entry: `Audit logs`.
+- Customer, quote, organization product/material, organization knowledge/script, and follow-up create/update/delete paths now write structured audit entries where organization context exists.
+
+### Security
+
+- Audit logs are scoped by `organizationId`.
+- `owner` and `manager` can view organization logs.
+- `sales` and `support` can only view their own audit logs.
+- Cross-organization access is rejected.
+- Audit CSV export escapes formula-like cells and does not include password, token, secret, cookie, session, or API key fields.
+- No WhatsApp official API integration, automatic WhatsApp sending, bulk sending, simulated send-button clicking, payments, order-system, finance, or boss-dashboard logic was added.
+
+### Tests
+
+- Added audit log API tests for write sanitization, owner/manager listing, sales/support self-only visibility, cross-organization rejection, filters, and CSV export.
+- Updated organization knowledge/script/product/material tests to assert structured `before` / `after` audit records.
+
+## Unreleased - V3-F Organization shared products and materials
+
+### Added
+
+- Added `OrganizationProduct` for sharing existing products into an organization library.
+- Added `OrganizationMaterial` for sharing existing materials into an organization library.
+- Added protected organization product APIs:
+  - `GET /api/products/org`
+  - `GET /api/products/org/:id`
+  - `POST /api/products/org`
+  - `PATCH /api/products/org/:id`
+  - `DELETE /api/products/org/:id`
+- Added protected organization material APIs:
+  - `GET /api/materials/org`
+  - `GET /api/materials/org/:id`
+  - `POST /api/materials/org`
+  - `PATCH /api/materials/org/:id`
+  - `DELETE /api/materials/org/:id`
+- Added Web backend navigation entries: `Org products` and `Org materials`.
+- Quote generation can now use organization-shared products when `organizationId` is provided.
+- Organization product/material create, update, and delete actions write `AuditLog` entries.
+
+### Security
+
+- Organization products/materials are scoped by `organizationId`.
+- `owner` and `manager` can add, update, and remove shared resources.
+- `sales` and `support` are read-only.
+- Adding a shared product/material requires that the current user owns the underlying personal product/material.
+- Cross-organization access is rejected.
+- No WhatsApp official API integration, automatic WhatsApp sending, bulk sending, simulated send-button clicking, payments, pricing, order-system, finance, or boss-dashboard logic was added.
+
+### Tests
+
+- Added organization shared product/material API tests for list/search, read-only sales/support enforcement, cross-organization rejection, duplicate share rejection, audit logging, and quote generation using organization-shared products.
+
+## Unreleased - V3-E Organization shared knowledge and scripts
+
+### Added
+
+- Added `KnowledgeBaseOrg` for organization-level shared knowledge.
+- Added `ScriptOrg` for organization-level shared draft scripts.
+- Added lightweight `AuditLog` records for organization knowledge/script create, update, and delete operations.
+- Added protected organization knowledge APIs:
+  - `GET /api/knowledge-base/org`
+  - `GET /api/knowledge-base/org/:id`
+  - `POST /api/knowledge-base/org`
+  - `PATCH /api/knowledge-base/org/:id`
+  - `DELETE /api/knowledge-base/org/:id`
+- Added protected organization script APIs:
+  - `GET /api/scripts/org`
+  - `GET /api/scripts/org/:id`
+  - `POST /api/scripts/org`
+  - `PATCH /api/scripts/org/:id`
+  - `DELETE /api/scripts/org/:id`
+- Added Web backend navigation entries: `Org knowledge` and `Org scripts`.
+- AI reply lookup can now use `organizationId` and returns `[Org]` entries in `knowledgeUsed` when organization knowledge is referenced.
+
+### Security
+
+- Organization knowledge/script records are always scoped by `organizationId`.
+- `owner` and `manager` can create, update, delete, enable, and disable organization records.
+- `sales` and `support` are read-only.
+- Disabled organization knowledge is excluded from AI lookup.
+- Cross-organization read/write access is rejected.
+- No WhatsApp official API integration, automatic WhatsApp sending, bulk sending, simulated send-button clicking, payments, pricing, order-system, finance, or boss-dashboard logic was added.
+
+### Tests
+
+- Added organization knowledge/script API tests for CRUD permissions, read-only sales/support access, cross-organization rejection, search, duplicate detection, audit logging, and AI organization knowledge usage.
+
+## Unreleased - V3-D Duplicate customer collision detection
+
+### Added
+
+- Added `Customer.socialLinks` for storing customer social media profile URLs.
+- Added `CustomerDuplicateEventLog` for recording duplicate customer checks that were detected, blocked, or skipped.
+- Added duplicate customer pre-check API: `POST /api/customers/check-duplicate`.
+- Customer create/update now detects duplicate WhatsApp numbers, email addresses, and social links within the same personal or organization scope.
+- Customer CSV import now validates duplicate WhatsApp numbers, email addresses, and social links during `dryRun`, skips duplicates by default during formal import, and supports `skipDuplicates=false` for row-level duplicate errors.
+- Web customer form now includes social links and blocks save when duplicate customer matches are found, showing owner/assigned user and matched fields.
+
+### Security
+
+- Duplicate detection is scoped by current user for personal customers and by organization for organization customers.
+- Cross-organization duplicates are allowed.
+- `support` remains read-only for organization customer import and customer creation.
+- CSV `ownerId`, `createdBy`, `organizationId`, password, token, secret, API key, session, and cookie fields are still ignored on import.
+- No WhatsApp official API integration, automatic WhatsApp sending, bulk sending, simulated send-button clicking, payments, pricing, order-system, finance, or boss-dashboard logic was added.
+
+### Tests
+
+- Added tests for same-organization duplicate blocking by WhatsApp/email/social link, cross-organization duplicate allowance, duplicate pre-check responses, duplicate event logs, import `dryRun` duplicate reporting, formal import duplicate skipping, and `skipDuplicates=false` behavior.
+
+## Unreleased - V3-C Customer ownership and assignment
+
+### Added
+
+- Added organization-aware customer ownership fields: `organizationId`, `assignedTo`, `collaborators`, and `email`.
+- Added `CustomerAssignmentLog` Prisma model for recording customer assignment changes.
+- Added customer assignment API: `POST /api/customers/:id/assign`.
+- Customer list and detail APIs now support organization context and role-aware visibility.
+- Web backend customer page now shows organization, owner, assigned user, collaborators, email, and assignment logs.
+- Customer create/update and CSV import now include duplicate collision checks by WhatsApp number or email within the current personal or organization scope.
+
+### Security
+
+- Organization customers are still created with the current user as `ownerId`.
+- `assignedTo` and `collaborators` must be active members of the same organization.
+- `owner` and `manager` can view and assign organization customers.
+- `sales` can view and manage customers they created or are assigned to.
+- `support` and collaborators can view customer details but cannot edit or delete customers.
+- Cross-organization customer access and assignment are rejected.
+- No WhatsApp official API integration, automatic WhatsApp sending, bulk sending, simulated send-button clicking, payments, pricing, order-system, finance, or boss-dashboard logic was added.
+
+### Tests
+
+- Added customer API tests covering organization customer creation, duplicate collision checks, organization visibility, collaborator read-only behavior, customer assignment, and assignment logs.
+
+## Unreleased - V3-B Role permission management
+
+### Added
+
+- Added `Role` Prisma model scoped to organization, with fixed role names `owner`, `manager`, `sales`, and `support`.
+- Organization creation now initializes default role descriptions for all four roles.
+- Added protected role APIs:
+  - `GET /api/roles?organizationId=...`
+  - `GET /api/roles/:id`
+  - `POST /api/roles`
+  - `PATCH /api/roles/:id`
+  - `DELETE /api/roles/:id`
+- Added organization role permission middleware for organization-context resource requests.
+- Added Web backend `Roles` page for listing, searching, creating, updating, and deleting role descriptions.
+
+### Security
+
+- Only organization members can read role definitions for that organization.
+- Only `owner` can create, update, or delete role definitions.
+- For organization-context customer/product/material/knowledge-base requests, `owner` and `manager` can write while `sales` and `support` are read-only.
+- Existing personal V1/V2 data isolation remains active when no organization context is provided.
+- No WhatsApp official API integration, automatic WhatsApp sending, bulk sending, simulated send-button clicking, payments, pricing, or order-system logic was added.
+
+### Tests
+
+- Added role API and permission middleware tests covering default role listing, cross-organization rejection, owner-only role CRUD, invalid role names, and sales/support read-only enforcement.
+
+## Unreleased - V3-A Organization and team member management
+
+### Added
+
+- Added `Organization` and `OrganizationMember` Prisma models for the V3 team collaboration foundation.
+- Added protected organization APIs:
+  - `GET /api/organizations`
+  - `GET /api/organizations/:id`
+  - `POST /api/organizations`
+  - `PATCH /api/organizations/:id`
+  - `DELETE /api/organizations/:id`
+- Added protected member management APIs:
+  - `GET /api/organizations/:id/members`
+  - `POST /api/organizations/:id/members`
+  - `PATCH /api/organizations/:id/members/:memberId`
+  - `DELETE /api/organizations/:id/members/:memberId`
+- Added Web backend `Organizations` page for creating organizations, editing organization names, deleting organizations, searching members, adding members, changing role/status, and removing members.
+- Added shared organization role/status types for `owner`, `manager`, `sales`, `support`, `active`, and `inactive`.
+- Added V3 team collaboration documentation in `docs/v3-team-collaboration.md`.
+
+### Security
+
+- Organization APIs only return organizations where the current user is owner or active member.
+- Organization updates/deletes require owner role.
+- Member add/update/delete requires owner or manager role.
+- The owner member role is reserved for the organization creator; member management cannot add another owner, promote a member to owner, change the owner member, or remove the owner member.
+- Adding members validates that `userId` exists.
+- Cross-organization access is rejected.
+- V3-A does not change V1/V2 personal data isolation. Customer, product, quote, follow-up, knowledge base, material, sample order, custom request, import, and export data remain scoped to the current logged-in user.
+- No WhatsApp official API integration, automatic WhatsApp sending, bulk sending, or simulated send-button clicking was added.
+
+### Tests
+
+- Added organization API tests covering create, list visibility, owner-only organization updates/deletes, member add/update/delete, userId validation, role permissions, and cross-organization access rejection.
+
 ## v0.4-v2-sales-enhancement - 2026-05-20
 
 V2 成交增强版收尾版本，覆盖 V2-A 到 V2-F 的完整能力，并完成全链路联调、账号隔离检查、安全边界检查、部署检查和文档收尾。

@@ -9,6 +9,7 @@ import {
   MAX_CSV_BYTES,
   type ImportExportDb
 } from "./import-export-utils.js";
+import { canReadOrganization, getActiveOrganizationRole, organizationIdFromRequest } from "./organization-permissions.js";
 
 type UploadedCsv = { filename: string; contentType: string; text: string; size: number };
 const defaultDb = prisma as unknown as ImportExportDb;
@@ -57,9 +58,16 @@ export function createImportRouter(db: ImportExportDb = defaultDb) {
       if (upload.contentType && !["text/csv", "application/vnd.ms-excel", "application/octet-stream"].includes(upload.contentType.toLowerCase())) {
         return res.status(400).json({ message: "invalid CSV MIME type" });
       }
+      const organizationId = type === "customers" ? organizationIdFromRequest(req) : "";
+      if (organizationId) {
+        const role = await getActiveOrganizationRole(db as any, organizationId, req.user!.id);
+        if (!canReadOrganization(role)) return res.status(403).json({ message: "organization membership required" });
+        if (role === "support") return res.status(403).json({ message: "support role is read-only for customer import" });
+      }
       const result = await importCsv(db, type, req.user!.id, upload.text, {
         dryRun: String(req.query.dryRun || "false") === "true",
-        skipDuplicates: String(req.query.skipDuplicates || "true") !== "false"
+        skipDuplicates: String(req.query.skipDuplicates || "true") !== "false",
+        organizationId: organizationId || undefined
       });
       res.json(result);
     } catch (error) {

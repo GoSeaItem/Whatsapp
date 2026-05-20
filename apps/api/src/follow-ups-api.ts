@@ -1,6 +1,7 @@
 import { Router } from "express";
 import type { FollowUpListQuery, FollowUpStatus, FollowUpTaskType, FollowUpUpsertRequest } from "@wa-ai/shared";
 import { prisma } from "./db.js";
+import { writeAuditLog } from "./audit-log-utils.js";
 import {
   buildDashboard,
   FOLLOW_UP_TASK_TYPES,
@@ -12,7 +13,7 @@ import {
   validateFollowUpPayload
 } from "./follow-up-utils.js";
 
-type FollowUpDb = Pick<typeof prisma, "followUpTask" | "customer">;
+type FollowUpDb = Pick<typeof prisma, "followUpTask" | "customer"> & Partial<Pick<typeof prisma, "auditLog">>;
 
 export function createFollowUpsRouter(db: FollowUpDb = prisma) {
   const followUpsRouter = Router();
@@ -147,6 +148,7 @@ export function createFollowUpsRouter(db: FollowUpDb = prisma) {
         data: toFollowUpCreateData(body, req.user!.id),
         include: { customer: true }
       });
+      await writeAuditLog(db, { organizationId: (task as any).customer?.organizationId, userId: req.user!.id, action: "create", entityType: "FollowUpTask", entityId: task.id, before: null, after: task });
       res.status(201).json(serializeFollowUp(task));
     } catch (error) {
       next(error);
@@ -193,6 +195,7 @@ export function createFollowUpsRouter(db: FollowUpDb = prisma) {
         data: toFollowUpUpdateData(req.body),
         include: { customer: true }
       });
+      await writeAuditLog(db, { organizationId: (existing as any).customer?.organizationId, userId: req.user!.id, action: "update", entityType: "FollowUpTask", entityId: task.id, before: existing, after: task });
       res.json(serializeFollowUp(task));
     } catch (error) {
       next(error);
@@ -227,11 +230,13 @@ export function createFollowUpsRouter(db: FollowUpDb = prisma) {
 
   followUpsRouter.delete("/:id", async (req, res, next) => {
     try {
-      const result = await db.followUpTask.deleteMany({ where: { id: req.params.id, ownerId: req.user!.id } });
-      if (result.count === 0) {
+      const existing = await findOwnedTask(db, req.params.id, req.user!.id);
+      if (!existing) {
         res.status(404).json({ message: "follow-up task not found" });
         return;
       }
+      await db.followUpTask.deleteMany({ where: { id: req.params.id, ownerId: req.user!.id } });
+      await writeAuditLog(db, { organizationId: (existing as any).customer?.organizationId, userId: req.user!.id, action: "delete", entityType: "FollowUpTask", entityId: existing.id, before: existing, after: null });
       res.status(204).send();
     } catch (error) {
       next(error);
@@ -257,11 +262,13 @@ async function findOwnedTask(db: FollowUpDb, taskId: string, ownerId: string) {
 async function updateStatus(db: FollowUpDb, taskId: string, ownerId: string, status: FollowUpStatus) {
   const existing = await findOwnedTask(db, taskId, ownerId);
   if (!existing) return null;
-  return db.followUpTask.update({
+  const task = await db.followUpTask.update({
     where: { id: taskId },
     data: { status, completedAt: status === "completed" ? new Date() : null },
     include: { customer: true }
   });
+  await writeAuditLog(db, { organizationId: (existing as any).customer?.organizationId, userId: ownerId, action: "update", entityType: "FollowUpTask", entityId: task.id, before: existing, after: task, metadata: { operation: status } });
+  return task;
 }
 
 function parseNow(value: unknown) {

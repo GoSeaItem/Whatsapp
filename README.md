@@ -2,6 +2,8 @@
 
 当前版本：`v0.4-v2-sales-enhancement`
 
+当前开发阶段：`V3-H 主管看板`
+
 面向中国跨境电商业务员和外贸销售人员的 WhatsApp Web 销售辅助原型。V1 采用 Web 后台 + Chrome Extension 侧边栏 + Desktop 复制粘贴工作流，帮助业务员更快翻译客户消息、生成专业回复、管理客户标签、发送产品介绍、生成报价并设置跟进提醒。
 
 ## v0.4-v2-sales-enhancement
@@ -18,6 +20,124 @@ V2 成交增强版已经完成并进入全链路联调收尾。当前版本在 V
 V2 仍然明确不做收费、定价、支付、套餐、团队/角色/部门权限、完整订单系统、财务利润、采购预测或老板驾驶舱。系统不接入 WhatsApp 官方 API，不自动发送 WhatsApp 消息，不自动群发，不模拟点击发送按钮。所有 AI 回复、产品介绍、素材说明、报价、跟进、样品和定制话术都只是草稿，必须由业务员手动确认后发送。
 
 下一版本建议进入：`V3 团队协作版`，再评估团队共享、角色权限、协作知识库和更完整的数据运营能力。
+
+## V3-A 组织与团队成员管理
+
+V3-A 已开始建设团队协作底座，新增组织和成员管理，但不会改变现有 V1/V2 数据的个人隔离规则。
+
+- 新增 `Organization` 和 `OrganizationMember` 数据模型。
+- 组织支持多个成员，成员角色为 `owner`、`manager`、`sales`、`support`。
+- 成员状态支持 `active`、`inactive`。
+- 新增组织 API：`GET /api/organizations`、`GET /api/organizations/:id`、`POST /api/organizations`、`PATCH /api/organizations/:id`、`DELETE /api/organizations/:id`。
+- 新增成员 API：`GET /api/organizations/:id/members`、`POST /api/organizations/:id/members`、`PATCH /api/organizations/:id/members/:memberId`、`DELETE /api/organizations/:id/members/:memberId`。
+- Web 后台新增 `Organizations` 页面，可创建组织、查看组织、编辑组织名称、删除组织、搜索成员、添加成员、修改成员角色/状态、移除成员。
+- 权限规则：只有 `owner` 可以编辑或删除组织；`owner` 和 `manager` 可以管理成员；V3-A 不支持新增 owner 或转移 owner；跨组织访问返回拒绝。
+- 创建组织时当前用户自动成为 owner 成员；添加成员会校验 userId 存在。
+
+V3-A 只做组织和成员底座，不做客户/产品/素材/知识库的组织共享数据，不做团队报表，不做部门权限，不做收费、支付或订单系统。客户、产品、报价、跟进、知识库、素材、样品单、定制需求、导入导出仍保持当前登录用户隔离。详细说明见：[docs/v3-team-collaboration.md](docs/v3-team-collaboration.md)。
+
+## V3-B 角色权限管理
+
+V3-B 在 V3-A 组织成员基础上新增角色定义和组织上下文权限校验。
+
+- 新增 `Role` 数据模型，按组织保存 `owner`、`manager`、`sales`、`support` 的权限描述。
+- 创建组织时会自动初始化四个默认角色说明。
+- 新增角色 API：`GET /api/roles`、`GET /api/roles/:id`、`POST /api/roles`、`PATCH /api/roles/:id`、`DELETE /api/roles/:id`。
+- Web 后台新增 `Roles` 页面，可按组织查看角色、搜索角色、编辑角色描述。
+- 只有组织 `owner` 可以创建、更新、删除角色说明。
+- 带组织上下文的产品、素材、知识库 API 请求会经过角色校验：`owner` / `manager` 可写，`sales` / `support` 只读；客户 API 在 V3-C 进入更细的归属、负责人和协作成员权限。
+- 未带组织上下文的个人数据请求继续按当前登录用户隔离和授权，避免破坏现有 V1/V2 个人工作流。
+
+V3-B 不新增 WhatsApp 自动发送、自动群发、模拟点击发送按钮、收费、支付、订单、财务或老板驾驶舱能力。详细说明见：[docs/v3-team-collaboration.md](docs/v3-team-collaboration.md)。
+
+## V3-C 客户归属与客户分配
+
+V3-C 新增组织上下文下的客户归属、负责人分配、协作成员和分配日志能力，同时保留个人账号客户隔离。
+
+- `Customer` 新增 `email`、`organizationId`、`assignedTo`、`collaborators` 字段。
+- 新增 `CustomerAssignmentLog`，记录客户从一个负责人转给另一个负责人的操作。
+- 创建组织客户时自动绑定 `ownerId`、`organizationId`，默认负责人为当前用户，也可由 `owner` / `manager` 指定组织内成员。
+- 新增客户分配 API：`POST /api/customers/:id/assign`。
+- 组织上下文客户列表按角色返回可见客户：`owner` / `manager` 可看组织客户；`sales` / `support` 只能看自己创建、负责或协作的客户。
+- 协作成员可以查看客户，但不能修改客户。
+- 防撞单逻辑：创建客户和 CSV 导入客户时，会按手机号或邮箱检查当前个人/组织范围内重复客户。
+- Web 后台客户页新增组织、负责人、协作成员、邮箱和分配按钮。
+- 权限规则：组织 `owner` / `manager` 可查看、编辑和分配组织客户；`sales` 可编辑自己创建或负责的客户；`support` 和协作成员只读，不能修改客户。
+- 分配客户会写入 `CustomerAssignmentLog`，用于客户详情中查看负责人转移历史。
+
+V3-C 仍不做自动分配、不做抢单池、不做客户公海、不做复杂团队报表，也不会自动发送 WhatsApp 消息。详细说明见：[docs/v3-team-collaboration.md](docs/v3-team-collaboration.md)。
+
+## V3-D 防撞单（重复客户检测）
+
+V3-D 在 V3-C 客户归属基础上增强重复客户检测，减少同一组织内多个业务员重复建客。
+
+- `Customer` 新增 `socialLinks`，可保存客户 Instagram、Facebook、TikTok、LinkedIn 等社媒链接。
+- 新增 `CustomerDuplicateEventLog`，记录防撞命中、阻止或导入跳过事件。
+- 新增 API：`POST /api/customers/check-duplicate`，用于前端保存前检查。
+- 创建/编辑客户时检查同一组织或个人范围内的 `whatsappNumber`、`email`、`socialLinks` 是否重复。
+- CSV 客户导入支持 dryRun 重复行提示；正式导入默认 `skipDuplicates=true` 跳过重复客户，`skipDuplicates=false` 时返回行级错误。
+- Web 后台客户表单新增 `Social links`，保存前会提示重复客户、负责人和命中字段，并阻止重复提交。
+- 跨组织允许出现相同手机号、邮箱或社媒链接；同组织重复会被阻止。
+
+权限规则：`owner` / `manager` 可查看和处理组织重复提示；`sales` 可以创建和维护自己负责的客户但不能覆盖他人客户；`support` 只读，不可创建、导入或覆盖客户。V3-D 不做自动合并、不做客户公海、不做抢单池，也不会自动发送 WhatsApp 消息。详细说明见：[docs/v3-team-collaboration.md](docs/v3-team-collaboration.md)。
+
+## V3-E 公共话术库 / 公共知识库
+
+V3-E 在组织和角色权限基础上新增团队共享的组织知识库与组织话术库，让 AI 回复可以引用团队统一维护的公司政策、物流说明、付款规则、禁用表达和常用话术。
+
+- 新增 `KnowledgeBaseOrg`：组织级共享知识，绑定 `organizationId` 和 `createdBy`。
+- 新增 `ScriptOrg`：组织级公共话术，绑定 `organizationId` 和 `createdBy`。
+- 新增轻量 `AuditLog`：记录组织知识/话术的创建、更新、删除操作。
+- 新增 API：`/api/knowledge-base/org` 与 `/api/scripts/org`，支持列表、详情、创建、更新、删除、搜索、分类/语言筛选和启用/禁用。
+- Web 后台新增导航入口：`Org knowledge` 和 `Org scripts`。
+- 权限规则：`owner` / `manager` 可增删改；`sales` / `support` 只读；跨组织访问被拒绝。
+- AI 回复支持 `organizationId`，检索顺序为产品相关个人知识、组织知识库、个人知识库、默认规则；返回的 `knowledgeUsed` 会标记 `[Org]` 来源。
+- `enabled=false` 的组织知识不会被 AI 使用。
+
+V3-E 不会自动发送 WhatsApp 消息，不会自动群发，也不会模拟点击发送按钮。组织知识和话术只作为 AI 草稿上下文，不能替代业务员确认价格、库存、交期、运费、付款和售后承诺。详细说明见：[docs/v3-team-collaboration.md](docs/v3-team-collaboration.md)。
+
+## V3-F 公共产品库 / 公共素材库
+
+V3-F 新增组织共享产品库和组织共享素材库，让团队可以复用经过 owner/manager 维护的产品与素材，业务员可只读使用。
+
+- 新增 `OrganizationProduct`：把已有个人产品加入组织共享产品库。
+- 新增 `OrganizationMaterial`：把已有个人素材加入组织共享素材库。
+- 新增 API：`/api/products/org` 与 `/api/materials/org`，支持组织列表、详情、添加、更新、删除、搜索和筛选。
+- Web 后台新增导航入口：`Org products` 和 `Org materials`。
+- 权限规则：`owner` / `manager` 可添加、编辑、移除共享产品和素材；`sales` / `support` 只读。
+- 报价助手支持传入 `organizationId` 后使用组织共享产品生成报价草稿。
+- AI/素材/报价中的知识库引用仍然只生成草稿，不会自动发送 WhatsApp 消息。
+- 共享产品/素材操作会写入 `AuditLog`。
+
+V3-F 只做组织共享资源，不做库存系统、文件上传、采购预测、财务利润、订单系统、支付或 WhatsApp 自动化。详细说明见：[docs/v3-team-collaboration.md](docs/v3-team-collaboration.md)。
+
+## V3-G 操作日志
+
+V3-G 将前面 V3 的轻量审计记录升级为可查询的组织操作日志，用于团队内部追溯关键资料变更。
+
+- `AuditLog` 新增 `userId`、`before`、`after` 字段，保留 `actorId` 兼容已有日志。
+- 新增 API：`GET /api/audit-logs?organizationId=xxx` 和 `GET /api/audit-logs/:id`。
+- 日志列表支持按 `entityType`、`userId`、`action`、时间范围过滤，支持分页。
+- 日志支持 `format=csv` 导出，CSV 会做公式注入防护，并过滤 password、secret、token、cookie、api key 等敏感字段。
+- Web 后台新增导航入口：`Audit logs`，可查看 before/after JSON。
+- 权限规则：`owner` / `manager` 可查看组织日志；`sales` / `support` 只能查看自己操作产生的日志；跨组织访问被拒绝。
+- 当前接入记录：组织客户、报价、共享产品、共享素材、组织知识库、组织话术库、跟进任务的 create/update/delete。
+
+V3-G 只做审计查看，不允许修改或删除日志，不做自动发送 WhatsApp 消息、不做群发、不做支付、订单、财务或老板驾驶舱。详细说明见：[docs/v3-team-collaboration.md](docs/v3-team-collaboration.md)。
+
+## V3-H 主管看板
+
+V3-H 在组织权限基础上新增团队主管看板，帮助 `owner` / `manager` 查看组织范围内的销售进度和客户质量。
+
+- 不新增数据库表，使用 `Customer`、`Quote`、`FollowUpTask`、`OrganizationMember` 和现有意向评分规则实时统计。
+- 新增 API：`GET /api/dashboard/team-summary?organizationId=xxx`。
+- `GET /api/dashboard/high-intent-customers?organizationId=xxx` 支持组织高意向客户列表。
+- 团队总览 KPI：今日新增客户、今日待跟进、逾期未跟进、高意向客户、已报价未跟进客户。
+- 业务员汇总：客户总数、已完成跟进数、报价数。
+- Web 后台新增 `Team dashboard`，仅当前选中组织的 `owner` / `manager` 可见。
+- 支持 CSV 导出团队看板数据，导出内容隐藏联系方式等敏感字段并做公式注入防护。
+
+V3-H 不是老板驾驶舱，不做财务利润、采购预测、订单系统、收费或支付；只提供团队销售辅助统计。不会接入 WhatsApp 官方 API，不会自动发送 WhatsApp 消息，不会自动群发或模拟点击发送按钮。详细说明见：[docs/v3-team-collaboration.md](docs/v3-team-collaboration.md)。
 
 ## V2-F 数据导入导出
 
