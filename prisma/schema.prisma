@@ -1263,3 +1263,96 @@ model BrandAssignment {
   @@index([entityType])
   @@index([entityId])
 }
+
+model OrganizationUnit {
+  id             String   @id @default(cuid())
+  organizationId String
+  parentId       String?
+  name           String
+  type           String   @default("organization")
+  status         String   @default("active")
+  createdBy      String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([parentId])
+  @@index([type])
+  @@index([status])
+  @@index([createdBy])
+}
+
+model EnterpriseRole {
+  id             String   @id @default(cuid())
+  organizationId String
+  roleName       String
+  permissions    Json
+  description    String?
+  createdBy      String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([organizationId, roleName])
+  @@index([organizationId])
+  @@index([roleName])
+  @@index([createdBy])
+}
+
+model EnterpriseAuditLog {
+  id                 String   @id @default(cuid())
+  organizationId     String?
+  organizationUnitId String?
+  userId             String
+  action             String
+  entityType         String
+  entityId           String?
+  metadata           Json?
+  riskLevel          String   @default("low")
+  createdAt          DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([organizationUnitId])
+  @@index([userId])
+  @@index([action])
+  @@index([entityType])
+  @@index([riskLevel])
+  @@index([createdAt])
+}
+
+model EnterpriseReport {
+  id             String   @id @default(cuid())
+  organizationId String?
+  reportType     String
+  filters        Json?
+  result         Json?
+  status         String   @default("completed")
+  createdBy      String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([reportType])
+  @@index([status])
+  @@index([createdBy])
+}
+
+model EnterpriseResourceLink {
+  id                   String   @id @default(cuid())
+  organizationId        String
+  sourceOrganizationId  String
+  targetOrganizationId  String
+  resourceType          String
+  resourceId            String
+  accessLevel           String   @default("read")
+  status                String   @default("active")
+  createdBy             String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([sourceOrganizationId])
+  @@index([targetOrganizationId])
+  @@index([resourceType])
+  @@index([resourceId])
+  @@index([status])
+}

@@ -1,4 +1,4 @@
-﻿-- V4-K lightweight script A/B testing.
+-- V4-K lightweight script A/B testing.
 
 CREATE TABLE "ScriptExperiment" (
   "id" TEXT NOT NULL,

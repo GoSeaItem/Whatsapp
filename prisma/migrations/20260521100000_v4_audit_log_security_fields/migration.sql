@@ -1,4 +1,4 @@
-﻿-- Add V4-D security audit metadata fields.
+-- Add V4-D security audit metadata fields.
 ALTER TABLE "AuditLog" ADD COLUMN "ipAddress" TEXT;
 ALTER TABLE "AuditLog" ADD COLUMN "userAgent" TEXT;
 ALTER TABLE "AuditLog" ADD COLUMN "riskLevel" TEXT NOT NULL DEFAULT 'low';

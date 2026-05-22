@@ -19,11 +19,13 @@ import {
   CUSTOM_REQUEST_STATUSES,
   CUSTOM_REQUEST_TYPES,
   CUSTOM_SCRIPT_SCENARIOS,
+  ENTERPRISE_ENTITY_STATUSES,
   KNOWLEDGE_BASE_CATEGORIES,
   KNOWLEDGE_BASE_LANGUAGES,
   MATERIAL_LANGUAGES,
   MATERIAL_TYPES,
   ORGANIZATION_MEMBER_STATUSES,
+  ORGANIZATION_UNIT_TYPES,
   ORDER_AFTER_SALES_STATUSES,
   ORDER_FULFILLMENT_SCRIPT_SCENARIOS,
   ORDER_PAYMENT_STATUSES,
@@ -59,6 +61,10 @@ import {
   type CustomerPredictionSummary,
   type CustomerSummary,
   type CustomerUpsertRequest,
+  type EnterpriseAuditLogSummary,
+  type EnterpriseBrandContextResponse,
+  type EnterpriseReportSummary,
+  type EnterpriseRoleSummary,
   type FollowUpSummary,
   type FollowUpTaskType,
   type KnowledgeBaseCategory,
@@ -76,6 +82,7 @@ import {
   type OrganizationMemberSummary,
   type OrganizationMemberUpdateRequest,
   type OrganizationRole,
+  type OrganizationUnitSummary,
   type OrderFulfillmentBoardResponse,
   type OrderFulfillmentAlertSummary,
   type OrderFulfillmentScriptScenario,
@@ -129,6 +136,9 @@ import {
   createCustomRequest,
   createAfterSalesCase,
   createAfterSalesFollowUpTask,
+  createEnterpriseOrganizationUnit,
+  createEnterpriseReport,
+  createEnterpriseRole,
   createCustomer,
   createFollowUp,
   createKnowledgeBaseItem,
@@ -208,6 +218,12 @@ import {
   getCustomerPredictions,
   getCustomerQuotes,
   getCustomers,
+  getEnterpriseAuditLogs,
+  getEnterpriseBrandContext,
+  getEnterpriseMembers,
+  getEnterpriseOrganizationUnits,
+  getEnterpriseReports,
+  getEnterpriseRoles,
   getFollowUps,
   getHighIntentCustomers,
   getKnowledgeBase,
@@ -269,6 +285,10 @@ import {
   updateAfterSalesSolution,
   updateAfterSalesStatus,
   updateCustomer,
+  updateEnterpriseOrganizationUnit,
+  updateEnterpriseMember,
+  updateEnterpriseRole,
+  upsertEnterpriseMember,
   updateKnowledgeBaseItem,
   updateMaterial,
   updateOrgKnowledgeBaseItem,
@@ -324,10 +344,10 @@ import {
 import type { CsvImportResult, ImportExportType, OrganizationExportJob, OrganizationImportExportType, OrganizationImportJob } from "./api";
 import { exportCsvUrl, templateCsvUrl } from "./api";
 
-// Release safety copy kept in source for regression checks: 复制后由业务员手动发送
-// Navigation regression marker: navButton("roles", "角色")
+// Release safety copy kept in source for regression checks: drafts are copied and sent manually by the salesperson.
+// Navigation regression marker: navButton("roles", "Roles")
 
-type View = "dashboard" | "teamDashboard" | "reports" | "predictions" | "reorderOps" | "afterSales" | "scriptTests" | "suppliers" | "brands" | "organizations" | "roles" | "permissions" | "customers" | "products" | "orgProducts" | "quotes" | "orders" | "fulfillment" | "profit" | "knowledge" | "orgKnowledge" | "orgScripts" | "materials" | "orgMaterials" | "samples" | "custom" | "importExport" | "auditLogs" | "riskEvents";
+type View = "dashboard" | "enterprise" | "teamDashboard" | "reports" | "predictions" | "reorderOps" | "afterSales" | "scriptTests" | "suppliers" | "brands" | "organizations" | "roles" | "permissions" | "customers" | "products" | "orgProducts" | "quotes" | "orders" | "fulfillment" | "profit" | "knowledge" | "orgKnowledge" | "orgScripts" | "materials" | "orgMaterials" | "samples" | "custom" | "importExport" | "auditLogs" | "riskEvents";
 type CustomerFilters = { q: string; tag: string; stage: string; sort: "" | "intentScore"; intentLevel: "" | "low" | "medium" | "high"; organizationId: string };
 type ProductFilters = { q: string; category: string };
 type KnowledgeFilters = { q: string; category: string; language: string; productId: string };
@@ -347,6 +367,9 @@ type AfterSalesFilters = { organizationId: string; customerId: string; orderId: 
 type ScriptTestFilters = { organizationId: string; scenario: string; status: string; targetLanguage: string };
 type SupplierFilters = { organizationId: string; status: string; riskLevel: string; tag: string; keyword: string; country: string; city: string };
 type BrandFilters = { organizationId: string; status: string; keyword: string };
+type EnterpriseForm = { organizationId: string; parentId: string; name: string; type: string; status: string };
+type EnterpriseRoleForm = { organizationId: string; roleName: string; permissions: string; description: string };
+type EnterpriseReportForm = { organizationId: string; reportType: string };
 
 type OrganizationForm = {
   name: string;
@@ -536,6 +559,9 @@ const emptyPredictionFilters: PredictionFilters = { organizationId: "", predicti
 const emptyOrganizationForm: OrganizationForm = { name: "" };
 const emptyOrganizationMemberForm: OrganizationMemberForm = { userId: "", role: "sales", status: "active" };
 const emptyRoleForm: RoleForm = { organizationId: "", name: "sales", description: "" };
+const emptyEnterpriseForm: EnterpriseForm = { organizationId: "", parentId: "", name: "", type: "subsidiary", status: "active" };
+const emptyEnterpriseRoleForm: EnterpriseRoleForm = { organizationId: "", roleName: "enterprise_manager", permissions: "enterprise.organization.view\nenterprise.report.view\nenterprise.audit.view", description: "" };
+const emptyEnterpriseReportForm: EnterpriseReportForm = { organizationId: "", reportType: "enterprise_summary" };
 
 const emptyCustomerForm: CustomerForm = {
   name: "",
@@ -808,6 +834,12 @@ export function App() {
   const [brands, setBrands] = useState<any[]>([]);
   const [selectedBrand, setSelectedBrand] = useState<any | null>(null);
   const [brandContext, setBrandContext] = useState<any | null>(null);
+  const [enterpriseUnits, setEnterpriseUnits] = useState<OrganizationUnitSummary[]>([]);
+  const [enterpriseMembers, setEnterpriseMembers] = useState<OrganizationMemberSummary[]>([]);
+  const [enterpriseRoles, setEnterpriseRoles] = useState<EnterpriseRoleSummary[]>([]);
+  const [enterpriseReports, setEnterpriseReports] = useState<EnterpriseReportSummary[]>([]);
+  const [enterpriseAuditLogs, setEnterpriseAuditLogs] = useState<EnterpriseAuditLogSummary[]>([]);
+  const [enterpriseBrandContext, setEnterpriseBrandContext] = useState<EnterpriseBrandContextResponse | null>(null);
   const [predictionScript, setPredictionScript] = useState("");
   const [predictionRiskWarnings, setPredictionRiskWarnings] = useState<string[]>([]);
   const [reorderOperationScript, setReorderOperationScript] = useState("");
@@ -886,6 +918,9 @@ export function App() {
   const [brandRuleForm, setBrandRuleForm] = useState(emptyBrandRuleForm);
   const [brandScriptLinkForm, setBrandScriptLinkForm] = useState(emptyBrandScriptLinkForm);
   const [brandAssignmentForm, setBrandAssignmentForm] = useState(emptyBrandAssignmentForm);
+  const [enterpriseForm, setEnterpriseForm] = useState<EnterpriseForm>(emptyEnterpriseForm);
+  const [enterpriseRoleForm, setEnterpriseRoleForm] = useState<EnterpriseRoleForm>(emptyEnterpriseRoleForm);
+  const [enterpriseReportForm, setEnterpriseReportForm] = useState<EnterpriseReportForm>(emptyEnterpriseReportForm);
   const [brandProductLinkId, setBrandProductLinkId] = useState("");
   const [brandMaterialLinkId, setBrandMaterialLinkId] = useState("");
   const [brandKnowledgeLinkId, setBrandKnowledgeLinkId] = useState("");
@@ -1041,9 +1076,13 @@ export function App() {
       setSupplierFilters((filters) => ({ ...filters, organizationId: id }));
       setBrandFilters((filters) => ({ ...filters, organizationId: id }));
       setBrandForm((form) => ({ ...form, organizationId: id }));
+      setEnterpriseForm((form) => ({ ...form, organizationId: id }));
+      setEnterpriseRoleForm((form) => ({ ...form, organizationId: id }));
+      setEnterpriseReportForm((form) => ({ ...form, organizationId: id }));
       setOrganizations((items) => items.map((item) => (item.id === detail.id ? { ...item, ...detail } : item)));
       await Promise.all([
         loadRoles(id),
+        loadEnterpriseData(id),
         loadOrgProducts({ ...orgProductFilters, organizationId: id }),
         loadOrgKnowledgeBase({ ...orgKnowledgeFilters, organizationId: id }),
         loadOrgScriptsList({ ...orgScriptFilters, organizationId: id }),
@@ -1077,6 +1116,138 @@ export function App() {
       setReorderOpportunities([]);
       setReorderCampaigns([]);
       setReorderPlaybooks([]);
+      setEnterpriseUnits([]);
+      setEnterpriseMembers([]);
+      setEnterpriseRoles([]);
+      setEnterpriseReports([]);
+      setEnterpriseAuditLogs([]);
+      setEnterpriseBrandContext(null);
+    }
+  }
+
+  async function loadEnterpriseData(organizationId = selectedOrganizationId) {
+    if (!organizationId) return;
+    try {
+      const [units, members, enterpriseRoleRows, reports, logs] = await Promise.all([
+        getEnterpriseOrganizationUnits(organizationId),
+        getEnterpriseMembers(organizationId),
+        getEnterpriseRoles(organizationId),
+        getEnterpriseReports(organizationId),
+        getEnterpriseAuditLogs(organizationId)
+      ]);
+      setEnterpriseUnits(units);
+      setEnterpriseMembers(members);
+      setEnterpriseRoles(enterpriseRoleRows);
+      setEnterpriseReports(reports);
+      setEnterpriseAuditLogs(logs);
+    } catch {
+      setEnterpriseUnits([]);
+      setEnterpriseMembers([]);
+      setEnterpriseRoles([]);
+      setEnterpriseReports([]);
+      setEnterpriseAuditLogs([]);
+      setStatus("Enterprise platform data failed to load.");
+    }
+  }
+
+  async function saveEnterpriseUnit() {
+    const organizationId = enterpriseForm.organizationId || selectedOrganizationId;
+    if (!organizationId) return setStatus("Select an organization first.");
+    try {
+      await createEnterpriseOrganizationUnit({ ...enterpriseForm, organizationId });
+      setEnterpriseForm({ ...emptyEnterpriseForm, organizationId });
+      await loadEnterpriseData(organizationId);
+      setStatus("Enterprise organization unit saved.");
+    } catch {
+      setStatus("Enterprise organization unit save failed.");
+    }
+  }
+
+  async function archiveEnterpriseUnit(id: string) {
+    if (!window.confirm("Archive this enterprise organization unit?")) return;
+    try {
+      await updateEnterpriseOrganizationUnit(id, { status: "archived", confirm: true });
+      await loadEnterpriseData(selectedOrganizationId);
+      setStatus("Enterprise organization unit archived.");
+    } catch {
+      setStatus("Enterprise organization unit archive failed.");
+    }
+  }
+
+  async function saveEnterpriseMember(userId?: string) {
+    const organizationId = selectedOrganizationId;
+    if (!organizationId) return setStatus("Select an organization first.");
+    if (!userId) return setStatus("Enter a user ID.");
+    try {
+      await upsertEnterpriseMember({ organizationId, userId, role: "sales", status: "active" });
+      await loadEnterpriseData(organizationId);
+      setStatus("Enterprise member assigned.");
+    } catch {
+      setStatus("Enterprise member update failed.");
+    }
+  }
+
+  async function updateEnterpriseMemberRecord(memberId: string, payload: { role?: string; status?: string }) {
+    if (!window.confirm("This sensitive member change requires confirmation. Continue?")) return;
+    try {
+      await updateEnterpriseMember(memberId, { ...payload, confirm: true });
+      await loadEnterpriseData(selectedOrganizationId);
+      setStatus("Enterprise member updated.");
+    } catch {
+      setStatus("Enterprise member update failed.");
+    }
+  }
+
+  async function saveEnterpriseRole() {
+    const organizationId = enterpriseRoleForm.organizationId || selectedOrganizationId;
+    if (!organizationId) return setStatus("Select an organization first.");
+    try {
+      await createEnterpriseRole({
+        organizationId,
+        roleName: enterpriseRoleForm.roleName,
+        description: enterpriseRoleForm.description,
+        permissions: splitLinesOrComma(enterpriseRoleForm.permissions)
+      });
+      setEnterpriseRoleForm({ ...emptyEnterpriseRoleForm, organizationId });
+      await loadEnterpriseData(organizationId);
+      setStatus("Enterprise role saved.");
+    } catch {
+      setStatus("Enterprise role save failed.");
+    }
+  }
+
+  async function updateEnterpriseRoleRecord(roleId: string, permissions: string[]) {
+    try {
+      await updateEnterpriseRole(roleId, { permissions });
+      await loadEnterpriseData(selectedOrganizationId);
+      setStatus("Enterprise role updated.");
+    } catch {
+      setStatus("Enterprise role update failed.");
+    }
+  }
+
+  async function createEnterpriseReportRecord() {
+    const organizationId = enterpriseReportForm.organizationId || selectedOrganizationId;
+    if (!organizationId) return setStatus("Select an organization first.");
+    try {
+      await createEnterpriseReport({ organizationId, reportType: enterpriseReportForm.reportType, filters: { generatedFrom: "web" } });
+      await loadEnterpriseData(organizationId);
+      setStatus("Enterprise report generated.");
+    } catch {
+      setStatus("Enterprise report generation failed.");
+    }
+  }
+
+  async function loadEnterpriseBrandContext() {
+    const organizationId = selectedOrganizationId;
+    const brandId = selectedBrandId || selectedBrand?.id || brands[0]?.id;
+    if (!organizationId || !brandId) return setStatus("Select an organization and brand first.");
+    try {
+      const context = await getEnterpriseBrandContext({ organizationId, brandId, scenario: "enterprise_summary", enterpriseContext: { source: "web" } });
+      setEnterpriseBrandContext(context);
+    } catch {
+      setEnterpriseBrandContext(null);
+      setStatus("Enterprise brand context failed to load.");
     }
   }
 
@@ -3318,6 +3489,7 @@ export function App() {
           {navButton("scriptTests", "A/B scripts")}
           {navButton("suppliers", "Suppliers")}
           {navButton("brands", "Brands / stores")}
+          {canManageSelectedOrganization && navButton("enterprise", "Enterprise")}
           {navButton("organizations", "Organizations")}
           {navButton("roles", "Roles")}
           {navButton("permissions", "Permissions")}
@@ -3363,6 +3535,7 @@ export function App() {
         {view === "scriptTests" && renderScriptTests()}
         {view === "suppliers" && renderSuppliers()}
         {view === "brands" && renderBrands()}
+        {view === "enterprise" && renderEnterprise()}
         {view === "organizations" && renderOrganizations()}
         {view === "roles" && renderRoles()}
         {view === "permissions" && renderPermissions()}
@@ -4332,6 +4505,144 @@ export function App() {
     );
   }
 
+  function renderEnterprise() {
+    const activeUnits = enterpriseUnits.filter((item) => item.status === "active").length;
+    const report = enterpriseReports[0];
+    const reportKpis = (report?.result as any)?.kpis || {};
+    return (
+      <>
+        <section className="metrics">
+          <Metric label="Org units" value={enterpriseUnits.length} />
+          <Metric label="Active units" value={activeUnits} />
+          <Metric label="Enterprise roles" value={enterpriseRoles.length} />
+          <Metric label="Audit events" value={enterpriseAuditLogs.length} />
+        </section>
+        <section className="grid quote-layout">
+          <Panel title="Enterprise organization units" description="V5 manages subsidiaries and branches under the selected organization.">
+            <div className="form-grid">
+              <SelectField label="Organization" value={enterpriseForm.organizationId || selectedOrganizationId} onChange={(value) => setEnterpriseForm({ ...enterpriseForm, organizationId: value })} options={organizations.map((item) => [item.id, item.name])} emptyLabel="Select organization" />
+              <Field label="Name"><input value={enterpriseForm.name} onChange={(event) => setEnterpriseForm({ ...enterpriseForm, name: event.target.value })} placeholder="Subsidiary / branch name" /></Field>
+              <SelectField label="Type" value={enterpriseForm.type} onChange={(value) => setEnterpriseForm({ ...enterpriseForm, type: value })} options={ORGANIZATION_UNIT_TYPES.map((item: string) => [item, item])} />
+              <SelectField label="Status" value={enterpriseForm.status} onChange={(value) => setEnterpriseForm({ ...enterpriseForm, status: value })} options={ENTERPRISE_ENTITY_STATUSES.map((item: string) => [item, item])} />
+              <Field label="Parent unit ID"><input value={enterpriseForm.parentId} onChange={(event) => setEnterpriseForm({ ...enterpriseForm, parentId: event.target.value })} placeholder="Optional" /></Field>
+            </div>
+            <div className="detail-actions">
+              <button onClick={saveEnterpriseUnit} disabled={loading || !canManageSelectedOrganization}>Create unit</button>
+              <button className="secondary-button" onClick={() => loadEnterpriseData(selectedOrganizationId)} disabled={!selectedOrganizationId}>Refresh enterprise data</button>
+            </div>
+            <SimpleList items={enterpriseUnits} render={(item) => (
+              <div className="customer-row">
+                <strong>{item.name}</strong>
+                <span>{item.type} / {item.status} / org {item.organizationId.slice(0, 8)}</span>
+                <span>Parent: {item.parentId || "-"}</span>
+                <button className="danger-button" onClick={() => archiveEnterpriseUnit(item.id)} disabled={!canManageSelectedOrganization || item.status === "archived"}>Archive</button>
+              </div>
+            )} />
+          </Panel>
+
+          <Panel title="Enterprise members and role matrix" description="Central member list plus enterprise role overlays. Sensitive member changes require confirmation.">
+            <div className="form-grid">
+              <Field label="User ID"><input value={memberForm.userId} onChange={(event) => setMemberForm({ ...memberForm, userId: event.target.value })} placeholder="Existing user id" /></Field>
+              <Field label="Role name"><input value={enterpriseRoleForm.roleName} onChange={(event) => setEnterpriseRoleForm({ ...enterpriseRoleForm, roleName: event.target.value })} /></Field>
+            </div>
+            <Field label="Enterprise permissions"><textarea rows={5} value={enterpriseRoleForm.permissions} onChange={(event) => setEnterpriseRoleForm({ ...enterpriseRoleForm, permissions: event.target.value })} placeholder="One permission per line" /></Field>
+            <Field label="Role description"><input value={enterpriseRoleForm.description} onChange={(event) => setEnterpriseRoleForm({ ...enterpriseRoleForm, description: event.target.value })} /></Field>
+            <div className="detail-actions">
+              <button onClick={() => saveEnterpriseMember(memberForm.userId)} disabled={loading || !canManageSelectedOrganization}>Assign member</button>
+              <button onClick={saveEnterpriseRole} disabled={loading || !canManageSelectedOrganization}>Create role overlay</button>
+            </div>
+            <div className="quote-history">
+              <div className="section-subhead"><strong>Members</strong><span>{enterpriseMembers.length}</span></div>
+              <SimpleList items={enterpriseMembers} render={(member) => (
+                <div className="list-item">
+                  <div>
+                    <strong>{member.userName || member.userEmail || member.userId}</strong>
+                    <span>{member.role} / {member.status}</span>
+                  </div>
+                  <select value={member.role} onChange={(event) => updateEnterpriseMemberRecord(member.id, { role: event.target.value })} disabled={!canManageSelectedOrganization}>
+                    {ORGANIZATION_ROLES.map((role) => <option key={role}>{role}</option>)}
+                  </select>
+                  <select value={member.status} onChange={(event) => updateEnterpriseMemberRecord(member.id, { status: event.target.value })} disabled={!canManageSelectedOrganization}>
+                    {ORGANIZATION_MEMBER_STATUSES.map((status) => <option key={status}>{status}</option>)}
+                  </select>
+                </div>
+              )} />
+            </div>
+            <div className="quote-history">
+              <div className="section-subhead"><strong>Enterprise role overlays</strong><span>{enterpriseRoles.length}</span></div>
+              <SimpleList items={enterpriseRoles} render={(role) => (
+                <div className="customer-row">
+                  <strong>{role.roleName}</strong>
+                  <span>{role.description || "No description"}</span>
+                  <span>{role.permissions.slice(0, 8).join(", ")}{role.permissions.length > 8 ? "..." : ""}</span>
+                  <button className="secondary-button" onClick={() => updateEnterpriseRoleRecord(role.id, role.permissions)} disabled={!canManageSelectedOrganization}>Refresh audit</button>
+                </div>
+              )} />
+            </div>
+          </Panel>
+        </section>
+
+        <section className="grid quote-layout">
+          <Panel title="Enterprise reports" description="Aggregated V5 KPI snapshot across accessible organization data.">
+            <div className="form-grid">
+              <SelectField label="Organization" value={enterpriseReportForm.organizationId || selectedOrganizationId} onChange={(value) => setEnterpriseReportForm({ ...enterpriseReportForm, organizationId: value })} options={organizations.map((item) => [item.id, item.name])} emptyLabel="Select organization" />
+              <Field label="Report type"><input value={enterpriseReportForm.reportType} onChange={(event) => setEnterpriseReportForm({ ...enterpriseReportForm, reportType: event.target.value })} /></Field>
+            </div>
+            <div className="detail-actions">
+              <button onClick={createEnterpriseReportRecord} disabled={loading || !canManageSelectedOrganization}>Generate report</button>
+            </div>
+            <div className="metrics">
+              <Metric label="Customers today" value={reportKpis.todayNewCustomers ?? "-"} />
+              <Metric label="Orders" value={reportKpis.orderCount ?? "-"} />
+              <Metric label="Brands" value={reportKpis.activeBrands ?? "-"} />
+              <Metric label="Suppliers" value={reportKpis.supplierCount ?? "-"} />
+            </div>
+            <SimpleList items={enterpriseReports} render={(item) => (
+              <div className="customer-row">
+                <strong>{item.reportType}</strong>
+                <span>{item.status} / {item.createdAt}</span>
+                <span>{JSON.stringify((item.result as any)?.kpis || {}).slice(0, 160)}</span>
+              </div>
+            )} />
+          </Panel>
+
+          <Panel title="Enterprise AI brand context" description="Checks brand rules and organization context for AI drafts. It never sends WhatsApp messages.">
+            <div className="detail-actions">
+              <button onClick={loadEnterpriseBrandContext} disabled={loading || !selectedOrganizationId || !brands.length}>Load brand context</button>
+            </div>
+            {enterpriseBrandContext && (
+              <div className="quote-history-item">
+                <strong>{enterpriseBrandContext.brandUsed || "No brand selected"}</strong>
+                <span>Rules: {enterpriseBrandContext.brandRulesUsed.join(", ") || "-"}</span>
+                <span>Knowledge: {enterpriseBrandContext.knowledgeUsed.join(", ") || "-"}</span>
+              </div>
+            )}
+            <RiskWarnings items={enterpriseBrandContext?.riskWarnings || ["Enterprise AI context is advisory only. Confirm price, inventory, lead time, payment, logistics and after-sales policy before sending."]} />
+          </Panel>
+        </section>
+
+        <section className="grid quote-layout">
+          <Panel title="Enterprise audit trail" description="Centralized enterprise operations and AI context checks.">
+            <SimpleList items={enterpriseAuditLogs} render={(item) => (
+              <div className="customer-row">
+                <strong>{item.riskLevel || "low"} / {item.action}</strong>
+                <span>{item.entityType} {item.entityId || ""}</span>
+                <span>{item.createdAt}</span>
+              </div>
+            )} />
+          </Panel>
+          <Panel title="V5 safety boundary" description="Enterprise platform keeps V4 sales safety behavior unchanged.">
+            <RiskWarnings items={[
+              "No WhatsApp official API, no automatic sending, no bulk sending, and no send-button simulation.",
+              "AI output remains a draft or recommendation. Salespeople must manually confirm before sending.",
+              "Sensitive exports, destructive changes and role changes stay permission-gated and audited."
+            ]} />
+          </Panel>
+        </section>
+      </>
+    );
+  }
+
   function renderRoles() {
     return (
       <section className="customer-layout">
@@ -5277,24 +5588,24 @@ export function App() {
     };
     const roleSummaries: Record<OrganizationRole, { label: string; description: string; highlights: string[] }> = {
       owner: {
-        label: "所有者",
-        description: "拥有组织内全部管理能力，可管理成员、敏感导出、审计日志和高风险操作。",
-        highlights: ["全部功能", "成员管理", "敏感导出", "审计导出", "组织删除"]
+        label: "Owner",
+        description: "Full organization access, including members, sensitive exports, audit exports and high-risk operations.",
+        highlights: ["All features", "Member admin", "Sensitive export", "Audit export", "Organization delete"]
       },
       manager: {
-        label: "经理",
-        description: "可管理团队业务数据、公共资料、报表和普通导出，但不能删除组织或导出敏感字段。",
-        highlights: ["团队数据", "公共资料", "客户分配", "团队报表", "普通导出"]
+        label: "Manager",
+        description: "Can manage team business data, shared resources, reports and normal exports, but cannot delete the organization or export sensitive fields by default.",
+        highlights: ["Team data", "Shared resources", "Customer assignment", "Team reports", "Normal export"]
       },
       sales: {
-        label: "销售",
-        description: "主要操作自己负责的客户、报价、跟进、样品、定制和 AI 草稿，不可管理成员或组织级导出。",
-        highlights: ["自己客户", "报价跟进", "AI 草稿", "样品定制", "无团队导出"]
+        label: "Sales",
+        description: "Works mainly on assigned customers, quotes, follow-ups, samples, custom requests and AI drafts. Cannot manage members or organization exports.",
+        highlights: ["Own customers", "Quote follow-up", "AI drafts", "Samples/custom", "No team export"]
       },
       support: {
-        label: "支持",
-        description: "以只读和售后跟进为主，可查看授权客户并生成售后类草稿，不可报价、导出或管理公共资料。",
-        highlights: ["授权客户", "售后跟进", "只读资料", "AI 风险检查", "无导出"]
+        label: "Support",
+        description: "Read and after-sales focused. Can view authorized customers and create support drafts, but cannot quote, export or manage shared resources.",
+        highlights: ["Authorized customers", "After-sales", "Read-only resources", "AI risk check", "No export"]
       }
     };
     return (
@@ -5312,7 +5623,7 @@ export function App() {
                   {roleSummaries[role].highlights.map((item) => <span key={item}>{item}</span>)}
                 </div>
                 <details>
-                  <summary>查看技术权限 key（{rolePermissions[role].length} 项）</summary>
+                  <summary>View technical permission keys ({rolePermissions[role].length})</summary>
                   <p className="permission-key-list">{rolePermissions[role].join(", ")}</p>
                 </details>
               </div>
@@ -5730,6 +6041,7 @@ function titleForView(view: View) {
     scriptTests: "A/B script testing",
     suppliers: "Suppliers / procurement",
     brands: "Brands / stores",
+    enterprise: "Enterprise platform",
     organizations: "Organizations",
     roles: "Roles",
     permissions: "Permission matrix",

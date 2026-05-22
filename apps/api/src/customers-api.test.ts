@@ -212,7 +212,7 @@ describe("Customer CRUD API", () => {
 
     const response = await request(app).post("/api/customers").set("x-user-id", "sales-1").send({ name: "" }).expect(400);
 
-    expect(response.body.errors).toContainEqual({ field: "name", message: "客户名称不能为空" });
+    expect(response.body.errors).toContainEqual({ field: "name", message: "\u5ba2\u6237\u540d\u79f0\u4e0d\u80fd\u4e3a\u7a7a" });
   });
 
   it("creates organization customers with owner, organization, assignment and duplicate protection", async () => {

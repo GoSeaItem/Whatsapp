@@ -1,6 +1,14 @@
 # Known Issues
 
-Current release target: `v0.6-v4-growth-ops`.
+Current release target: `v1.0-enterprise`.
+
+## V5 Enterprise Platform
+
+- V5 adds enterprise organization units, role overlays, audit logs, reports, and brand-context lookup. It does not yet implement a full enterprise IAM/SSO directory, complex approval engine, or asynchronous big-data reporting queue.
+- `EnterpriseResourceLink` is a safe foundation for cross-organization resource sharing; broader cross-organization data sharing remains conservative and should be expanded in a dedicated hardening pass.
+- Enterprise import/export coverage for all V5 entities should be extended later under the existing sensitive-export and audit rules.
+- Legacy mojibake strings still exist in older seed/demo data and some historical V1/V2 text. User-facing critical V5 pages avoid those strings, but a full localization cleanup is still recommended.
+- Safety boundaries remain unchanged: no automatic WhatsApp sending, no bulk sending, no send-button simulation, no automatic customer/supplier contact, no real payment/logistics/procurement, and no automatic commercial promises.
 
 ## V4-N Full-chain Release Review
 

@@ -186,7 +186,15 @@ export const PERMISSION_KEYS = [
   "brand.manageRules",
   "brand.assignEntity",
   "brand.useInAI",
-  "brand.export"
+  "brand.export",
+  "enterprise.organization.view",
+  "enterprise.organization.manage",
+  "enterprise.member.manage",
+  "enterprise.role.manage",
+  "enterprise.report.view",
+  "enterprise.report.export",
+  "enterprise.audit.view",
+  "enterprise.brandContext.use"
 ] as const;
 
 export type PermissionKey = typeof PERMISSION_KEYS[number];

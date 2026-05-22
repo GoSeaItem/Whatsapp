@@ -787,10 +787,81 @@ export const PERMISSION_KEYS = [
   "brand.manageRules",
   "brand.assignEntity",
   "brand.useInAI",
-  "brand.export"
+  "brand.export",
+  "enterprise.organization.view",
+  "enterprise.organization.manage",
+  "enterprise.member.manage",
+  "enterprise.role.manage",
+  "enterprise.report.view",
+  "enterprise.report.export",
+  "enterprise.audit.view",
+  "enterprise.brandContext.use"
 ] as const;
 export type PermissionKey = typeof PERMISSION_KEYS[number];
 export type SecurityRiskLevel = "low" | "medium" | "high";
+
+export const ORGANIZATION_UNIT_TYPES = ["organization", "subsidiary", "branch"] as const;
+export type OrganizationUnitType = typeof ORGANIZATION_UNIT_TYPES[number];
+
+export const ENTERPRISE_ENTITY_STATUSES = ["active", "inactive", "archived"] as const;
+export type EnterpriseEntityStatus = typeof ENTERPRISE_ENTITY_STATUSES[number];
+
+export type OrganizationUnitSummary = {
+  id: string;
+  organizationId: string;
+  parentId?: string | null;
+  name: string;
+  type: OrganizationUnitType | string;
+  status: EnterpriseEntityStatus | string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type EnterpriseRoleSummary = {
+  id: string;
+  organizationId: string;
+  roleName: string;
+  permissions: string[];
+  description?: string | null;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type EnterpriseAuditLogSummary = {
+  id: string;
+  organizationId?: string | null;
+  organizationUnitId?: string | null;
+  userId: string;
+  action: string;
+  entityType: string;
+  entityId?: string | null;
+  metadata?: unknown;
+  riskLevel: SecurityRiskLevel | string;
+  createdAt: string;
+};
+
+export type EnterpriseReportSummary = {
+  id: string;
+  organizationId?: string | null;
+  reportType: string;
+  filters?: unknown;
+  result?: unknown;
+  status: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type EnterpriseBrandContextResponse = {
+  organizationId: string;
+  enterpriseContext?: unknown;
+  brandUsed?: string | null;
+  brandRulesUsed: string[];
+  knowledgeUsed: string[];
+  riskWarnings: string[];
+};
 
 export const ORGANIZATION_ROLES = ["owner", "manager", "sales", "support"] as const;
 export type OrganizationRole = typeof ORGANIZATION_ROLES[number];

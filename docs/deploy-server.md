@@ -1,6 +1,6 @@
 # Ubuntu 24.04 Staging Deployment
 
-Current release target: `v0.6-v4-growth-ops`.
+Current release target: `v1.0-enterprise`.
 
 Target:
 
@@ -348,3 +348,7 @@ Extension cannot call API:
 - Confirm `manifest.json` host permissions include `http://187.77.138.174/*`.
 - Confirm all extension fetch calls use `credentials: "include"`.
 - Open Chrome DevTools on WhatsApp Web and inspect `/api/auth/me`.
+
+## V5 Deployment Note
+
+V5 uses production-safe Prisma migrations. Deploy with `prisma migrate deploy`, never `migrate dev`, then rebuild and restart Docker services. Verify `/api/health`, Web login, the `Enterprise` page, enterprise report generation, and Chrome extension login state.

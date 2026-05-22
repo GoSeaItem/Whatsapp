@@ -29,6 +29,10 @@ import type {
   CustomerPredictionSummary,
   CustomerSummary,
   CustomerUpsertRequest,
+  EnterpriseAuditLogSummary,
+  EnterpriseBrandContextResponse,
+  EnterpriseReportSummary,
+  EnterpriseRoleSummary,
   FollowUpDetail,
   FollowUpListQuery,
   FollowUpSummary,
@@ -50,6 +54,7 @@ import type {
   MaterialSummary,
   MaterialUpsertRequest,
   OrganizationDetail,
+  OrganizationUnitSummary,
   OrganizationMemberSummary,
   OrganizationMemberUpdateRequest,
   OrganizationMemberUpsertRequest,
@@ -249,6 +254,82 @@ export function generateReportJob(organizationId: string, type: ReportJobType, f
 
 export function getReportJob(id: string) {
   return request<ReportJobSummary>(`/api/reports/${id}/status`);
+}
+
+export function getEnterpriseOrganizationUnits(organizationId: string) {
+  return request<OrganizationUnitSummary[]>(`/api/enterprise/organizations${toQuery({ organizationId })}`);
+}
+
+export function createEnterpriseOrganizationUnit(payload: { organizationId: string; parentId?: string | null; name: string; type: string; status?: string }) {
+  return request<OrganizationUnitSummary>("/api/enterprise/organizations", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateEnterpriseOrganizationUnit(id: string, payload: Partial<{ parentId: string | null; name: string; type: string; status: string; confirm: boolean }>) {
+  return request<OrganizationUnitSummary>(`/api/enterprise/organizations/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function getEnterpriseMembers(organizationId: string) {
+  return request<OrganizationMemberSummary[]>(`/api/enterprise/members${toQuery({ organizationId })}`);
+}
+
+export function upsertEnterpriseMember(payload: { organizationId: string; userId: string; role: string; status?: string }) {
+  return request<OrganizationMemberSummary>("/api/enterprise/members", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateEnterpriseMember(id: string, payload: Partial<{ role: string; status: string; confirm: boolean }>) {
+  return request<OrganizationMemberSummary>(`/api/enterprise/members/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function getEnterpriseRoles(organizationId: string) {
+  return request<EnterpriseRoleSummary[]>(`/api/enterprise/roles${toQuery({ organizationId })}`);
+}
+
+export function createEnterpriseRole(payload: { organizationId: string; roleName: string; permissions: string[]; description?: string | null }) {
+  return request<EnterpriseRoleSummary>("/api/enterprise/roles", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateEnterpriseRole(id: string, payload: Partial<{ permissions: string[]; description: string | null }>) {
+  return request<EnterpriseRoleSummary>(`/api/enterprise/roles/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function getEnterpriseReports(organizationId: string) {
+  return request<EnterpriseReportSummary[]>(`/api/enterprise/reports${toQuery({ organizationId })}`);
+}
+
+export function createEnterpriseReport(payload: { organizationId: string; reportType: string; filters?: Record<string, unknown> }) {
+  return request<EnterpriseReportSummary>("/api/enterprise/reports", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function getEnterpriseAuditLogs(organizationId: string) {
+  return request<EnterpriseAuditLogSummary[]>(`/api/enterprise/audit-logs${toQuery({ organizationId })}`);
+}
+
+export function getEnterpriseBrandContext(payload: { organizationId: string; brandId?: string; customerId?: string; productId?: string; scenario?: string; enterpriseContext?: unknown }) {
+  return request<EnterpriseBrandContextResponse>("/api/enterprise/brand-context", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
 }
 
 export function createCustomer(payload: CustomerUpsertRequest) {

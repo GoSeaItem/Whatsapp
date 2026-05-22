@@ -57,7 +57,7 @@ describe("safety boundaries", () => {
     const app = await readFile(new URL("../../web/src/App.tsx", import.meta.url), "utf8");
 
     expect(app).toContain("AI_SAFETY_NOTE");
-    expect(app).toContain("复制后由业务员手动发送");
+    expect(app).toContain("drafts are copied and sent manually by the salesperson");
     expect(app).not.toContain('createdBy: "demo-owner"');
   });
 });

@@ -1,6 +1,6 @@
 {
   "name": "whatsapp-ai-sales-assistant-v1",
-  "version": "0.6.0",
+  "version": "1.0.0",
   "private": true,
   "description": "WhatsApp AI sales assistant V1 prototype for cross-border ecommerce sales teams.",
   "scripts": {

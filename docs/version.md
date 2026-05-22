@@ -1,12 +1,21 @@
 # Version
 
-Current version: `v0.6-v4-growth-ops`
+Current version: `v1.0-enterprise`
 
-Package version: `0.6.0`
+Package version: `1.0.0`
 
 Release date: 2026-05-22
 
-Current development stage: `V4-N Full-chain Integration and Version Marking`
+Current development stage: `V5 Enterprise Platform`
+
+## Completed V5 Scope
+
+- Enterprise organization units for subsidiaries, branches, and business lines.
+- Enterprise role overlays and permission-matrix documentation.
+- Centralized enterprise audit logs.
+- Enterprise reports and KPI snapshots.
+- Enterprise brand context for AI drafts.
+- Production-safe migration and Web `Enterprise` entry.
 
 ## Completed V4 Scope
 
@@ -24,31 +33,16 @@ Current development stage: `V4-N Full-chain Integration and Version Marking`
 - V4-L Supplier / procurement collaboration
 - V4-M Multi-brand / multi-store management
 
-## Completed V2 Scope
-
-- V2-A AI company knowledge base
-- V2-B material center
-- V2-C customer intent scoring
-- V2-D sample order management
-- V2-E custom request management
-- V2-F CSV import/export
-
 ## Product Boundaries
 
 - No WhatsApp official API integration.
 - No automatic WhatsApp sending.
 - No bulk sending.
 - No simulated clicking of WhatsApp send buttons.
-- All AI-generated content is draft-only.
-- Salespeople must manually confirm and send messages.
-- No real payment, real logistics, automatic refund, automatic shipment, automatic inventory confirmation, automatic cost confirmation, full ERP, full finance system, store API sync, WhatsApp account switching, or automatic supplier/customer contact in V4.
+- All AI-generated content is draft-only or advisory.
+- Users must manually confirm and send messages.
+- No real payment, real logistics, automatic refund, automatic shipment, automatic inventory confirmation, automatic cost confirmation, full ERP, full finance system, automatic procurement, store API sync, WhatsApp account switching, or automatic supplier/customer contact.
 
 ## Next Suggested Version
 
-After V4-N is stabilized, the next suggested work item is V5 enterprise platform edition, only if the product owner confirms the scope. It must keep the same no-auto-send, no-bulk-send, no-auto-marketing, no-real-payment, no-real-logistics, no-auto-procurement, no-inventory-ERP, no-store-API-sync, no-automatic-WhatsApp-account-switching, and no-full-ERP boundaries unless explicitly re-scoped.
-
-- V4-J: After-sales and exception management included in the V4 release scope.
-- V4-K: Lightweight A/B script testing included in the V4 release scope.
-- V4-L: Supplier / procurement collaboration included in the V4 release scope.
-- V4-M: Multi-brand / multi-store management included in the V4 release scope.
-- V4-N: Full-chain integration and version marking completed for `v0.6-v4-growth-ops`.
+After V5 is stabilized, the next suggested work is a dedicated hardening pass: enterprise import/export expansion, larger report queues, UI localization cleanup, and dependency maintenance.

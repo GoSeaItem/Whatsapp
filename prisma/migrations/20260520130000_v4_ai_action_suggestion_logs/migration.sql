@@ -1,4 +1,4 @@
-﻿-- Add V4-C AI action suggestion logs for sales recommendation auditability.
+-- Add V4-C AI action suggestion logs for sales recommendation auditability.
 CREATE TABLE "AIActionSuggestionLog" (
   "id" TEXT NOT NULL,
   "organizationId" TEXT,

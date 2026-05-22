@@ -127,7 +127,7 @@ describe("Quote CRUD API", () => {
 
     expect(response.body).toMatchObject({ id: "quote-1", customerId: "customer-1", productId: "product-1", createdBy: "sales-1" });
     expect(response.body.quoteText).toContain("Bluetooth Speaker");
-    expect(response.body.riskWarnings.join(" ")).toMatch(/WhatsApp|草稿|draft/i);
+    expect(response.body.riskWarnings.join(" ")).toMatch(/WhatsApp|锟捷革拷|draft/i);
   });
 
   it("lists only the current user's quotes", async () => {
@@ -155,7 +155,7 @@ describe("Quote CRUD API", () => {
 
     const update = await request(app).patch("/api/quotes/quote-1").set("x-user-id", "sales-1").send({ unitPrice: 9, shippingCost: null, leadTime: "" }).expect(200);
     expect(update.body.unitPrice).toBe("9.00");
-    expect(update.body.riskWarnings.join(" ")).toContain("最低价");
+    expect(update.body.riskWarnings.join(" ")).toContain("\u6700\u4f4e\u4ef7");
 
     await request(app).delete("/api/quotes/quote-1?confirm=true").set("x-user-id", "sales-1").expect(204);
     await request(app).get("/api/quotes/quote-1").set("x-user-id", "sales-1").expect(404);
@@ -176,11 +176,11 @@ describe("Quote CRUD API", () => {
     const response = await request(app).post("/api/quotes/generate").set("x-user-id", "sales-1").send({ ...validQuote(), customerId: null, unitPrice: 8, shippingCost: null, leadTime: null }).expect(200);
 
     const warnings = response.body.riskWarnings.join(" ");
-    expect(warnings).toContain("最低价");
-    expect(warnings).toContain("运费");
-    expect(warnings).toContain("交期");
-    expect(warnings).toContain("库存");
-    expect(warnings).toContain("不允许");
+    expect(warnings).toContain("\u6700\u4f4e\u4ef7");
+    expect(warnings).toContain("\u8fd0\u8d39");
+    expect(warnings).toContain("\u4ea4\u671f");
+    expect(warnings).toContain("\u5e93\u5b58");
+    expect(warnings).toContain("\u4e0d\u5141\u8bb8");
   });
 
   it("generates draft text without any WhatsApp auto-send behavior", async () => {

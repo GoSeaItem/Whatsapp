@@ -157,11 +157,11 @@ describe("SampleOrder API", () => {
   it("generates safe sample scripts", async () => {
     const { app } = createTestApp({ samples: [makeSample({ id: "s1", sampleFee: null, shippingCost: null })] });
     const quote = await request(app).post("/api/sample-orders/s1/script").send({ scenario: "sample_quote" }).expect(200);
-    expect(quote.body.riskWarnings.join(" ")).toContain("未填写样品费");
-    expect(quote.body.riskWarnings.join(" ")).toContain("收款账户");
+    expect(quote.body.riskWarnings.join(" ")).toContain("\u672a\u586b\u5199\u6837\u54c1\u8d39");
+    expect(quote.body.riskWarnings.join(" ")).toContain("\u6536\u6b3e\u8d26\u6237");
     expect(JSON.stringify(quote.body).toLowerCase()).not.toMatch(/click.*send|send button|automatic send|auto-send|bulk send/);
     const shipped = await request(app).post("/api/sample-orders/s1/script").send({ scenario: "sample_shipped" }).expect(200);
-    expect(shipped.body.riskWarnings.join(" ")).toContain("物流单号");
+    expect(shipped.body.riskWarnings.join(" ")).toContain("\u7269\u6d41\u5355\u53f7");
   });
 });
 

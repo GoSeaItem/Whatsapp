@@ -83,7 +83,7 @@ Run these after the existing login, CRM, product, quote, follow-up, import/expor
    - Expected: script is editable/copyable draft only, with payment/logistics/after-sales confirmation warnings.
    - Confirm no automatic WhatsApp sending, bulk sending or send-button clicking occurs.
 
-Current release target: `v0.6-v4-growth-ops`.
+Current release target: `v1.0-enterprise`.
 
 Use this checklist after deployment to `http://187.77.138.174`.
 
@@ -279,7 +279,7 @@ Operation:
 ```bash
 curl -i -b "$COOKIE_FILE" \
   -H "Content-Type: application/json" \
-  -d '{"customerId":"<customer-id>","taskType":"报价后跟�?,"remindAt":"2030-01-02T10:00:00.000Z","recommendedScript":"Hi, just checking if you reviewed the quotation. This is only a draft; please confirm price, stock, lead time, and shipping before sending."}' \
+  -d '{"customerId":"<customer-id>","taskType":"报价后跟�?,"remindAt":"2030-01-02T10:00:00.000Z","recommendedScript":"Hi, just checking if you reviewed the quotation. This is only a draft; please confirm price, stock, lead time, and shipping before sending."}' \
   "$BASE_URL/api/follow-ups"
 ```
 
@@ -493,3 +493,11 @@ Troubleshooting:
 10. Confirm inactive/archived brands do not appear by default in the sidebar.
 11. Confirm cross-organization brand, product, material, knowledge, script and assignment IDs are rejected.
 12. Confirm the extension does not switch WhatsApp accounts, call store APIs, auto-send WhatsApp messages, bulk-send, or click the WhatsApp send button.
+
+## V5 Enterprise Smoke Test
+
+- Log in as owner/manager and open the Web `Enterprise` entry.
+- Create an organization unit, generate an enterprise report, and confirm an `EnterpriseAuditLog` entry appears.
+- Open enterprise brand context for an active brand and confirm `brandUsed`, `brandRulesUsed`, and risk warnings are visible.
+- Confirm sales/support cannot manage enterprise units or generate enterprise reports.
+- Confirm no WhatsApp message is sent automatically from any V5 workflow.

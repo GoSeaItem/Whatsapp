@@ -1,6 +1,6 @@
 # Chrome Extension Production Build
 
-Current release target: `v0.6-v4-growth-ops`.
+Current release target: `v1.0-enterprise`.
 
 The Chrome Extension is Manifest V3 and runs only on:
 
@@ -225,3 +225,10 @@ The sidebar includes a brand/store selector. After login it loads active brands 
 If a customer is saved while a brand is selected, the extension can manually assign that brand to the customer. Created orders and after-sales cases can also be manually assigned to the selected brand. These assignments are record updates only; they do not switch WhatsApp accounts, sync store orders, call store APIs, or send any messages.
 
 If the API returns `403`, the sidebar shows a permission message. The extension must continue using `credentials: "include"` and must never auto-send WhatsApp messages, bulk-send, simulate clicking the send button, or bypass brand/organization permissions.
+
+## V5 Enterprise Extension Notes
+
+- The Chrome extension continues to use Web login cookies with `credentials: include`.
+- Enterprise context is advisory only; plugin-side AI drafts must still be manually copied/inserted and sent by the salesperson.
+- The extension must keep `content_scripts.matches` limited to `https://web.whatsapp.com/*` and must not simulate the WhatsApp send button.
+- If an enterprise or brand-context API returns `403`, show a permission message instead of exposing organization data.

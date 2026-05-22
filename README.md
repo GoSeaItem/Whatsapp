@@ -1,8 +1,24 @@
 ﻿# WhatsApp AI 销售助手 V1
 
-当前版本：`v0.6-v4-growth-ops`
+Current version: `v1.0-enterprise`
 
-当前开发阶段：`V4-N 全链路联调和版本标记`
+Current development stage: `V5 Enterprise Platform`
+
+## v1.0-enterprise
+
+`v1.0-enterprise` upgrades the V4 growth-ops system into an enterprise platform layer: multi-organization units, enterprise role overlays, centralized enterprise audit logs, enterprise reports, cross-organization resource-link placeholders, and enterprise brand context for AI drafts.
+
+- Added `OrganizationUnit` for subsidiaries, branches, and business units under an organization.
+- Added `EnterpriseRole` for enterprise permission overlays and centralized role-matrix documentation.
+- Added `EnterpriseAuditLog` for enterprise-level organization, member, role, report, and brand-context operations.
+- Added `EnterpriseReport` for KPI snapshots across customers, orders, brands, suppliers, after-sales, roles, and team activity.
+- Added `EnterpriseResourceLink` as a safe foundation for future cross-organization resource sharing.
+- Added APIs under `/api/enterprise/*` for organization units, members, roles, reports, audit logs, and enterprise brand context.
+- Added Web entry `Enterprise` for enterprise organization units, members, role overlays, reports, AI brand context, and audit trail.
+
+Safety boundary remains unchanged: no WhatsApp official API, no automatic sending, no bulk sending, no simulated send-button click, no automatic customer or supplier contact, no automatic payment/refund/shipment/procurement, and no automatic promise of price, stock, lead time, freight, payment, logistics, after-sales, cost, supplier, brand, or store policy. All AI output remains draft-only and must be manually checked by a salesperson or administrator.
+
+Docs: [enterprise platform](docs/enterprise-platform.md), [enterprise permissions and audit](docs/enterprise-permissions-audit.md), [enterprise reports](docs/enterprise-reports.md), [enterprise audit](docs/enterprise-audit.md).
 
 ## v0.6-v4-growth-ops
 
