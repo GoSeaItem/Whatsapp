@@ -3475,8 +3475,8 @@ export function App() {
         <div className="brand">
           <div className="brand-mark">WA</div>
           <div>
-            <h1>WhatsApp AI Sales Assistant</h1>
-            <p>V4 sales enhancement</p>
+            <h1>WhatsApp AI 销售助手</h1>
+            <p>V5 企业平台版</p>
           </div>
         </div>
         <nav className="nav-list">
