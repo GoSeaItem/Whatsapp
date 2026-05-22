@@ -3568,7 +3568,7 @@ export function App() {
           {navButton("suppliers", "Suppliers")}
           {navButton("brands", "Brands / stores")}
           {canManageSelectedOrganization && navButton("enterprise", "Enterprise")}
-          {canManageSelectedOrganization && navButton("aiKeys", "AI keys")}
+          {navButton("aiKeys", "AI keys")}
           {navButton("organizations", "Organizations")}
           {navButton("roles", "Roles")}
           {navButton("permissions", "Permissions")}
@@ -4726,6 +4726,11 @@ export function App() {
   function renderAiKeys() {
     const instantKeys = aiProviderKeys.filter((item) => item.mode === "instant");
     const thinkingKeys = aiProviderKeys.filter((item) => item.mode === "thinking");
+    const permissionWarnings = !selectedOrganizationId
+      ? ["Select an organization first. AI keys are stored per organization."]
+      : !canManageSelectedOrganization
+        ? [`Current role is ${selectedOrganization?.currentUserRole || "none"}. Owner or manager role is required to add or manage AI keys.`]
+        : [];
     return (
       <>
         <section className="metrics">
@@ -4736,6 +4741,7 @@ export function App() {
         </section>
         <section className="customer-layout">
           <Panel title="AI key pool" description="Owner/manager only. Keys are encrypted at rest, masked in UI, and selected by mode plus priority. Environment keys remain fallback keys.">
+            <RiskWarnings items={permissionWarnings} />
             <div className="form-grid">
               <SelectField label="Organization" value={aiKeyForm.organizationId || selectedOrganizationId} onChange={(value) => setAiKeyForm({ ...aiKeyForm, organizationId: value })} options={organizations.map((item) => [item.id, item.name])} emptyLabel="Select organization" />
               <Field label="Name"><input value={aiKeyForm.name} onChange={(event) => setAiKeyForm({ ...aiKeyForm, name: event.target.value })} placeholder="OpenAI key label" /></Field>
