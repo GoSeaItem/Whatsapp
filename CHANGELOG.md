@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased - OpenAI key pool and real translation
+## Unreleased - DeepSeek V4 and ChatGPT 5.5 key pool
 
 ### Added
 
@@ -10,11 +10,18 @@
 - Added `OPENAI_MODEL`, `OPENAI_BASE_URL`, and `OPENAI_TIMEOUT_MS` environment settings.
 - Added organization-managed backend AI key pool under `/api/ai-keys`, with encrypted key storage, `instant` / `thinking` modes, priority, enable/disable status, usage counts, token totals, rate-limit counts, quota-error counts, and last-use/error timestamps.
 - Added `OPENAI_INSTANT_MODEL`, `OPENAI_THINKING_MODEL`, and `OPENAI_KEY_ENCRYPTION_SECRET` environment settings.
+- Added model registry entries for DeepSeek V4 fastest/thinking and ChatGPT 5.5 instant/thinking, dispatched through the unified AI provider client.
+- Added `DEEPSEEK_API_KEY`, `DEEPSEEK_API_KEYS`, `DEEPSEEK_BASE_URL`, `DEEPSEEK_V4_FASTEST_MODEL`, `DEEPSEEK_V4_THINKING_MODEL`, `OPENAI_GPT55_INSTANT_MODEL`, and `OPENAI_GPT55_THINKING_MODEL` environment settings.
+- Added JSON/YAML AI key document import through `POST /api/ai-keys/import`; records are encrypted, bound to the selected organization, and can include `key`, `model`, and `user_email`.
+- Added AI model list and masked usage export endpoints for the Web backend AI Key page.
+- Added a Chrome extension AI model selector for `instant`, `thinking`, DeepSeek V4 models, and ChatGPT 5.5 models.
 
 ### Safety
 
 - OpenAI keys remain server-side only and are never returned to Web or Chrome extension clients.
 - Database-managed keys are encrypted at rest and API responses only expose masked tail digits.
+- AI key management endpoints and the Web navigation entry are restricted to `goseashop@gmail.com`; other users receive 403 and do not see the entry.
+- Usage exports include masked IDs and token counters only, never plaintext keys.
 - AI output is still draft-only. The system still does not auto-send WhatsApp messages, bulk-send, or simulate clicking the WhatsApp send button.
 
 ## V4-O - WhatsApp auto context recognition

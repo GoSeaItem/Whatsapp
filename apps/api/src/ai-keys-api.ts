@@ -1,6 +1,5 @@
 import express from "express";
 import { prisma } from "./db.js";
-import { canWriteOrganizationResource, getActiveOrganizationRole } from "./organization-permissions.js";
 import { writeAuditLog } from "./audit-log-utils.js";
 import {
   AI_KEY_MODES,
@@ -11,28 +10,123 @@ import {
   normalizeAiKeyStatus,
   serializeAiProviderKey
 } from "./ai-key-utils.js";
+import { aiModelRegistry, defaultModelForMode, findAiModel } from "./ai-model-registry.js";
+
+const AI_KEY_ADMIN_EMAIL = "goseashop@gmail.com";
+
+type ImportedAiKey = {
+  key?: string;
+  apiKey?: string;
+  key_name?: string;
+  name?: string;
+  model?: string;
+  provider?: string;
+  mode?: string;
+  user_email?: string;
+  userEmail?: string;
+  baseUrl?: string;
+  base_url?: string;
+  organizationId?: string;
+  priority?: number | string;
+};
 
 export const aiKeysRouter = express.Router();
 
-aiKeysRouter.get("/", async (req, res, next) => {
+aiKeysRouter.get("/models", async (req, res, next) => {
   try {
+    requireAiKeyAdmin(req);
+    res.json(aiModelRegistry());
+  } catch (error) {
+    next(error);
+  }
+});
+
+aiKeysRouter.get("/export", async (req, res, next) => {
+  try {
+    requireAiKeyAdmin(req);
     const organizationId = clean(req.query.organizationId);
     if (!organizationId) return res.status(400).json({ message: "organizationId is required" });
-    await requireOwnerOrManager(req.user!.id, organizationId);
+    const keys = await loadKeys({ organizationId, mode: clean(req.query.mode), status: clean(req.query.status), model: clean(req.query.model) });
+    await writeAuditLog(prisma as any, {
+      organizationId,
+      userId: req.user!.id,
+      action: "create",
+      entityType: "AiProviderKeyUsageExport",
+      entityId: organizationId,
+      metadata: { fields: "masked_usage_only", count: keys.length },
+      riskLevel: "medium"
+    });
+    res.setHeader("content-type", "text/csv; charset=utf-8");
+    res.setHeader("content-disposition", `attachment; filename="ai-key-usage-${new Date().toISOString().slice(0, 10)}.csv"`);
+    res.send(aiKeysToCsv(keys));
+  } catch (error) {
+    next(error);
+  }
+});
 
-    const mode = clean(req.query.mode);
-    const status = clean(req.query.status);
-    const keys = await (prisma as any).aiProviderKey.findMany({
-      where: {
-        organizationId,
-        provider: "openai",
-        ...(AI_KEY_MODES.includes(mode as any) ? { mode } : {}),
-        ...(AI_KEY_STATUSES.includes(status as any) ? { status } : {})
-      },
-      orderBy: [{ mode: "asc" }, { priority: "asc" }, { createdAt: "asc" }]
+aiKeysRouter.get("/", async (req, res, next) => {
+  try {
+    requireAiKeyAdmin(req);
+    const organizationId = clean(req.query.organizationId);
+    if (!organizationId) return res.status(400).json({ message: "organizationId is required" });
+    const keys = await loadKeys({ organizationId, mode: clean(req.query.mode), status: clean(req.query.status), model: clean(req.query.model) });
+    res.json(keys.map(serializeAiProviderKey));
+  } catch (error) {
+    next(error);
+  }
+});
+
+aiKeysRouter.post("/import", async (req, res, next) => {
+  try {
+    requireAiKeyAdmin(req);
+    const organizationId = clean(req.body.organizationId);
+    if (!organizationId) return res.status(400).json({ message: "organizationId is required" });
+    const imported = parseImportDocument(req.body.items || req.body.content || req.body.document || req.body);
+    if (imported.length === 0) return res.status(400).json({ message: "No AI keys found in document" });
+
+    const created: any[] = [];
+    const errors: Array<{ index: number; message: string }> = [];
+    for (const [index, item] of imported.entries()) {
+      try {
+        const apiKey = clean(item.key || item.apiKey);
+        if (!apiKey) throw new Error("key is required");
+        const data = buildKeyData({
+          organizationId: clean(item.organizationId) || organizationId,
+          apiKey,
+          name: clean(item.key_name || item.name),
+          mode: item.mode,
+          model: item.model,
+          provider: item.provider,
+          baseUrl: clean(item.baseUrl || item.base_url),
+          userEmail: clean(item.user_email || item.userEmail) || req.user!.email,
+          status: "active",
+          priority: item.priority,
+          createdBy: req.user!.id
+        });
+        const row = await (prisma as any).aiProviderKey.create({ data });
+        created.push(row);
+      } catch (error) {
+        errors.push({ index: index + 1, message: error instanceof Error ? error.message : "import failed" });
+      }
+    }
+
+    await writeAuditLog(prisma as any, {
+      organizationId,
+      userId: req.user!.id,
+      action: "create",
+      entityType: "AiProviderKeyImport",
+      entityId: organizationId,
+      after: { createdCount: created.length, failedCount: errors.length },
+      metadata: { filename: clean(req.body.filename), source: "document_upload" },
+      riskLevel: "medium"
     });
 
-    res.json(keys.map(serializeAiProviderKey));
+    res.status(201).json({
+      createdCount: created.length,
+      failedCount: errors.length,
+      errors,
+      keys: created.map(serializeAiProviderKey)
+    });
   } catch (error) {
     next(error);
   }
@@ -40,24 +134,25 @@ aiKeysRouter.get("/", async (req, res, next) => {
 
 aiKeysRouter.post("/", async (req, res, next) => {
   try {
+    requireAiKeyAdmin(req);
     const organizationId = clean(req.body.organizationId);
     const apiKey = clean(req.body.apiKey);
     if (!organizationId) return res.status(400).json({ message: "organizationId is required" });
     if (!apiKey) return res.status(400).json({ message: "apiKey is required" });
-    await requireOwnerOrManager(req.user!.id, organizationId);
 
-    const mode = normalizeAiKeyMode(req.body.mode);
-    const data = {
+    const data = buildKeyData({
       organizationId,
-      provider: "openai",
-      name: clean(req.body.name) || `${mode} key ${keyLast4(apiKey)}`,
-      mode,
-      encryptedKey: encryptProviderKey(apiKey),
-      keyLast4: keyLast4(apiKey),
-      status: normalizeAiKeyStatus(req.body.status),
-      priority: Number.isFinite(Number(req.body.priority)) ? Number(req.body.priority) : 100,
+      apiKey,
+      name: clean(req.body.name),
+      mode: req.body.mode,
+      model: clean(req.body.model),
+      provider: clean(req.body.provider),
+      baseUrl: clean(req.body.baseUrl),
+      userEmail: clean(req.body.userEmail) || req.user!.email,
+      status: req.body.status,
+      priority: req.body.priority,
       createdBy: req.user!.id
-    };
+    });
 
     const created = await (prisma as any).aiProviderKey.create({ data });
     await writeAuditLog(prisma as any, {
@@ -66,8 +161,8 @@ aiKeysRouter.post("/", async (req, res, next) => {
       action: "create",
       entityType: "AiProviderKey",
       entityId: created.id,
-      after: { ...serializeAiProviderKey(created), apiKey: undefined },
-      metadata: { mode, provider: "openai" },
+      after: serializeAiProviderKey(created),
+      metadata: { provider: created.provider, model: created.model, mode: created.mode },
       riskLevel: "medium"
     });
 
@@ -77,9 +172,33 @@ aiKeysRouter.post("/", async (req, res, next) => {
   }
 });
 
+aiKeysRouter.get("/:id/usage", async (req, res, next) => {
+  try {
+    requireAiKeyAdmin(req);
+    const key = await findManagedKey(req.params.id);
+    res.json({
+      key: serializeAiProviderKey(key),
+      usage: {
+        totalRequests: key.totalRequests,
+        totalTokens: key.totalTokens,
+        successCount: key.successCount,
+        errorCount: key.errorCount,
+        rateLimitCount: key.rateLimitCount,
+        quotaErrorCount: key.quotaErrorCount,
+        lastUsedAt: key.lastUsedAt,
+        lastSuccessAt: key.lastSuccessAt,
+        lastErrorAt: key.lastErrorAt
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 aiKeysRouter.patch("/:id", async (req, res, next) => {
   try {
-    const existing = await findManagedKey(req.params.id, req.user!.id);
+    requireAiKeyAdmin(req);
+    const existing = await findManagedKey(req.params.id);
     const apiKey = clean(req.body.apiKey);
     const data: Record<string, unknown> = {};
 
@@ -87,6 +206,16 @@ aiKeysRouter.patch("/:id", async (req, res, next) => {
     if (req.body.mode !== undefined) data.mode = normalizeAiKeyMode(req.body.mode);
     if (req.body.status !== undefined) data.status = normalizeAiKeyStatus(req.body.status);
     if (req.body.priority !== undefined && Number.isFinite(Number(req.body.priority))) data.priority = Number(req.body.priority);
+    if (req.body.userEmail !== undefined) data.userEmail = clean(req.body.userEmail) || null;
+    if (req.body.baseUrl !== undefined) data.baseUrl = clean(req.body.baseUrl) || null;
+    if (req.body.model !== undefined || req.body.provider !== undefined || req.body.mode !== undefined) {
+      const requestedModel = clean(req.body.model);
+      const definition = findAiModel(requestedModel) || defaultModelForMode(typeof req.body.mode === "string" ? req.body.mode : existing.mode);
+      data.provider = clean(req.body.provider) || definition.provider;
+      data.model = requestedModel && requestedModel !== definition.id ? requestedModel : definition.model;
+      data.baseUrl = clean(req.body.baseUrl) || existing.baseUrl || definition.baseUrl;
+      data.mode = normalizeAiKeyMode(req.body.mode || definition.mode);
+    }
     if (apiKey) {
       data.encryptedKey = encryptProviderKey(apiKey);
       data.keyLast4 = keyLast4(apiKey);
@@ -105,7 +234,7 @@ aiKeysRouter.patch("/:id", async (req, res, next) => {
       entityId: existing.id,
       before: serializeAiProviderKey(existing),
       after: serializeAiProviderKey(updated),
-      metadata: { provider: "openai", replacedKey: Boolean(apiKey) },
+      metadata: { replacedKey: Boolean(apiKey), provider: updated.provider, model: updated.model },
       riskLevel: apiKey ? "high" : "medium"
     });
 
@@ -117,8 +246,9 @@ aiKeysRouter.patch("/:id", async (req, res, next) => {
 
 aiKeysRouter.delete("/:id", async (req, res, next) => {
   try {
+    requireAiKeyAdmin(req);
     if (req.body?.confirm !== true) return res.status(400).json({ error: "CONFIRM_REQUIRED", message: "This action requires confirmation." });
-    const existing = await findManagedKey(req.params.id, req.user!.id);
+    const existing = await findManagedKey(req.params.id);
     const updated = await (prisma as any).aiProviderKey.update({ where: { id: existing.id }, data: { status: "disabled" } });
     await writeAuditLog(prisma as any, {
       organizationId: existing.organizationId,
@@ -128,7 +258,7 @@ aiKeysRouter.delete("/:id", async (req, res, next) => {
       entityId: existing.id,
       before: serializeAiProviderKey(existing),
       after: serializeAiProviderKey(updated),
-      metadata: { softDelete: true, provider: "openai" },
+      metadata: { softDelete: true },
       riskLevel: "high"
     });
     res.json(serializeAiProviderKey(updated));
@@ -137,19 +267,138 @@ aiKeysRouter.delete("/:id", async (req, res, next) => {
   }
 });
 
-async function findManagedKey(id: string, userId: string) {
+async function loadKeys(input: { organizationId: string; mode?: string; status?: string; model?: string }) {
+  return (prisma as any).aiProviderKey.findMany({
+    where: {
+      organizationId: input.organizationId,
+      ...(AI_KEY_MODES.includes(input.mode as any) ? { mode: input.mode } : {}),
+      ...(AI_KEY_STATUSES.includes(input.status as any) ? { status: input.status } : {}),
+      ...(input.model ? { model: input.model } : {})
+    },
+    orderBy: [{ provider: "asc" }, { mode: "asc" }, { priority: "asc" }, { createdAt: "asc" }]
+  });
+}
+
+async function findManagedKey(id: string) {
   const key = await (prisma as any).aiProviderKey.findUnique({ where: { id } });
   if (!key) throw Object.assign(new Error("AI provider key not found"), { status: 404 });
-  await requireOwnerOrManager(userId, key.organizationId);
   return key;
 }
 
-async function requireOwnerOrManager(userId: string, organizationId: string) {
-  const role = await getActiveOrganizationRole(prisma as any, organizationId, userId);
-  if (!canWriteOrganizationResource(role)) throw Object.assign(new Error("owner or manager role required"), { status: 403 });
+function buildKeyData(input: {
+  organizationId: string;
+  apiKey: string;
+  name?: string;
+  mode?: unknown;
+  model?: string;
+  provider?: string;
+  baseUrl?: string;
+  userEmail?: string;
+  status?: unknown;
+  priority?: unknown;
+  createdBy: string;
+}) {
+  const requestedMode = typeof input.mode === "string" ? input.mode : null;
+  const definition = findAiModel(input.model) || defaultModelForMode(requestedMode);
+  const provider = input.provider || definition.provider;
+  const mode = normalizeAiKeyMode(input.mode || definition.mode);
+  const model = input.model && input.model !== definition.id ? input.model : definition.model;
+  return {
+    organizationId: input.organizationId,
+    provider,
+    name: input.name || `${provider} ${mode} key ${keyLast4(input.apiKey)}`,
+    mode,
+    model,
+    baseUrl: input.baseUrl || definition.baseUrl,
+    userEmail: input.userEmail || null,
+    encryptedKey: encryptProviderKey(input.apiKey),
+    keyLast4: keyLast4(input.apiKey),
+    status: normalizeAiKeyStatus(input.status),
+    priority: Number.isFinite(Number(input.priority)) ? Number(input.priority) : definition.priority,
+    createdBy: input.createdBy
+  };
+}
+
+function parseImportDocument(input: unknown): ImportedAiKey[] {
+  if (Array.isArray(input)) return input as ImportedAiKey[];
+  if (typeof input === "object" && input && Array.isArray((input as { keys?: unknown }).keys)) return (input as { keys: ImportedAiKey[] }).keys;
+  if (typeof input === "object" && input && (input as ImportedAiKey).key) return [input as ImportedAiKey];
+  if (typeof input !== "string") return [];
+  const text = input.trim();
+  if (!text) return [];
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) return parsed;
+    if (Array.isArray(parsed.keys)) return parsed.keys;
+    if (parsed.key) return [parsed];
+  } catch {
+    // Fall through to the small YAML parser below.
+  }
+  return parseSimpleYamlKeys(text);
+}
+
+function parseSimpleYamlKeys(text: string): ImportedAiKey[] {
+  const lines = text.split(/\r?\n/);
+  const items: ImportedAiKey[] = [];
+  let current: ImportedAiKey | null = null;
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    if (line.startsWith("- ")) {
+      if (current) items.push(current);
+      current = {};
+      assignYamlPair(current, line.slice(2));
+      continue;
+    }
+    if (!current) current = {};
+    assignYamlPair(current, line);
+  }
+  if (current && Object.keys(current).length > 0) items.push(current);
+  return items.filter((item) => item.key || item.apiKey);
+}
+
+function assignYamlPair(target: ImportedAiKey, line: string) {
+  const index = line.indexOf(":");
+  if (index <= 0) return;
+  const key = line.slice(0, index).trim();
+  const value = line.slice(index + 1).trim().replace(/^['"]|['"]$/g, "");
+  (target as Record<string, unknown>)[key] = value;
+}
+
+function requireAiKeyAdmin(req: express.Request) {
+  const email = req.user?.email?.toLowerCase();
+  if (email !== AI_KEY_ADMIN_EMAIL) throw Object.assign(new Error("AI key management is restricted"), { status: 403 });
+}
+
+function aiKeysToCsv(keys: any[]) {
+  const header = ["id", "organizationId", "provider", "model", "mode", "name", "maskedKey", "status", "totalRequests", "totalTokens", "successCount", "errorCount", "lastUsedAt"];
+  const rows = keys.map((key) => {
+    const item = serializeAiProviderKey(key);
+    return [
+      item.id,
+      item.organizationId,
+      item.provider,
+      item.model,
+      item.mode,
+      item.name,
+      item.maskedKey,
+      item.status,
+      item.totalRequests,
+      item.totalTokens,
+      item.successCount,
+      item.errorCount,
+      item.lastUsedAt || ""
+    ];
+  });
+  return [header, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
+}
+
+function csvCell(value: unknown) {
+  const text = value === null || value === undefined ? "" : String(value);
+  const safe = /^[=+\-@]/.test(text) ? `'${text}` : text;
+  return `"${safe.replace(/"/g, '""')}"`;
 }
 
 function clean(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
-

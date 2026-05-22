@@ -188,6 +188,19 @@ function createSidebar() {
             </select>
           </label>
           <label class="wa-ai-field">
+            <span>AI model</span>
+            <select id="wa-ai-model-select">
+              <option value="deepseek-v4-fastest">DeepSeek V4 fastest</option>
+              <option value="instant">instant</option>
+              <option value="thinking">thinking</option>
+              <option value="deepseek-v4-pro">DeepSeek V4 thinking</option>
+              <option value="deepseek-v4-chat">DeepSeek V4 chat</option>
+              <option value="deepseek-v4-reasoner">DeepSeek V4 reasoner</option>
+              <option value="chatgpt-5.5-instant">ChatGPT 5.5 instant</option>
+              <option value="chatgpt-5.5-thinking">ChatGPT 5.5 thinking</option>
+            </select>
+          </label>
+          <label class="wa-ai-field">
             <span>销售阶段</span>
             <select id="wa-ai-stage">
               <option value="新线索">新线索</option>
@@ -2557,13 +2570,28 @@ async function handleQuickAction(action: Exclude<QuickAction, "product" | "quote
 
 async function requestAiReply(payload: AiReplyRequest) {
   const brandId = selectedBrandId();
+  const aiModel = selectedAiModel();
   const response = await apiFetch("/api/ai/reply", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...payload, brandId: brandId || undefined })
+    body: JSON.stringify({
+      ...payload,
+      brandId: brandId || undefined,
+      aiModel: aiModel.model,
+      aiMode: aiModel.mode
+    })
   });
   if (!response.ok) throw new Error("AI reply request failed");
   return response.json() as Promise<AiReplyResponse>;
+}
+
+function selectedAiModel() {
+  const value = getSelect("wa-ai-model-select")?.value || "deepseek-v4-fastest";
+  const thinking = value === "thinking" || value.includes("thinking") || value.includes("pro");
+  return {
+    model: value === "instant" || value === "thinking" ? undefined : value,
+    mode: thinking ? "thinking" : "instant"
+  };
 }
 
 function renderAiReply(result: AiReplyResponse) {

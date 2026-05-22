@@ -27,6 +27,14 @@ Troubleshooting:
 3. If customer matching fails, verify the Web backend login session and organization membership.
 4. If the extension falls back to manual paste, the user can still paste the message and generate drafts normally.
 
+## AI Provider Selection
+
+- The AI tab includes a model selector for `DeepSeek V4 fastest`, `instant`, `thinking`, `DeepSeek V4 thinking`, `ChatGPT 5.5 instant`, and `ChatGPT 5.5 thinking`.
+- The selected value is sent to the backend as draft-generation context only. The backend AIService chooses an encrypted database key first, then environment fallback keys.
+- Database AI keys are managed only by `goseashop@gmail.com` in the Web backend. The extension never sees plaintext keys.
+- The backend tries active DeepSeek V4 keys before ChatGPT 5.5 fallback keys for the same mode unless the user explicitly selects a ChatGPT model.
+- AI output remains a draft. The extension can copy or insert text into the WhatsApp input box but must not auto-send, bulk-send, call the WhatsApp official API, or simulate the send button.
+
 ## V4-F Order Center Sidebar
 
 - The sidebar can load current customer orders, create a manual order record, and generate an order script draft.

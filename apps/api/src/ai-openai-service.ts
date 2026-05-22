@@ -24,11 +24,13 @@ const COMMON_SAFETY_RULES = [
 export async function generateAiReplySmart(input: AiReplyRequest): Promise<AiReplyResponse> {
   const fallback = generateAiReply(input);
   const aiMode = (input as any).aiMode === "thinking" || (input as any).mode === "thinking" ? "thinking" : "instant";
+  const aiModel = typeof (input as any).aiModel === "string" ? (input as any).aiModel : typeof (input as any).model === "string" ? (input as any).model : null;
 
   try {
     const completion = await createOpenAiChatCompletion({
       organizationId: input.organizationId || null,
       mode: aiMode,
+      model: aiModel,
       messages: [
         {
           role: "system",
@@ -69,7 +71,7 @@ export async function generateAiReplySmart(input: AiReplyRequest): Promise<AiRep
       riskWarnings: mergeUnique([
         ...fallback.riskWarnings,
         ...stringArray(parsed.riskWarnings),
-        `OpenAI draft generated with ${completion.model}; salesperson must manually confirm before sending.`
+        `AI draft generated with ${completion.model}; salesperson must manually confirm before sending.`
       ])
     };
   } catch (error) {
@@ -77,7 +79,7 @@ export async function generateAiReplySmart(input: AiReplyRequest): Promise<AiRep
       ...fallback,
       riskWarnings: mergeUnique([
         ...fallback.riskWarnings,
-        `OpenAI unavailable, used local fallback draft. ${error instanceof Error ? error.message : ""}`.trim()
+        `AI provider unavailable, used local fallback draft. ${error instanceof Error ? error.message : ""}`.trim()
       ])
     };
   }
@@ -87,12 +89,14 @@ export async function generateDraftSmart(input: GenerateDraftRequest): Promise<G
   const fallback = generateDraft(input);
   if (!input.sourceText?.trim()) return fallback;
   const aiMode = (input as any).aiMode === "thinking" || (input as any).mode === "thinking" ? "thinking" : "instant";
+  const aiModel = typeof (input as any).aiModel === "string" ? (input as any).aiModel : typeof (input as any).model === "string" ? (input as any).model : null;
 
   try {
     const targetLanguage = input.languageTo || (input.intent === "translate" ? "Chinese" : "English");
     const completion = await createOpenAiChatCompletion({
       organizationId: (input as any).organizationId || null,
       mode: aiMode,
+      model: aiModel,
       messages: [
         {
           role: "system",
@@ -120,12 +124,12 @@ export async function generateDraftSmart(input: GenerateDraftRequest): Promise<G
     if (!completion) return fallback;
     return {
       draft: completion.content.trim(),
-      safetyNote: `OpenAI draft generated with ${completion.model}. Draft only; salesperson must manually confirm and send.`
+      safetyNote: `AI draft generated with ${completion.model}. Draft only; salesperson must manually confirm and send.`
     };
   } catch (error) {
     return {
       ...fallback,
-      safetyNote: `OpenAI unavailable, used local fallback. ${fallback.safetyNote}`
+      safetyNote: `AI provider unavailable, used local fallback. ${fallback.safetyNote}`
     };
   }
 }

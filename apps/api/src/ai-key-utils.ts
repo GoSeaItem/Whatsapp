@@ -45,6 +45,9 @@ export function serializeAiProviderKey(key: any) {
     provider: key.provider,
     name: key.name,
     mode: key.mode,
+    model: key.model || "",
+    userEmail: key.userEmail || null,
+    baseUrl: key.baseUrl || null,
     maskedKey: maskProviderKey(key.keyLast4),
     status: key.status,
     priority: key.priority,
@@ -69,4 +72,3 @@ function encryptionKey(env: NodeJS.ProcessEnv) {
   if (!secret) throw new Error("OPENAI_KEY_ENCRYPTION_SECRET, COOKIE_SECRET, or SESSION_SECRET is required to store AI provider keys");
   return createHash("sha256").update(secret).digest();
 }
-

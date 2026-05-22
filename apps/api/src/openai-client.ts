@@ -1,4 +1,5 @@
 import { decryptProviderKey } from "./ai-key-utils.js";
+import { aiModelRegistry, defaultModelForMode, findAiModel, type AiModelDefinition } from "./ai-model-registry.js";
 import { prisma } from "./db.js";
 
 type ChatMessage = {
@@ -13,6 +14,7 @@ type OpenAiChatOptions = {
   env?: NodeJS.ProcessEnv;
   organizationId?: string | null;
   mode?: "instant" | "thinking" | string | null;
+  model?: string | null;
 };
 
 export type OpenAiChatResult = {
@@ -21,19 +23,8 @@ export type OpenAiChatResult = {
   keyIndex: number;
 };
 
-const DEFAULT_MODEL = "gpt-4o-mini";
-let nextKeyIndex = 0;
-
 export function getOpenAiKeys(env: NodeJS.ProcessEnv = process.env) {
-  const keys = [
-    ...(env.OPENAI_API_KEYS || "")
-      .split(/[\n,;]+/)
-      .map((key) => key.trim())
-      .filter(Boolean),
-    env.OPENAI_API_KEY?.trim() || ""
-  ].filter(Boolean);
-
-  return Array.from(new Set(keys));
+  return getEnvKeys(env.OPENAI_API_KEYS, env.OPENAI_API_KEY);
 }
 
 export function hasOpenAiKeys(env: NodeJS.ProcessEnv = process.env) {
@@ -44,16 +35,18 @@ export function hasOpenAiKeys(env: NodeJS.ProcessEnv = process.env) {
 export async function createOpenAiChatCompletion(options: OpenAiChatOptions): Promise<OpenAiChatResult | null> {
   const env = options.env || process.env;
   if (env.NODE_ENV === "test" && env.OPENAI_ENABLE_IN_TEST !== "true") return null;
-  const dbKeys = await loadDatabaseKeys(options.organizationId || "", options.mode || "instant", env);
-  const envKeys = getOpenAiKeys(env).map((apiKey, index) => ({ apiKey, id: null as string | null, keyIndex: index, source: "env" as const }));
+  const explicitModel = findAiModel(options.model, env);
+  const selectedModel = explicitModel || defaultModelForMode(options.mode, env);
+  const modelCandidates = explicitModel
+    ? [explicitModel]
+    : aiModelRegistry(env).filter((item) => item.mode === selectedModel.mode).sort((a, b) => a.priority - b.priority);
+  const dbKeys = await loadDatabaseKeys(options.organizationId || "", options.mode || selectedModel.mode, options.model || selectedModel.model, env);
+  const envKeys = loadEnvironmentKeys(modelCandidates, env);
   const keys = [...dbKeys, ...envKeys];
   if (keys.length === 0) return null;
 
-  const mode = options.mode === "thinking" ? "thinking" : "instant";
-  const model = (mode === "thinking" ? env.OPENAI_THINKING_MODEL?.trim() : env.OPENAI_INSTANT_MODEL?.trim()) || env.OPENAI_MODEL?.trim() || DEFAULT_MODEL;
-  const baseUrl = (env.OPENAI_BASE_URL?.trim() || "https://api.openai.com/v1").replace(/\/+$/, "");
   const timeoutMs = Number(env.OPENAI_TIMEOUT_MS || 30000);
-  const startedIndex = nextKeyIndex % keys.length;
+  const startedIndex = 0;
   const errors: string[] = [];
 
   for (let attempt = 0; attempt < keys.length; attempt += 1) {
@@ -63,8 +56,8 @@ export async function createOpenAiChatCompletion(options: OpenAiChatOptions): Pr
     try {
       const completion = await callChatCompletions({
         apiKey: key.apiKey,
-        baseUrl,
-        model,
+        baseUrl: key.baseUrl,
+        model: key.model,
         timeoutMs,
         messages: options.messages,
         temperature: options.temperature ?? 0.2,
@@ -72,13 +65,11 @@ export async function createOpenAiChatCompletion(options: OpenAiChatOptions): Pr
       });
 
       if (key.id) await recordDatabaseKeySuccess(key.id, completion.totalTokens);
-      nextKeyIndex = keyIndex;
-      return { content: completion.content, model, keyIndex: key.keyIndex };
+      return { content: completion.content, model: key.model, keyIndex: key.keyIndex };
     } catch (error) {
       const message = error instanceof Error ? error.message : "unknown error";
       if (key.id) await recordDatabaseKeyFailure(key.id, message);
       errors.push(`${key.source} key#${key.keyIndex + 1}: ${message}`);
-      nextKeyIndex = (keyIndex + 1) % keys.length;
     }
   }
 
@@ -128,25 +119,72 @@ async function callChatCompletions(input: {
   }
 }
 
-async function loadDatabaseKeys(organizationId: string, mode: string, env: NodeJS.ProcessEnv) {
+function loadEnvironmentKeys(modelCandidates: AiModelDefinition[], env: NodeJS.ProcessEnv) {
+  return modelCandidates.flatMap((selectedModel) => {
+    const keys = selectedModel.provider === "deepseek"
+      ? getEnvKeys(env.DEEPSEEK_API_KEYS, env.DEEPSEEK_API_KEY)
+      : getOpenAiKeys(env);
+    return keys.map((apiKey, index) => ({
+      apiKey,
+      id: null as string | null,
+      keyIndex: index,
+      source: "env" as const,
+      provider: selectedModel.provider,
+      model: selectedModel.model,
+      baseUrl: selectedModel.baseUrl
+    }));
+  });
+}
+
+function getEnvKeys(keysText?: string, singleKey?: string) {
+  const keys = [
+    ...(keysText || "")
+      .split(/[\n,;]+/)
+      .map((key) => key.trim())
+      .filter(Boolean),
+    singleKey?.trim() || ""
+  ].filter(Boolean);
+  return Array.from(new Set(keys));
+}
+
+async function loadDatabaseKeys(organizationId: string, mode: string, requestedModel: string, env: NodeJS.ProcessEnv) {
   if (!organizationId) return [];
+  const registry = aiModelRegistry(env);
+  const requested = findAiModel(requestedModel, env);
+  const normalizedMode = mode === "thinking" ? "thinking" : "instant";
   const rows = await (prisma as any).aiProviderKey.findMany({
     where: {
       organizationId,
-      provider: "openai",
-      mode: mode === "thinking" ? "thinking" : "instant",
-      status: "active"
+      status: "active",
+      ...(requested ? { provider: requested.provider, model: requested.model } : { mode: normalizedMode })
     },
     orderBy: [{ priority: "asc" }, { createdAt: "asc" }]
   }).catch(() => []);
 
-  return rows.flatMap((row: any, index: number) => {
+  return rows
+    .sort((a: any, b: any) => providerRank(a.provider) - providerRank(b.provider) || a.priority - b.priority)
+    .flatMap((row: any, index: number) => {
     try {
-      return [{ apiKey: decryptProviderKey(row.encryptedKey, env), id: row.id as string, keyIndex: index, source: "database" as const }];
+      const definition = registry.find((item) => item.provider === row.provider && item.model === row.model);
+      return [{
+        apiKey: decryptProviderKey(row.encryptedKey, env),
+        id: row.id as string,
+        keyIndex: index,
+        source: "database" as const,
+        provider: row.provider || definition?.provider || "openai",
+        model: row.model || definition?.model || defaultModelForMode(row.mode, env).model,
+        baseUrl: (row.baseUrl || definition?.baseUrl || defaultModelForMode(row.mode, env).baseUrl).replace(/\/+$/, "")
+      }];
     } catch {
       return [];
     }
   });
+}
+
+function providerRank(provider: string) {
+  if (provider === "deepseek") return 0;
+  if (provider === "openai") return 1;
+  return 2;
 }
 
 async function recordDatabaseKeySuccess(id: string, totalTokens: number) {

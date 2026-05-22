@@ -321,6 +321,7 @@ import {
   applySupplierQuoteToOrderCost,
   archiveBrand,
   assignBrand,
+  aiKeyUsageExportUrl,
   createBrand,
   createBrandRule,
   createAiProviderKey,
@@ -329,7 +330,9 @@ import {
   getBrand,
   getBrandContext,
   getBrands,
+  getAiModels,
   getAiProviderKeys,
+  importAiProviderKeys,
   linkBrandKnowledgeBase,
   linkBrandMaterial,
   linkBrandProduct,
@@ -345,7 +348,7 @@ import {
   updateAiProviderKey,
   type AuthUser
 } from "./api";
-import type { AiProviderKeySummary, CsvImportResult, ImportExportType, OrganizationExportJob, OrganizationImportExportType, OrganizationImportJob } from "./api";
+import type { AiModelDefinition, AiProviderKeySummary, CsvImportResult, ImportExportType, OrganizationExportJob, OrganizationImportExportType, OrganizationImportJob } from "./api";
 import { exportCsvUrl, templateCsvUrl } from "./api";
 
 // Release safety copy kept in source for regression checks: drafts are copied and sent manually by the salesperson.
@@ -374,7 +377,18 @@ type BrandFilters = { organizationId: string; status: string; keyword: string };
 type EnterpriseForm = { organizationId: string; parentId: string; name: string; type: string; status: string };
 type EnterpriseRoleForm = { organizationId: string; roleName: string; permissions: string; description: string };
 type EnterpriseReportForm = { organizationId: string; reportType: string };
-type AiKeyForm = { organizationId: string; name: string; apiKey: string; mode: "instant" | "thinking"; status: "active" | "disabled" | "exhausted"; priority: string };
+type AiKeyForm = {
+  organizationId: string;
+  provider: string;
+  name: string;
+  apiKey: string;
+  mode: "instant" | "thinking";
+  model: string;
+  userEmail: string;
+  baseUrl: string;
+  status: "active" | "disabled" | "exhausted";
+  priority: string;
+};
 
 type OrganizationForm = {
   name: string;
@@ -567,7 +581,7 @@ const emptyRoleForm: RoleForm = { organizationId: "", name: "sales", description
 const emptyEnterpriseForm: EnterpriseForm = { organizationId: "", parentId: "", name: "", type: "subsidiary", status: "active" };
 const emptyEnterpriseRoleForm: EnterpriseRoleForm = { organizationId: "", roleName: "enterprise_manager", permissions: "enterprise.organization.view\nenterprise.report.view\nenterprise.audit.view", description: "" };
 const emptyEnterpriseReportForm: EnterpriseReportForm = { organizationId: "", reportType: "enterprise_summary" };
-const emptyAiKeyForm: AiKeyForm = { organizationId: "", name: "", apiKey: "", mode: "instant", status: "active", priority: "100" };
+const emptyAiKeyForm: AiKeyForm = { organizationId: "", provider: "deepseek", name: "", apiKey: "", mode: "instant", model: "deepseek-v4-flash", userEmail: "goseashop@gmail.com", baseUrl: "", status: "active", priority: "10" };
 
 const emptyCustomerForm: CustomerForm = {
   name: "",
@@ -847,6 +861,9 @@ export function App() {
   const [enterpriseAuditLogs, setEnterpriseAuditLogs] = useState<EnterpriseAuditLogSummary[]>([]);
   const [enterpriseBrandContext, setEnterpriseBrandContext] = useState<EnterpriseBrandContextResponse | null>(null);
   const [aiProviderKeys, setAiProviderKeys] = useState<AiProviderKeySummary[]>([]);
+  const [aiModels, setAiModels] = useState<AiModelDefinition[]>([]);
+  const [aiKeyImportContent, setAiKeyImportContent] = useState("");
+  const [aiKeyImportFilename, setAiKeyImportFilename] = useState("");
   const [predictionScript, setPredictionScript] = useState("");
   const [predictionRiskWarnings, setPredictionRiskWarnings] = useState<string[]>([]);
   const [reorderOperationScript, setReorderOperationScript] = useState("");
@@ -961,6 +978,7 @@ export function App() {
   const selectedProduct = useMemo(() => products.find((item) => item.id === selectedProductId), [products, selectedProductId]);
   const canManageSelectedOrganization = selectedOrganization?.currentUserRole === "owner" || selectedOrganization?.currentUserRole === "manager";
   const isSelectedOrganizationOwner = selectedOrganization?.currentUserRole === "owner";
+  const canManageAiKeys = currentUser?.email?.toLowerCase() === "goseashop@gmail.com";
 
   useEffect(() => {
     void loadCurrentUser();
@@ -1163,45 +1181,60 @@ export function App() {
 
   async function loadAiProviderKeys(organizationId = selectedOrganizationId) {
     if (!organizationId) return;
+    if (!canManageAiKeys) {
+      setAiProviderKeys([]);
+      return;
+    }
     try {
-      const list = await getAiProviderKeys({ organizationId });
+      const [list, models] = await Promise.all([getAiProviderKeys({ organizationId }), getAiModels()]);
       setAiProviderKeys(list);
+      setAiModels(models);
     } catch {
       setAiProviderKeys([]);
-      setStatus("AI key pool failed to load. Owner or manager role is required.");
+      setStatus("AI key pool failed to load. Only goseashop@gmail.com can manage AI keys.");
     }
   }
 
   async function saveAiProviderKey() {
     const organizationId = aiKeyForm.organizationId || selectedOrganizationId;
+    if (!canManageAiKeys) return setStatus("AI key management is restricted to goseashop@gmail.com.");
     if (!organizationId) return setStatus("Select an organization first.");
-    if (!aiKeyForm.apiKey.trim()) return setStatus("Paste an OpenAI API key before saving.");
+    if (!aiKeyForm.apiKey.trim()) return setStatus("Paste an AI provider key before saving.");
     setLoading(true);
     try {
       await createAiProviderKey({
         organizationId,
+        provider: aiKeyForm.provider,
         name: aiKeyForm.name,
         apiKey: aiKeyForm.apiKey.trim(),
         mode: aiKeyForm.mode,
+        model: aiKeyForm.model,
+        baseUrl: aiKeyForm.baseUrl,
+        userEmail: aiKeyForm.userEmail,
         status: aiKeyForm.status,
         priority: Number(aiKeyForm.priority) || 100
       });
-      setAiKeyForm({ ...emptyAiKeyForm, organizationId, mode: aiKeyForm.mode });
+      setAiKeyForm({ ...emptyAiKeyForm, organizationId, mode: aiKeyForm.mode, provider: aiKeyForm.provider, model: aiKeyForm.model });
       await loadAiProviderKeys(organizationId);
       setStatus("AI key saved. The plaintext key is encrypted and will not be shown again.");
     } catch {
-      setStatus("AI key save failed. Check owner/manager permission and encryption secret.");
+      setStatus("AI key save failed. Check goseashop permission and encryption secret.");
     } finally {
       setLoading(false);
     }
   }
 
   async function updateAiProviderKeyRecord(id: string, payload: Partial<AiKeyForm>) {
+    if (!canManageAiKeys) return setStatus("AI key management is restricted to goseashop@gmail.com.");
     setLoading(true);
     try {
       await updateAiProviderKey(id, {
         name: payload.name,
+        provider: payload.provider,
         mode: payload.mode,
+        model: payload.model,
+        baseUrl: payload.baseUrl,
+        userEmail: payload.userEmail,
         status: payload.status,
         priority: payload.priority !== undefined ? Number(payload.priority) : undefined
       });
@@ -1215,6 +1248,7 @@ export function App() {
   }
 
   async function disableAiProviderKeyRecord(id: string) {
+    if (!canManageAiKeys) return setStatus("AI key management is restricted to goseashop@gmail.com.");
     if (!window.confirm("Disable this AI key? Existing usage stats will be kept.")) return;
     setLoading(true);
     try {
@@ -1226,6 +1260,29 @@ export function App() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function importAiKeyDocument() {
+    const organizationId = aiKeyForm.organizationId || selectedOrganizationId;
+    if (!canManageAiKeys) return setStatus("AI key management is restricted to goseashop@gmail.com.");
+    if (!organizationId) return setStatus("Select an organization first.");
+    if (!aiKeyImportContent.trim()) return setStatus("Paste or upload a JSON/YAML key document first.");
+    setLoading(true);
+    try {
+      const result = await importAiProviderKeys({ organizationId, content: aiKeyImportContent, filename: aiKeyImportFilename });
+      await loadAiProviderKeys(organizationId);
+      setStatus(`Imported ${result.createdCount} AI keys. Failed rows: ${result.failedCount}.`);
+    } catch {
+      setStatus("AI key import failed. Check document format and goseashop permission.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleAiKeyFile(file: File | null) {
+    if (!file) return;
+    setAiKeyImportFilename(file.name);
+    setAiKeyImportContent(await file.text());
   }
 
   async function saveEnterpriseUnit() {
@@ -3568,7 +3625,7 @@ export function App() {
           {navButton("suppliers", "Suppliers")}
           {navButton("brands", "Brands / stores")}
           {canManageSelectedOrganization && navButton("enterprise", "Enterprise")}
-          {navButton("aiKeys", "AI keys")}
+          {canManageAiKeys && navButton("aiKeys", "AI keys")}
           {navButton("organizations", "Organizations")}
           {navButton("roles", "Roles")}
           {navButton("permissions", "Permissions")}
@@ -4726,56 +4783,98 @@ export function App() {
   function renderAiKeys() {
     const instantKeys = aiProviderKeys.filter((item) => item.mode === "instant");
     const thinkingKeys = aiProviderKeys.filter((item) => item.mode === "thinking");
+    const totalTokens = aiProviderKeys.reduce((sum, item) => sum + item.totalTokens, 0);
+    const modelOptions = (aiModels.length > 0 ? aiModels : [
+      { id: "deepseek-v4-fastest", label: "DeepSeek V4 fastest", provider: "deepseek", mode: "instant", model: "deepseek-v4-flash", baseUrl: "https://api.deepseek.com", priority: 10 },
+      { id: "deepseek-v4-pro", label: "DeepSeek V4 thinking", provider: "deepseek", mode: "thinking", model: "deepseek-v4-pro", baseUrl: "https://api.deepseek.com", priority: 20 },
+      { id: "deepseek-v4-chat", label: "DeepSeek V4 chat", provider: "deepseek", mode: "instant", model: "deepseek-v4-chat", baseUrl: "https://api.deepseek.com", priority: 30 },
+      { id: "deepseek-v4-reasoner", label: "DeepSeek V4 reasoner", provider: "deepseek", mode: "thinking", model: "deepseek-v4-reasoner", baseUrl: "https://api.deepseek.com", priority: 40 },
+      { id: "chatgpt-5.5-instant", label: "ChatGPT 5.5 instant", provider: "openai", mode: "instant", model: "gpt-5.5-instant", baseUrl: "https://api.openai.com/v1", priority: 100 },
+      { id: "chatgpt-5.5-thinking", label: "ChatGPT 5.5 thinking", provider: "openai", mode: "thinking", model: "gpt-5.5-thinking", baseUrl: "https://api.openai.com/v1", priority: 110 }
+    ] as AiModelDefinition[]);
     const permissionWarnings = !selectedOrganizationId
       ? ["Select an organization first. AI keys are stored per organization."]
-      : !canManageSelectedOrganization
-        ? [`Current role is ${selectedOrganization?.currentUserRole || "none"}. Owner or manager role is required to add or manage AI keys.`]
+      : !canManageAiKeys
+        ? ["Only goseashop@gmail.com can view or manage AI keys."]
         : [];
+    if (!canManageAiKeys) {
+      return (
+        <Panel title="AI key pool" description="Restricted management page.">
+          <RiskWarnings items={permissionWarnings.length ? permissionWarnings : ["Only goseashop@gmail.com can access this page."]} />
+        </Panel>
+      );
+    }
     return (
       <>
         <section className="metrics">
           <Metric label="Instant keys" value={instantKeys.length} />
           <Metric label="Thinking keys" value={thinkingKeys.length} />
           <Metric label="Total requests" value={aiProviderKeys.reduce((sum, item) => sum + item.totalRequests, 0)} />
+          <Metric label="Tokens used" value={totalTokens} />
           <Metric label="Errors" value={aiProviderKeys.reduce((sum, item) => sum + item.errorCount, 0)} />
         </section>
         <section className="customer-layout">
-          <Panel title="AI key pool" description="Owner/manager only. Keys are encrypted at rest, masked in UI, and selected by mode plus priority. Environment keys remain fallback keys.">
+          <Panel title="AI key pool" description="Restricted to goseashop@gmail.com. Keys are encrypted at rest, masked in UI, and selected by model, mode and priority.">
             <RiskWarnings items={permissionWarnings} />
             <div className="form-grid">
               <SelectField label="Organization" value={aiKeyForm.organizationId || selectedOrganizationId} onChange={(value) => setAiKeyForm({ ...aiKeyForm, organizationId: value })} options={organizations.map((item) => [item.id, item.name])} emptyLabel="Select organization" />
-              <Field label="Name"><input value={aiKeyForm.name} onChange={(event) => setAiKeyForm({ ...aiKeyForm, name: event.target.value })} placeholder="OpenAI key label" /></Field>
+              <Field label="Name"><input value={aiKeyForm.name} onChange={(event) => setAiKeyForm({ ...aiKeyForm, name: event.target.value })} placeholder="Provider key label" /></Field>
+              <SelectField label="Model" value={aiKeyForm.model} onChange={(value) => {
+                const model = modelOptions.find((item) => item.model === value || item.id === value);
+                setAiKeyForm({
+                  ...aiKeyForm,
+                  provider: model?.provider || aiKeyForm.provider,
+                  mode: model?.mode || aiKeyForm.mode,
+                  model: model?.model || value,
+                  baseUrl: model?.baseUrl || aiKeyForm.baseUrl,
+                  priority: String(model?.priority || aiKeyForm.priority || 100)
+                });
+              }} options={modelOptions.map((item) => [item.model, `${item.label} (${item.mode})`])} />
+              <SelectField label="Provider" value={aiKeyForm.provider} onChange={(value) => setAiKeyForm({ ...aiKeyForm, provider: value })} options={[["deepseek", "DeepSeek"], ["openai", "OpenAI / ChatGPT"]]} />
               <SelectField label="Mode" value={aiKeyForm.mode} onChange={(value) => setAiKeyForm({ ...aiKeyForm, mode: value as "instant" | "thinking" })} options={[["instant", "Instant"], ["thinking", "Thinking"]]} />
               <SelectField label="Status" value={aiKeyForm.status} onChange={(value) => setAiKeyForm({ ...aiKeyForm, status: value as "active" | "disabled" | "exhausted" })} options={[["active", "Active"], ["disabled", "Disabled"], ["exhausted", "Exhausted"]]} />
+              <Field label="User email"><input value={aiKeyForm.userEmail} onChange={(event) => setAiKeyForm({ ...aiKeyForm, userEmail: event.target.value })} placeholder="goseashop@gmail.com" /></Field>
+              <Field label="Base URL"><input value={aiKeyForm.baseUrl} onChange={(event) => setAiKeyForm({ ...aiKeyForm, baseUrl: event.target.value })} placeholder="Provider default if blank" /></Field>
               <Field label="Priority"><input value={aiKeyForm.priority} onChange={(event) => setAiKeyForm({ ...aiKeyForm, priority: event.target.value })} placeholder="Lower number is tried first" /></Field>
               <Field label="API key"><input type="password" value={aiKeyForm.apiKey} onChange={(event) => setAiKeyForm({ ...aiKeyForm, apiKey: event.target.value })} placeholder="sk-..." autoComplete="off" /></Field>
             </div>
             <div className="detail-actions">
-              <button onClick={saveAiProviderKey} disabled={loading || !canManageSelectedOrganization}>Save key</button>
+              <button onClick={saveAiProviderKey} disabled={loading || !canManageAiKeys}>Save key</button>
               <button className="secondary-button" onClick={() => loadAiProviderKeys(aiKeyForm.organizationId || selectedOrganizationId)} disabled={!selectedOrganizationId}>Refresh usage</button>
+              {selectedOrganizationId && <a className="secondary-button" href={aiKeyUsageExportUrl(selectedOrganizationId)} target="_blank" rel="noreferrer">Export usage CSV</a>}
             </div>
             <RiskWarnings items={[
               "Stored keys are never displayed again. Only masked suffix and usage counters are shown.",
-              "Instant mode is for fast replies/translations. Thinking mode is for heavier reasoning prompts.",
-              "If all database keys fail, the server can still fall back to OPENAI_API_KEYS / OPENAI_API_KEY."
+              "DeepSeek V4 keys are tried before ChatGPT 5.5 fallback keys when both are active.",
+              "Exported usage reports never include plaintext keys."
             ]} />
+          </Panel>
+
+          <Panel title="Document import" description="Paste or upload JSON/YAML with key, model and user_email fields. Example: { keys: [{ key, model, user_email }] }.">
+            <Field label="Upload JSON/YAML"><input type="file" accept=".json,.yaml,.yml,application/json,text/yaml,text/plain" onChange={(event) => void handleAiKeyFile(event.target.files?.[0] || null)} /></Field>
+            <Field label="Import document"><textarea rows={8} value={aiKeyImportContent} onChange={(event) => setAiKeyImportContent(event.target.value)} placeholder={'keys:\n  - key: sk-...\n    model: deepseek-v4-flash\n    user_email: goseashop@gmail.com'} /></Field>
+            <div className="detail-actions">
+              <button onClick={importAiKeyDocument} disabled={loading || !canManageAiKeys || !selectedOrganizationId}>Import keys</button>
+              <button className="secondary-button" onClick={() => { setAiKeyImportContent(""); setAiKeyImportFilename(""); }}>Clear</button>
+            </div>
           </Panel>
 
           <Panel title="Usage and health" description="The backend automatically tries active keys by mode and priority, then switches to the next key after rate-limit, quota, network, or API errors.">
             <SimpleList items={aiProviderKeys} render={(item) => (
               <div className="customer-row">
-                <strong>{item.name} / {item.mode} / {item.maskedKey}</strong>
-                <span>Status {item.status} / priority {item.priority} / tokens {item.totalTokens}</span>
+                <strong>{item.name} / {item.provider} / {item.model || item.mode} / {item.maskedKey}</strong>
+                <span>Status {item.status} / mode {item.mode} / priority {item.priority} / tokens {item.totalTokens}</span>
+                <span>User {item.userEmail || "-"} / base URL {item.baseUrl || "provider default"}</span>
                 <span>Requests {item.totalRequests} / success {item.successCount} / errors {item.errorCount} / 429 {item.rateLimitCount} / quota {item.quotaErrorCount}</span>
                 <span>Last used {formatDate(item.lastUsedAt)} / last success {formatDate(item.lastSuccessAt)} / last error {item.lastErrorMessage || "-"}</span>
                 <div className="detail-actions">
-                  <button className="secondary-button" onClick={() => updateAiProviderKeyRecord(item.id, { status: item.status === "active" ? "disabled" : "active" })} disabled={!canManageSelectedOrganization}>
+                  <button className="secondary-button" onClick={() => updateAiProviderKeyRecord(item.id, { status: item.status === "active" ? "disabled" : "active" })} disabled={!canManageAiKeys}>
                     {item.status === "active" ? "Disable" : "Enable"}
                   </button>
-                  <button className="secondary-button" onClick={() => updateAiProviderKeyRecord(item.id, { mode: item.mode === "instant" ? "thinking" : "instant" })} disabled={!canManageSelectedOrganization}>
+                  <button className="secondary-button" onClick={() => updateAiProviderKeyRecord(item.id, { mode: item.mode === "instant" ? "thinking" : "instant" })} disabled={!canManageAiKeys}>
                     Switch to {item.mode === "instant" ? "thinking" : "instant"}
                   </button>
-                  <button className="danger-button" onClick={() => disableAiProviderKeyRecord(item.id)} disabled={!canManageSelectedOrganization}>Disable with confirm</button>
+                  <button className="danger-button" onClick={() => disableAiProviderKeyRecord(item.id)} disabled={!canManageAiKeys}>Disable with confirm</button>
                 </div>
               </div>
             )} />

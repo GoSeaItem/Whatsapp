@@ -519,6 +519,9 @@ model AiProviderKey {
   provider          String       @default("openai")
   name              String
   mode              String       @default("instant")
+  model             String       @default("")
+  userEmail         String?
+  baseUrl           String?
   encryptedKey      String
   keyLast4          String
   status            String       @default("active")
@@ -542,6 +545,8 @@ model AiProviderKey {
   @@index([organizationId])
   @@index([provider])
   @@index([mode])
+  @@index([model])
+  @@index([userEmail])
   @@index([status])
   @@index([priority])
   @@index([createdBy])

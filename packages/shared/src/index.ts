@@ -1058,6 +1058,10 @@ export type GenerateDraftRequest = {
   tone?: "friendly" | "professional" | "concise";
   languageFrom?: string;
   languageTo?: string;
+  organizationId?: string | null;
+  aiMode?: "instant" | "thinking";
+  aiModel?: string | null;
+  model?: string | null;
 };
 
 export type GenerateDraftResponse = {
@@ -1085,6 +1089,9 @@ export type AiReplyRequest = {
   customerId?: string | null;
   productId?: string | null;
   organizationId?: string | null;
+  aiMode?: "instant" | "thinking";
+  aiModel?: string | null;
+  model?: string | null;
   useKnowledgeBase?: boolean;
   knowledgeContext?: string;
   knowledgeUsed?: string[];

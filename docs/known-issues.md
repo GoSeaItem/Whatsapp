@@ -2,6 +2,13 @@
 
 Current release target: `v1.0-enterprise`.
 
+## AI Key Pool and Provider Models
+
+- DeepSeek V4 and ChatGPT 5.5 model IDs are configurable labels in this product. If a provider changes the actual served model names, update `DEEPSEEK_V4_FASTEST_MODEL`, `DEEPSEEK_V4_THINKING_MODEL`, `OPENAI_GPT55_INSTANT_MODEL`, or `OPENAI_GPT55_THINKING_MODEL` in the server environment or imported key metadata.
+- AI key management is intentionally restricted to `goseashop@gmail.com`. If another administrator needs access later, add a dedicated admin allowlist rather than broadening the endpoint to all organization owners.
+- JSON/YAML key import supports simple documents and lists. Complex nested secret-management exports should be normalized before upload.
+- Usage counters use provider-reported `usage.total_tokens` when present. Providers that do not return usage may show request counts but low or zero token totals.
+
 ## V4-O WhatsApp Auto Context Recognition
 
 - WhatsApp Web DOM selectors are not a public API. If Meta changes header, message bubble, or input DOM structure, the extension may fall back to manual paste mode until selectors are updated.

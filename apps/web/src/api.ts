@@ -198,6 +198,9 @@ export type AiProviderKeySummary = {
   provider: string;
   name: string;
   mode: "instant" | "thinking";
+  model: string;
+  userEmail?: string | null;
+  baseUrl?: string | null;
   maskedKey: string;
   status: "active" | "disabled" | "exhausted";
   priority: number;
@@ -217,16 +220,34 @@ export type AiProviderKeySummary = {
 
 export type AiProviderKeyUpsertRequest = {
   organizationId?: string;
+  provider?: string;
   name?: string;
   apiKey?: string;
   mode?: "instant" | "thinking";
+  model?: string;
+  userEmail?: string;
+  baseUrl?: string;
   status?: "active" | "disabled" | "exhausted";
   priority?: number;
 };
 
-export function getAiProviderKeys(query: { organizationId: string; mode?: string; status?: string }) {
+export type AiModelDefinition = {
+  id: string;
+  label: string;
+  provider: string;
+  mode: "instant" | "thinking";
+  model: string;
+  baseUrl: string;
+  priority: number;
+};
+
+export function getAiModels() {
+  return request<AiModelDefinition[]>("/api/ai-keys/models");
+}
+
+export function getAiProviderKeys(query: { organizationId: string; mode?: string; status?: string; model?: string }) {
   return request<AiProviderKeySummary[]>(
-    `/api/ai-keys${toQuery({ organizationId: query.organizationId, mode: query.mode, status: query.status })}`
+    `/api/ai-keys${toQuery({ organizationId: query.organizationId, mode: query.mode, status: query.status, model: query.model })}`
   );
 }
 
@@ -249,6 +270,17 @@ export function disableAiProviderKey(id: string) {
     method: "DELETE",
     body: JSON.stringify({ confirm: true })
   });
+}
+
+export function importAiProviderKeys(payload: { organizationId: string; content: string; filename?: string }) {
+  return request<{ createdCount: number; failedCount: number; errors: Array<{ index: number; message: string }>; keys: AiProviderKeySummary[] }>("/api/ai-keys/import", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function aiKeyUsageExportUrl(organizationId: string) {
+  return `${API_BASE_URL}/api/ai-keys/export${toQuery({ organizationId })}`;
 }
 
 function toQuery(params: Record<string, string | undefined>) {
