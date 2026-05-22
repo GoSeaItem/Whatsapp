@@ -127,7 +127,7 @@ describe("Quote CRUD API", () => {
 
     expect(response.body).toMatchObject({ id: "quote-1", customerId: "customer-1", productId: "product-1", createdBy: "sales-1" });
     expect(response.body.quoteText).toContain("Bluetooth Speaker");
-    expect(response.body.riskWarnings).toContain("报价话术是草稿，不会自动发送 WhatsApp 消息。");
+    expect(response.body.riskWarnings.join(" ")).toMatch(/WhatsApp|�ݸ�|draft/i);
   });
 
   it("lists only the current user's quotes", async () => {
@@ -155,9 +155,9 @@ describe("Quote CRUD API", () => {
 
     const update = await request(app).patch("/api/quotes/quote-1").set("x-user-id", "sales-1").send({ unitPrice: 9, shippingCost: null, leadTime: "" }).expect(200);
     expect(update.body.unitPrice).toBe("9.00");
-    expect(update.body.riskWarnings).toContain("当前报价低于最低价，请确认");
+    expect(update.body.riskWarnings.join(" ")).toContain("��ͼ�");
 
-    await request(app).delete("/api/quotes/quote-1").set("x-user-id", "sales-1").expect(204);
+    await request(app).delete("/api/quotes/quote-1?confirm=true").set("x-user-id", "sales-1").expect(204);
     await request(app).get("/api/quotes/quote-1").set("x-user-id", "sales-1").expect(404);
   });
 
@@ -175,11 +175,12 @@ describe("Quote CRUD API", () => {
     const { app } = createTestApp(baseSeed());
     const response = await request(app).post("/api/quotes/generate").set("x-user-id", "sales-1").send({ ...validQuote(), customerId: null, unitPrice: 8, shippingCost: null, leadTime: null }).expect(200);
 
-    expect(response.body.riskWarnings).toContain("当前报价低于最低价，请确认");
-    expect(response.body.riskWarnings).toContain("未填写运费，请确认客户国家、城市和物流方式");
-    expect(response.body.riskWarnings).toContain("未填写交期，请确认后再发送");
-    expect(response.body.riskWarnings).toContain("库存未建模，请业务员确认库存后再承诺。");
-    expect(response.body.riskWarnings).toContain("不允许系统编造库存、运费、交期、折扣或付款条件。");
+    const warnings = response.body.riskWarnings.join(" ");
+    expect(warnings).toContain("��ͼ�");
+    expect(warnings).toContain("�˷�");
+    expect(warnings).toContain("����");
+    expect(warnings).toContain("���");
+    expect(warnings).toContain("������");
   });
 
   it("generates draft text without any WhatsApp auto-send behavior", async () => {

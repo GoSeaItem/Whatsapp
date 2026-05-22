@@ -115,8 +115,8 @@ describe("Organization and member API", () => {
     const { app } = createTestApp(seedOrganizations());
     await request(app).patch("/api/organizations/org-a").set("x-user-id", "manager").send({ name: "Bad" }).expect(403);
     expect((await request(app).patch("/api/organizations/org-a").set("x-user-id", "owner").send({ name: "New name" }).expect(200)).body.name).toBe("New name");
-    await request(app).delete("/api/organizations/org-a").set("x-user-id", "manager").expect(403);
-    await request(app).delete("/api/organizations/org-a").set("x-user-id", "owner").expect(204);
+    await request(app).delete("/api/organizations/org-a?confirm=true").set("x-user-id", "manager").expect(403);
+    await request(app).delete("/api/organizations/org-a?confirm=true").set("x-user-id", "owner").expect(204);
   });
 
   it("adds members, validates userId, and rejects duplicate members", async () => {
@@ -135,7 +135,7 @@ describe("Organization and member API", () => {
   it("updates roles and statuses when the current user has manager permission", async () => {
     const { app } = createTestApp(seedOrganizations());
     const response = await request(app)
-      .patch("/api/organizations/org-a/members/member-sales")
+      .patch("/api/organizations/org-a/members/member-sales?confirm=true")
       .set("x-user-id", "manager")
       .send({ role: "support", status: "inactive" })
       .expect(200);
@@ -146,7 +146,7 @@ describe("Organization and member API", () => {
 
   it("removes members when authorized and protects owner members from manager changes", async () => {
     const { app } = createTestApp(seedOrganizations());
-    await request(app).delete("/api/organizations/org-a/members/member-sales").set("x-user-id", "manager").expect(204);
+    await request(app).delete("/api/organizations/org-a/members/member-sales?confirm=true").set("x-user-id", "manager").expect(204);
     await request(app).patch("/api/organizations/org-a/members/member-owner").set("x-user-id", "manager").send({ role: "sales" }).expect(403);
     await request(app).delete("/api/organizations/org-a/members/member-owner").set("x-user-id", "manager").expect(403);
     await request(app).delete("/api/organizations/org-a/members/member-owner").set("x-user-id", "owner").expect(403);

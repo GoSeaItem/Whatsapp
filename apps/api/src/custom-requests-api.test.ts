@@ -131,7 +131,7 @@ describe("CustomRequest API", () => {
     expect((await request(app).patch("/api/custom-requests/c1/status").send({ status: "waiting_customer_confirm" }).expect(200)).body.status).toBe("waiting_customer_confirm");
     expect((await request(app).patch("/api/custom-requests/c1/status").send({ status: "" }).expect(400)).body.errors[0].field).toBe("status");
     expect((await request(app).patch("/api/custom-requests/c1/status").send({}).expect(400)).body.errors[0].field).toBe("status");
-    await request(app).delete("/api/custom-requests/c1").expect(204);
+    await request(app).delete("/api/custom-requests/c1?confirm=true").expect(204);
     await request(app).get("/api/custom-requests/c1").expect(404);
   });
 

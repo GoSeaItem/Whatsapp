@@ -92,7 +92,7 @@ describe("V3-G audit logs", () => {
 
     await request(app).get("/api/audit-logs?organizationId=org-b").set("x-user-id", "sales").expect(403);
     const csv = await request(app).get("/api/audit-logs?organizationId=org-a&format=csv").set("x-user-id", "owner").expect(200);
-    expect(csv.text).toContain('"createdAt","organizationId","userId","action","entityType","entityId","before","after"');
+    expect(csv.text).toContain('"createdAt","organizationId","userId","action","entityType","entityId","riskLevel","before","after"');
     expect(csv.text).not.toContain("passwordHash");
   });
 });

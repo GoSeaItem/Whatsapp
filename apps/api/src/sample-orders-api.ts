@@ -12,6 +12,7 @@ import {
   validateSampleOrderPayload,
   validateSampleScriptPayload
 } from "./sample-order-utils.js";
+import { requireConfirm } from "./permissions.js";
 
 type SampleOrderDb = Pick<typeof prisma, "sampleOrder" | "customer" | "product" | "knowledgeBase">;
 
@@ -100,6 +101,10 @@ export function createSampleOrdersRouter(db: SampleOrderDb = prisma) {
 
   router.delete("/:id", async (req, res, next) => {
     try {
+      const existing = await findOwnedSampleOrder(db, req.params.id, req.user!.id);
+      if (!existing) return res.status(404).json({ message: "sample order not found" });
+      const confirmError = requireConfirm(req, "sample.updateOwn");
+      if (confirmError) return res.status(409).json(confirmError);
       const result = await db.sampleOrder.deleteMany({ where: { id: req.params.id, ownerId: req.user!.id } });
       if (result.count === 0) return res.status(404).json({ message: "sample order not found" });
       res.status(204).send();

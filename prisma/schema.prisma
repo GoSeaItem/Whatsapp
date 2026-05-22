@@ -40,6 +40,29 @@ model User {
   createdOrgProducts OrganizationProduct[] @relation("OrganizationProductCreator")
   createdOrgMaterials OrganizationMaterial[] @relation("OrganizationMaterialCreator")
   auditLogs     AuditLog[] @relation("AuditLogActor")
+  importJobs    ImportJob[] @relation("ImportJobCreator")
+  exportJobs    ExportJob[] @relation("ExportJobCreator")
+  reportJobs    ReportJob[] @relation("ReportJobCreator")
+  aiActionSuggestionLogs AIActionSuggestionLog[]
+  customerPredictions CustomerPrediction[] @relation("CustomerPredictionUser")
+  reorderReminders ReorderReminder[] @relation("ReorderReminderOwner")
+  orders        Order[] @relation("OrderOwner")
+  createdOrders Order[] @relation("OrderCreator")
+  assignedOrders Order[] @relation("AssignedOrder")
+  orderFulfillmentAlerts OrderFulfillmentAlert[] @relation("OrderFulfillmentAlertOwner")
+  createdOrderCosts OrderCost[] @relation("OrderCostCreator")
+  confirmedOrderCosts OrderCost[] @relation("OrderCostConfirmer")
+  createdReorderCampaigns ReorderCampaign[] @relation("ReorderCampaignCreator")
+  ownedReorderOpportunities ReorderOpportunity[] @relation("ReorderOpportunityOwner")
+  createdReorderOpportunities ReorderOpportunity[] @relation("ReorderOpportunityCreator")
+  createdReorderPlaybooks ReorderPlaybook[] @relation("ReorderPlaybookCreator")
+  ownedAfterSalesCases AfterSalesCase[] @relation("AfterSalesCaseOwner")
+  assignedAfterSalesCases AfterSalesCase[] @relation("AfterSalesCaseAssignee")
+  createdAfterSalesCases AfterSalesCase[] @relation("AfterSalesCaseCreator")
+  createdAfterSalesEvents AfterSalesEvent[] @relation("AfterSalesEventCreator")
+  createdScriptExperiments ScriptExperiment[] @relation("ScriptExperimentCreator")
+  createdScriptVariants ScriptVariant[] @relation("ScriptVariantCreator")
+  scriptUsages ScriptUsage[] @relation("ScriptUsageUser")
 }
 
 model Organization {
@@ -57,6 +80,23 @@ model Organization {
   orgProducts OrganizationProduct[]
   orgMaterials OrganizationMaterial[]
   auditLogs AuditLog[]
+  importJobs ImportJob[]
+  exportJobs ExportJob[]
+  reportJobs ReportJob[]
+  aiActionSuggestionLogs AIActionSuggestionLog[]
+  customerPredictions CustomerPrediction[]
+  reorderReminders ReorderReminder[]
+  orders Order[]
+  orderFulfillmentAlerts OrderFulfillmentAlert[]
+  orderCosts OrderCost[]
+  reorderCampaigns ReorderCampaign[]
+  reorderOpportunities ReorderOpportunity[]
+  reorderPlaybooks ReorderPlaybook[]
+  afterSalesCases AfterSalesCase[]
+  afterSalesEvents AfterSalesEvent[]
+  scriptExperiments ScriptExperiment[]
+  scriptVariants ScriptVariant[]
+  scriptUsages ScriptUsage[]
 
   @@index([ownerId])
 }
@@ -134,6 +174,14 @@ model Customer {
   customRequests    CustomRequest[]
   assignmentLogs    CustomerAssignmentLog[]
   duplicateEvents   CustomerDuplicateEventLog[]
+  aiActionSuggestionLogs AIActionSuggestionLog[]
+  predictions       CustomerPrediction[]
+  reorderReminders  ReorderReminder[]
+  reorderOpportunities ReorderOpportunity[]
+  orders            Order[]
+  orderFulfillmentAlerts OrderFulfillmentAlert[]
+  afterSalesCases   AfterSalesCase[]
+  scriptUsages       ScriptUsage[]
 
   @@index([ownerId])
   @@index([assignedTo])
@@ -202,6 +250,10 @@ model Product {
   materials      Material[]
   sampleOrders   SampleOrder[]
   customRequests CustomRequest[]
+  reorderReminders ReorderReminder[]
+  reorderOpportunities ReorderOpportunity[]
+  orders         Order[]
+  afterSalesCases AfterSalesCase[]
   organizationProducts OrganizationProduct[]
 
   @@unique([ownerId, sku])
@@ -269,6 +321,86 @@ model ScriptOrg {
   @@index([organizationId, enabled])
 }
 
+model ScriptExperiment {
+  id                  String        @id @default(cuid())
+  organizationId      String?
+  name                String
+  scenario            String
+  description         String?
+  status              String        @default("draft")
+  targetLanguage      String?
+  targetCustomerStage String?
+  createdBy           String
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  organization        Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  creator             User          @relation("ScriptExperimentCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  variants            ScriptVariant[]
+  usages              ScriptUsage[]
+
+  @@index([organizationId])
+  @@index([scenario])
+  @@index([status])
+  @@index([createdBy])
+}
+
+model ScriptVariant {
+  id             String           @id @default(cuid())
+  experimentId   String
+  organizationId String?
+  title          String
+  versionLabel   String
+  content        String
+  language       String?
+  tone           String?
+  enabled        Boolean          @default(true)
+  createdBy      String
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  experiment     ScriptExperiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  organization   Organization?    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  creator        User             @relation("ScriptVariantCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  usages         ScriptUsage[]
+
+  @@unique([experimentId, versionLabel])
+  @@index([experimentId])
+  @@index([organizationId])
+  @@index([versionLabel])
+  @@index([enabled])
+}
+
+model ScriptUsage {
+  id             String           @id @default(cuid())
+  organizationId String?
+  experimentId   String
+  variantId      String
+  customerId     String?
+  userId         String
+  scenario       String
+  channel        String           @default("web")
+  usedText       String?
+  outcome        String           @default("used_draft")
+  quoteId        String?
+  orderId        String?
+  followUpTaskId String?
+  notes          String?
+  usedAt         DateTime         @default(now())
+  outcomeAt      DateTime?
+  experiment     ScriptExperiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  variant        ScriptVariant    @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  organization   Organization?    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer       Customer?        @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  user           User             @relation("ScriptUsageUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([experimentId])
+  @@index([variantId])
+  @@index([customerId])
+  @@index([userId])
+  @@index([scenario])
+  @@index([outcome])
+}
+
 model AuditLog {
   id             String        @id @default(cuid())
   organizationId String?
@@ -280,6 +412,9 @@ model AuditLog {
   before         Json?
   after          Json?
   metadata       Json?
+  ipAddress      String?
+  userAgent      String?
+  riskLevel      String        @default("low")
   createdAt      DateTime      @default(now())
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   actor          User          @relation("AuditLogActor", fields: [actorId], references: [id], onDelete: Cascade)
@@ -289,6 +424,220 @@ model AuditLog {
   @@index([userId])
   @@index([entityType])
   @@index([entityType, entityId])
+  @@index([riskLevel])
+  @@index([createdAt])
+}
+
+model ImportJob {
+  id             String       @id @default(cuid())
+  organizationId String
+  type           String
+  filePath       String
+  dryRun         Boolean      @default(false)
+  status         String       @default("pending")
+  result         Json?
+  createdBy      String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  creator        User         @relation("ImportJobCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([createdBy])
+  @@index([type])
+  @@index([status])
+}
+
+model ExportJob {
+  id             String       @id @default(cuid())
+  organizationId String
+  type           String
+  filePath       String
+  status         String       @default("pending")
+  filters        Json?
+  createdBy      String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  creator        User         @relation("ExportJobCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([createdBy])
+  @@index([type])
+  @@index([status])
+}
+
+model ReportJob {
+  id             String       @id @default(cuid())
+  organizationId String
+  type           String
+  filters        Json?
+  status         String       @default("pending")
+  result         Json?
+  createdBy      String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  creator        User         @relation("ReportJobCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([createdBy])
+  @@index([type])
+  @@index([status])
+}
+
+model AIActionSuggestionLog {
+  id             String        @id @default(cuid())
+  organizationId String?
+  customerId     String?
+  brandId        String?
+  brandUsed      String?
+  brandRulesUsed Json?
+  userId         String
+  actionType     String
+  scenario       String?
+  inputSnapshot  Json?
+  outputSnapshot Json?
+  riskLevel      String?
+  createdAt      DateTime      @default(now())
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer       Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([customerId])
+  @@index([brandId])
+  @@index([userId])
+  @@index([actionType])
+}
+
+model CustomerPrediction {
+  id                String        @id @default(cuid())
+  organizationId    String?
+  customerId        String
+  userId            String
+  predictionType    String
+  score             Int
+  level             String
+  reasons           Json?
+  recommendedAction String?
+  suggestedScript   String?
+  status            String        @default("open")
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  organization      Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer          Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  user              User          @relation("CustomerPredictionUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([customerId])
+  @@index([userId])
+  @@index([predictionType])
+  @@index([status])
+  @@unique([customerId, userId, predictionType])
+}
+
+model ReorderReminder {
+  id              String        @id @default(cuid())
+  organizationId  String?
+  customerId      String
+  productId       String?
+  reminderType    String
+  remindAt        DateTime
+  reason          String?
+  suggestedScript String?
+  status          String        @default("pending")
+  ownerId         String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer        Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  product         Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
+  owner           User          @relation("ReorderReminderOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([customerId])
+  @@index([productId])
+  @@index([ownerId])
+  @@index([status])
+  @@index([remindAt])
+}
+
+model ReorderCampaign {
+  id             String        @id @default(cuid())
+  organizationId String?
+  name           String
+  campaignType   String
+  targetScope    String
+  status         String        @default("draft")
+  filters        Json?
+  createdBy      String
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  creator        User          @relation("ReorderCampaignCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  opportunities  ReorderOpportunity[]
+
+  @@index([organizationId])
+  @@index([campaignType])
+  @@index([status])
+  @@index([createdBy])
+}
+
+model ReorderOpportunity {
+  id                String        @id @default(cuid())
+  organizationId    String?
+  customerId        String
+  productId         String?
+  orderId           String?
+  campaignId        String?
+  opportunityType   String
+  score             Int
+  level             String
+  reasons           Json?
+  recommendedAction String?
+  suggestedScript   String?
+  status            String        @default("open")
+  ownerId           String
+  createdBy         String
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  organization      Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer          Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  product           Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
+  order             Order?        @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  campaign          ReorderCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  owner             User          @relation("ReorderOpportunityOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  creator           User          @relation("ReorderOpportunityCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([customerId])
+  @@index([productId])
+  @@index([campaignId])
+  @@index([opportunityType])
+  @@index([status])
+  @@index([ownerId])
+}
+
+model ReorderPlaybook {
+  id             String        @id @default(cuid())
+  organizationId String?
+  title          String
+  scenario       String
+  language       String
+  content        String
+  enabled        Boolean       @default(true)
+  createdBy      String
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  creator        User          @relation("ReorderPlaybookCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([scenario])
+  @@index([language])
+  @@index([enabled])
+  @@index([createdBy])
 }
 
 model Material {
@@ -365,6 +714,7 @@ model Quote {
   owner           User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   customer        Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
   product         Product  @relation(fields: [productId], references: [id])
+  orders          Order[]
 
   @@index([ownerId])
   @@index([customerId])
@@ -391,6 +741,7 @@ model SampleOrder {
   owner                User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   customer             Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
   product              Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  orders               Order[]
 
   @@index([ownerId])
   @@index([customerId])
@@ -424,6 +775,7 @@ model CustomRequest {
   owner               User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   customer            Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
   product             Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  orders              Order[]
 
   @@index([ownerId])
   @@index([customerId])
@@ -432,9 +784,106 @@ model CustomRequest {
   @@index([ownerId, status])
 }
 
+model Order {
+  id                   String        @id @default(cuid())
+  organizationId       String?
+  customerId           String
+  quoteId              String?
+  sampleOrderId        String?
+  customRequestId      String?
+  orderNo              String
+  orderType            String
+  title                String?
+  amount               Decimal?      @db.Decimal(12, 2)
+  currency             String?
+  quantity             Int?
+  productId            String?
+  paymentStatus        String        @default("unpaid")
+  productionStatus     String        @default("not_started")
+  shippingStatus       String        @default("pending")
+  afterSalesStatus     String        @default("none")
+  orderStatus          String        @default("draft")
+  expectedShipDate     DateTime?
+  expectedDeliveryDate DateTime?
+  trackingNumber       String?
+  notes                String?
+  files                String[]      @default([])
+  ownerId              String
+  assignedTo           String?
+  createdBy            String
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  organization         Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer             Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  quote                Quote?        @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  sampleOrder          SampleOrder?  @relation(fields: [sampleOrderId], references: [id], onDelete: SetNull)
+  customRequest        CustomRequest? @relation(fields: [customRequestId], references: [id], onDelete: SetNull)
+  product              Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
+  owner                User          @relation("OrderOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  assignee             User?         @relation("AssignedOrder", fields: [assignedTo], references: [id], onDelete: SetNull)
+  creator              User          @relation("OrderCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  followUps            FollowUpTask[]
+  fulfillmentAlerts    OrderFulfillmentAlert[]
+  cost                 OrderCost?
+  reorderOpportunities ReorderOpportunity[]
+  afterSalesCases      AfterSalesCase[]
+
+  @@unique([organizationId, orderNo])
+  @@unique([ownerId, orderNo])
+  @@index([organizationId])
+  @@index([customerId])
+  @@index([quoteId])
+  @@index([sampleOrderId])
+  @@index([customRequestId])
+  @@index([productId])
+  @@index([ownerId])
+  @@index([assignedTo])
+  @@index([orderStatus])
+  @@index([paymentStatus])
+  @@index([productionStatus])
+  @@index([shippingStatus])
+}
+
+model OrderCost {
+  id                    String        @id @default(cuid())
+  organizationId        String?
+  orderId               String        @unique
+  currency              String?
+  productCost           Decimal?      @db.Decimal(12, 2)
+  packagingCost         Decimal?      @db.Decimal(12, 2)
+  domesticShipping      Decimal?      @db.Decimal(12, 2)
+  internationalShipping Decimal?      @db.Decimal(12, 2)
+  paymentFee            Decimal?      @db.Decimal(12, 2)
+  platformFee           Decimal?      @db.Decimal(12, 2)
+  refundAmount          Decimal?      @db.Decimal(12, 2)
+  reshipCost            Decimal?      @db.Decimal(12, 2)
+  otherCost             Decimal?      @db.Decimal(12, 2)
+  totalCost             Decimal?      @db.Decimal(12, 2)
+  grossProfit           Decimal?      @db.Decimal(12, 2)
+  grossMargin           Decimal?      @db.Decimal(8, 2)
+  costConfirmed         Boolean       @default(false)
+  confirmedBy           String?
+  confirmedAt           DateTime?
+  notes                 String?
+  createdBy             String
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  organization          Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  order                 Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  creator               User          @relation("OrderCostCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  confirmer             User?         @relation("OrderCostConfirmer", fields: [confirmedBy], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([orderId])
+  @@index([createdBy])
+  @@index([costConfirmed])
+}
+
 model FollowUpTask {
   id                String    @id @default(cuid())
   customerId        String
+  orderId           String?
+  afterSalesCaseId  String?
   taskType          String
   remindAt          DateTime
   recommendedScript String
@@ -444,10 +893,41 @@ model FollowUpTask {
   completedAt       DateTime?
   owner             User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   customer          Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  order             Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  afterSalesCase    AfterSalesCase? @relation(fields: [afterSalesCaseId], references: [id], onDelete: SetNull)
 
   @@index([ownerId])
   @@index([customerId])
+  @@index([orderId])
+  @@index([afterSalesCaseId])
   @@index([remindAt])
+}
+
+model OrderFulfillmentAlert {
+  id                String        @id @default(cuid())
+  organizationId    String?
+  orderId           String
+  customerId        String
+  alertType         String
+  level             String
+  reason            String?
+  recommendedAction String?
+  status            String        @default("open")
+  ownerId           String
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  organization      Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  order             Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  customer          Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  owner             User          @relation("OrderFulfillmentAlertOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([orderId])
+  @@index([customerId])
+  @@index([alertType])
+  @@index([status])
+  @@index([ownerId])
+  @@unique([orderId, alertType])
 }
 
 model MessageDraft {
@@ -464,4 +944,322 @@ model MessageDraft {
   owner        User?     @relation(fields: [ownerId], references: [id], onDelete: SetNull)
 
   @@index([ownerId])
+}
+
+model AfterSalesCase {
+  id                 String        @id @default(cuid())
+  organizationId     String?
+  customerId         String
+  orderId            String?
+  productId          String?
+  caseNo             String
+  caseType           String
+  priority           String        @default("medium")
+  status             String        @default("open")
+  responsibility     String?       @default("unknown")
+  requestedSolution  String?
+  finalSolution      String?
+  refundAmount       Decimal?      @db.Decimal(12, 2)
+  reshipCost         Decimal?      @db.Decimal(12, 2)
+  compensationAmount Decimal?      @db.Decimal(12, 2)
+  currency           String?
+  description        String?
+  customerClaim      String?
+  internalNotes      String?
+  evidenceUrls       String[]      @default([])
+  resolutionNotes    String?
+  openedAt           DateTime      @default(now())
+  resolvedAt         DateTime?
+  closedAt           DateTime?
+  ownerId            String
+  assignedTo         String?
+  createdBy          String
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  organization       Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer           Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  order              Order?        @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  product            Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
+  owner              User          @relation("AfterSalesCaseOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  assignee           User?         @relation("AfterSalesCaseAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
+  creator            User          @relation("AfterSalesCaseCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  events             AfterSalesEvent[]
+  followUps          FollowUpTask[]
+
+  @@unique([organizationId, caseNo])
+  @@unique([ownerId, caseNo])
+  @@index([organizationId])
+  @@index([customerId])
+  @@index([orderId])
+  @@index([productId])
+  @@index([caseType])
+  @@index([priority])
+  @@index([status])
+  @@index([ownerId])
+  @@index([assignedTo])
+}
+
+model AfterSalesEvent {
+  id               String         @id @default(cuid())
+  organizationId   String?
+  afterSalesCaseId String
+  eventType        String
+  oldValue         Json?
+  newValue         Json?
+  notes            String?
+  createdBy        String
+  createdAt        DateTime       @default(now())
+  organization     Organization?  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  afterSalesCase   AfterSalesCase @relation(fields: [afterSalesCaseId], references: [id], onDelete: Cascade)
+  creator          User           @relation("AfterSalesEventCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([afterSalesCaseId])
+  @@index([eventType])
+  @@index([createdBy])
+}
+
+model Supplier {
+  id             String   @id @default(cuid())
+  organizationId String?
+  name           String
+  contactName    String?
+  phone          String?
+  email          String?
+  whatsapp       String?
+  wechat         String?
+  country        String?
+  city           String?
+  address        String?
+  website        String?
+  tags           String[] @default([])
+  rating         Int?
+  status         String   @default("candidate")
+  riskLevel      String?
+  notes          String?
+  createdBy      String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([riskLevel])
+  @@index([createdBy])
+}
+
+model SupplierContact {
+  id             String   @id @default(cuid())
+  organizationId String?
+  supplierId     String
+  name           String
+  role           String?
+  phone          String?
+  email          String?
+  whatsapp       String?
+  wechat         String?
+  notes          String?
+  createdBy      String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([supplierId])
+}
+
+model SupplierQuote {
+  id             String   @id @default(cuid())
+  organizationId String?
+  supplierId     String
+  productId      String?
+  sku            String?
+  moq            Int?
+  unitCost       Decimal? @db.Decimal(12, 2)
+  currency       String?
+  leadTime       String?
+  sampleFee      Decimal? @db.Decimal(12, 2)
+  sampleLeadTime String?
+  bulkLeadTime   String?
+  validUntil     DateTime?
+  notes          String?
+  status         String   @default("active")
+  createdBy      String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([supplierId])
+  @@index([productId])
+  @@index([status])
+  @@index([validUntil])
+}
+
+model PurchaseNote {
+  id              String   @id @default(cuid())
+  organizationId  String?
+  supplierId      String?
+  productId       String?
+  orderId         String?
+  sampleOrderId   String?
+  customRequestId String?
+  noteType        String
+  content         String
+  createdBy       String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([supplierId])
+  @@index([productId])
+  @@index([orderId])
+  @@index([sampleOrderId])
+  @@index([customRequestId])
+}
+
+model SupplierRisk {
+  id             String   @id @default(cuid())
+  organizationId String?
+  supplierId     String
+  riskType       String
+  level          String
+  description    String?
+  status         String   @default("open")
+  createdBy      String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([supplierId])
+  @@index([riskType])
+  @@index([level])
+  @@index([status])
+}
+
+model SupplierLink {
+  id             String   @id @default(cuid())
+  organizationId String?
+  supplierId     String
+  entityType     String
+  entityId       String
+  relationType   String
+  createdBy      String
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([supplierId])
+  @@index([entityType])
+  @@index([entityId])
+}
+
+model Brand {
+  id              String   @id @default(cuid())
+  organizationId  String
+  name            String
+  displayName     String?
+  description     String?
+  logoUrl         String?
+  website         String?
+  defaultLanguage String?
+  defaultCurrency String?
+  country         String?
+  status          String   @default("active")
+  notes           String?
+  createdBy       String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@index([status])
+  @@index([createdBy])
+}
+
+model BrandProduct {
+  id             String   @id @default(cuid())
+  organizationId String
+  brandId        String
+  productId      String
+  createdBy      String
+  createdAt      DateTime @default(now())
+
+  @@unique([brandId, productId])
+  @@index([organizationId])
+  @@index([brandId])
+  @@index([productId])
+}
+
+model BrandMaterial {
+  id             String   @id @default(cuid())
+  organizationId String
+  brandId        String
+  materialId     String
+  createdBy      String
+  createdAt      DateTime @default(now())
+
+  @@unique([brandId, materialId])
+  @@index([organizationId])
+  @@index([brandId])
+  @@index([materialId])
+}
+
+model BrandKnowledgeBase {
+  id              String   @id @default(cuid())
+  organizationId  String
+  brandId         String
+  knowledgeBaseId String
+  createdBy       String
+  createdAt       DateTime @default(now())
+
+  @@unique([brandId, knowledgeBaseId])
+  @@index([organizationId])
+  @@index([brandId])
+  @@index([knowledgeBaseId])
+}
+
+model BrandScript {
+  id             String   @id @default(cuid())
+  organizationId String
+  brandId        String
+  scriptId       String
+  scriptType     String
+  createdBy      String
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([brandId])
+  @@index([scriptId])
+}
+
+model BrandRule {
+  id             String   @id @default(cuid())
+  organizationId String
+  brandId        String
+  ruleType       String
+  title          String
+  content        String
+  language       String?
+  enabled        Boolean  @default(true)
+  createdBy      String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([brandId])
+  @@index([ruleType])
+  @@index([enabled])
+}
+
+model BrandAssignment {
+  id             String   @id @default(cuid())
+  organizationId String
+  brandId        String
+  entityType     String
+  entityId       String
+  assignedBy     String
+  createdAt      DateTime @default(now())
+
+  @@unique([brandId, entityType, entityId])
+  @@index([organizationId])
+  @@index([brandId])
+  @@index([entityType])
+  @@index([entityId])
 }

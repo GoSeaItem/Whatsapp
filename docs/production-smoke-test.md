@@ -1,6 +1,89 @@
 # Production Smoke Test
 
-Current release target: `v0.4-v2-sales-enhancement`.
+## V4-C/V4-D/V4-E/V4-F Regression Additions
+
+Run these after the existing login, CRM, product, quote, follow-up, import/export, and extension checks:
+
+1. AI advanced next action
+   - Open Web backend AI sales suggestion page or call `POST /api/ai/next-action` with an accessible `customerId`.
+   - Expected: returns `recommendedAction`, `suggestedScript`, `riskWarnings`, and `createdLogId`.
+   - Failure checks: verify login, organization membership, and customer assignment.
+
+2. AI risk check
+   - Submit text containing `lowest price` or `always in stock`.
+   - Expected: `riskLevel=high`, risky phrases are listed, and a safe rewrite is returned.
+   - Failure checks: verify API logs and that forbidden-expression knowledge rows are enabled if used.
+
+3. Sensitive operation confirmation
+   - Try deleting a test customer without `confirm=true`.
+   - Expected: API returns `CONFIRM_REQUIRED`.
+   - Retry with `confirm=true` only for disposable test data.
+
+4. Organization export scope
+   - As owner, create normal and sensitive export jobs.
+   - As manager, verify normal export works and sensitive export returns `403`.
+   - As sales/support, verify organization export creation returns `403`.
+
+5. Audit and risk events
+   - Open audit logs and risk events pages.
+   - Expected: high/medium events such as missing confirmation or sensitive export attempts are visible to owner/manager only.
+
+## V4-I Reorder Operations Regression Additions
+
+1. Reorder opportunities
+   - Open Web backend `Reorder ops`.
+   - Click `Recalculate scope`.
+   - Expected: accessible old customers, dormant customers, replenishment, related product and high-value opportunities appear.
+
+2. Manual task creation
+   - Pick one open opportunity and click `Create FollowUpTask`.
+   - Expected: a follow-up task is created only after the user click; no WhatsApp message is sent.
+
+3. AI reorder operation script
+   - Generate a `new_product_recommendation` or `replenishment_check` draft.
+   - Expected: response includes `riskWarnings`; it does not claim previous purchase history unless completed order data exists.
+
+4. Campaigns and playbooks
+   - Create one campaign and one playbook.
+   - Delete each with confirmation.
+   - Expected: records are scoped to the current user/organization and deletion writes audit logs.
+
+5. Security boundary
+   - Confirm there is no automatic marketing, no bulk task creation, no automatic WhatsApp send, and no simulated send-button click.
+
+6. Chrome extension permission handling
+   - Use a role/customer combination without access.
+   - Expected: sidebar shows permission denied and does not auto-send, bulk-send, or simulate any WhatsApp send-button click.
+
+7. V4-E business prediction
+   - Call `POST /api/predictions/customers/recalculate` with an accessible `customerId`.
+   - Expected: response contains created/updated counts, and `GET /api/predictions/customers` returns prediction rows.
+   - Failure checks: verify customer ownership, assignment, collaborators, organization membership, and role.
+
+8. V4-E reorder reminder
+   - Create a reminder with `POST /api/reorder-reminders`.
+   - Expected: reminder is `pending`; no `FollowUpTask` is created until `POST /api/reorder-reminders/:id/create-follow-up-task` is called manually.
+   - Failure checks: verify `customerId` access and `remindAt` ISO date.
+
+9. V4-E reorder script
+   - Call `POST /api/ai/reorder-script` with an accessible `customerId`.
+   - Expected: returns `scriptText`, `riskWarnings`, and optional `knowledgeUsed`; text does not invent previous purchase history, price, inventory, discount, or urgency.
+   - Failure checks: verify login and knowledge/product access.
+
+10. V4-F order center
+   - Create one manual order in Web backend.
+   - Convert one saved quote to an order.
+   - Convert one sample order to a bulk order draft.
+   - Convert one custom request to an order draft.
+   - Update payment, production, shipping and after-sales status.
+   - Expected: each operation returns/saves risk warnings and writes audit logs. No payment is processed and no logistics API is called.
+
+11. V4-F order script and extension
+   - Generate an order script from Web backend and Chrome sidebar.
+   - Expected: script is editable/copyable draft only, with payment/logistics/after-sales confirmation warnings.
+   - Confirm no automatic WhatsApp sending, bulk sending or send-button clicking occurs.
+
+Current release target: `v0.6-v4-growth-ops`.
 
 Use this checklist after deployment to `http://187.77.138.174`.
 
@@ -196,7 +279,7 @@ Operation:
 ```bash
 curl -i -b "$COOKIE_FILE" \
   -H "Content-Type: application/json" \
-  -d '{"customerId":"<customer-id>","taskType":"报价后跟进","remindAt":"2030-01-02T10:00:00.000Z","recommendedScript":"Hi, just checking if you reviewed the quotation. This is only a draft; please confirm price, stock, lead time, and shipping before sending."}' \
+  -d '{"customerId":"<customer-id>","taskType":"报价后跟�?,"remindAt":"2030-01-02T10:00:00.000Z","recommendedScript":"Hi, just checking if you reviewed the quotation. This is only a draft; please confirm price, stock, lead time, and shipping before sending."}' \
   "$BASE_URL/api/follow-ups"
 ```
 
@@ -321,3 +404,92 @@ Troubleshooting:
 
 - If a real sending implementation appears, remove it before deployment.
 - Keep copy/insert behavior draft-only and user-confirmed.
+
+## 15. V4-G Order Fulfillment Board
+
+Operation:
+
+1. Create or open an order in `Orders`.
+2. Set `paymentStatus=unpaid` and `orderStatus=pending_payment`.
+3. Open `Fulfillment`.
+4. Click refresh or recalculate fulfillment alerts.
+5. Open the order and generate a fulfillment draft.
+
+Expected:
+
+- The order appears in pending payment.
+- Fulfillment alerts appear for overdue payment when applicable.
+- Alert status can be resolved or dismissed manually.
+- Fulfillment follow-up task is created only after clicking the button.
+- Fulfillment draft is editable/copyable and no WhatsApp message is sent.
+
+Troubleshooting:
+
+- Check `/api/orders/fulfillment-board`.
+- Check `/api/orders/:id/fulfillment`.
+- Check `/api/ai/order-fulfillment-script`.
+- Confirm the order belongs to the current user or current organization scope.
+
+## V4-H Profit Review Smoke Test
+
+1. Login as owner or manager.
+2. Open `Profit review`.
+3. Select an order and enter cost fields.
+4. Confirm total cost, gross profit, and gross margin are calculated.
+5. Confirm low-margin or loss warnings appear when margin is low or negative.
+6. Confirm `support` cannot access profit APIs.
+7. Confirm AI profit review says it is operational advice only and not accounting or tax advice.
+8. Confirm no WhatsApp message is sent automatically.
+
+## V4-J After-sales Smoke Test
+
+1. Log in to the Web backend.
+2. Open After sales.
+3. Create a case for an owned customer/order.
+4. Confirm the case appears in the list and customer detail.
+5. Try closing without notes/confirmation and confirm it is rejected.
+6. Confirm responsibility and final solution only after confirm=true.
+7. Generate an after-sales script and verify it is a draft with refund/reship/company-policy warnings.
+8. Create an after-sales FollowUpTask manually.
+9. Confirm no WhatsApp message is sent automatically.
+
+## V4-K A/B Script Testing Smoke Test
+
+1. Log in as owner or manager.
+2. Open `A/B scripts`.
+3. Create an active experiment for `price_reply`.
+4. Add variants A, B and C, or use AI generate and manually save the variants.
+5. Open the experiment detail and confirm stats show sample-size warnings before enough usage exists.
+6. Select a variant and click `Copy + record used_draft`; confirm a usage record appears.
+7. Mark the usage as `customer_replied`, `quote_created`, `order_created` or `no_response` manually.
+8. Open `https://web.whatsapp.com`, refresh the extension sidebar, select the active experiment and variant, then copy or insert the draft.
+9. Confirm the extension records usage but does not auto-send, bulk-send or click the WhatsApp send button.
+10. Confirm cross-organization experiment, variant and usage IDs are rejected by API tests.
+
+## V4-L Supplier / Procurement Smoke Test
+
+1. Log in as owner or manager.
+2. Open `Suppliers`.
+3. Create a supplier with status `candidate` or `active`.
+4. Add a supplier contact and confirm sensitive contact fields are visible only to permitted roles.
+5. Add a supplier quote with MOQ, unit cost, currency and lead time.
+6. Add a purchase note and supplier risk record.
+7. Apply the supplier quote to an order cost with `confirm=true`; confirm the cost remains manual and not auto-confirmed.
+8. Generate a supplier draft for price, MOQ or lead time and confirm it includes warnings to confirm price, MOQ, quality, lead time and cost.
+9. Open the Chrome extension sidebar and generate a supplier draft; confirm it can be copied/inserted but no supplier is contacted and no WhatsApp message is sent.
+10. Confirm cross-organization supplier, quote, product and order IDs are rejected.
+
+## V4-M Brand / Store Smoke Test
+
+1. Log in as owner or manager.
+2. Open `Brands / stores`.
+3. Create an active brand with default language and currency.
+4. Link one product, one material, one organization knowledge entry and one script to the brand.
+5. Add brand rules for quote rule, payment method, logistics and after-sales policy.
+6. Assign the brand to a customer with manual confirmation.
+7. Generate an AI reply with `brandId`; confirm the response includes `brandUsed`, `brandRulesUsed`, `knowledgeUsed` and brand risk warnings.
+8. Generate order, fulfillment, after-sales, reorder operation, supplier and A/B script drafts with `brandId`; confirm they remain drafts and include brand usage metadata where supported.
+9. Open the Chrome extension sidebar, select the brand, confirm product/material lists are brand-filtered, and generate an AI draft.
+10. Confirm inactive/archived brands do not appear by default in the sidebar.
+11. Confirm cross-organization brand, product, material, knowledge, script and assignment IDs are rejected.
+12. Confirm the extension does not switch WhatsApp accounts, call store APIs, auto-send WhatsApp messages, bulk-send, or click the WhatsApp send button.

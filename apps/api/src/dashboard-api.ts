@@ -94,13 +94,13 @@ export function createDashboardRouter(db: DashboardDb = prisma) {
 
 export const dashboardRouter = createDashboardRouter();
 
-async function requireTeamDashboardAccess(db: DashboardDb, organizationId: string, userId: string) {
+export async function requireTeamDashboardAccess(db: DashboardDb, organizationId: string, userId: string) {
   if (!organizationId || !db.organizationMember) return null;
   const role = await getActiveOrganizationRole(db as any, organizationId, userId);
   return canWriteOrganizationResource(role) ? role : null;
 }
 
-async function buildTeamDashboardSummary(db: DashboardDb, organizationId: string, now: Date, highIntentLimit = 10): Promise<TeamDashboardSummary> {
+export async function buildTeamDashboardSummary(db: DashboardDb, organizationId: string, now: Date, highIntentLimit = 10): Promise<TeamDashboardSummary> {
   const { start, end } = getDayRange(now);
   const customers = await db.customer.findMany({
     where: { organizationId },
@@ -196,11 +196,11 @@ function getDayRange(now: Date) {
   return { start, end };
 }
 
-function parseNow(value: unknown) {
+export function parseNow(value: unknown) {
   return typeof value === "string" && !Number.isNaN(Date.parse(value)) ? new Date(value) : new Date();
 }
 
-function teamSummaryToCsv(summary: TeamDashboardSummary) {
+export function teamSummaryToCsv(summary: TeamDashboardSummary) {
   const lines = [
     ["section", "metric", "value"],
     ["kpi", "todayNewCustomers", summary.kpis.todayNewCustomers],

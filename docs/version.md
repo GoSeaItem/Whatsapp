@@ -1,10 +1,28 @@
 # Version
 
-Current version: `v0.4-v2-sales-enhancement`
+Current version: `v0.6-v4-growth-ops`
 
-Package version: `0.4.0`
+Package version: `0.6.0`
 
-Release date: 2026-05-20
+Release date: 2026-05-22
+
+Current development stage: `V4-N Full-chain Integration and Version Marking`
+
+## Completed V4 Scope
+
+- V4-A Organization import/export jobs
+- V4-B Cross-organization analysis and reports
+- V4-C AI advanced enhancement
+- V4-D Advanced permissions and audit
+- V4-E Business prediction and reorder reminders
+- V4-F Order center
+- V4-G Order fulfillment board
+- V4-H Lightweight profit and cost review
+- V4-I Reorder operations
+- V4-J After-sales and exception management
+- V4-K Lightweight A/B script testing
+- V4-L Supplier / procurement collaboration
+- V4-M Multi-brand / multi-store management
 
 ## Completed V2 Scope
 
@@ -23,8 +41,14 @@ Release date: 2026-05-20
 - No simulated clicking of WhatsApp send buttons.
 - All AI-generated content is draft-only.
 - Salespeople must manually confirm and send messages.
-- No pricing, payment, subscription plans, team/role/department permissions, finance, purchasing prediction, boss dashboard, or full order system in V2.
+- No real payment, real logistics, automatic refund, automatic shipment, automatic inventory confirmation, automatic cost confirmation, full ERP, full finance system, store API sync, WhatsApp account switching, or automatic supplier/customer contact in V4.
 
 ## Next Suggested Version
 
-V3 should focus on team collaboration after the current single-user sales workflow is stable.
+After V4-N is stabilized, the next suggested work item is V5 enterprise platform edition, only if the product owner confirms the scope. It must keep the same no-auto-send, no-bulk-send, no-auto-marketing, no-real-payment, no-real-logistics, no-auto-procurement, no-inventory-ERP, no-store-API-sync, no-automatic-WhatsApp-account-switching, and no-full-ERP boundaries unless explicitly re-scoped.
+
+- V4-J: After-sales and exception management included in the V4 release scope.
+- V4-K: Lightweight A/B script testing included in the V4 release scope.
+- V4-L: Supplier / procurement collaboration included in the V4 release scope.
+- V4-M: Multi-brand / multi-store management included in the V4 release scope.
+- V4-N: Full-chain integration and version marking completed for `v0.6-v4-growth-ops`.

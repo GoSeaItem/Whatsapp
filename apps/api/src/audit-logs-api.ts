@@ -2,11 +2,35 @@ import { Router } from "express";
 import { prisma } from "./db.js";
 import { auditLogsToCsv, serializeAuditLog } from "./audit-log-utils.js";
 import { canReadOrganization, canWriteOrganizationResource, getActiveOrganizationRole, organizationIdFromRequest } from "./organization-permissions.js";
+import { assertCanViewAuditLog, redactAuditMetadata, recordSecurityAudit } from "./permissions.js";
 
 type AuditLogsDb = Pick<typeof prisma, "auditLog" | "organizationMember">;
 
 export function createAuditLogsRouter(db: AuditLogsDb = prisma) {
   const router = Router();
+
+  router.get("/export", async (req, res, next) => {
+    try {
+      const organizationId = organizationIdFromRequest(req);
+      if (!organizationId) return res.status(400).json({ message: "organizationId is required" });
+      const role = await assertCanViewAuditLog(db, req.user!.id, organizationId, "export");
+      const where = buildAuditWhere(req.query, organizationId);
+      const logs = await db.auditLog.findMany({ where, orderBy: { createdAt: "desc" }, take: 1000 });
+      await recordSecurityAudit(db, req, {
+        organizationId,
+        action: "export",
+        entityType: "AuditLog",
+        riskLevel: "medium",
+        metadata: { fieldsScope: role === "owner" ? "full" : "redacted", affectedCount: logs.length }
+      });
+      const output = role === "owner" ? logs : logs.map(redactLog);
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="audit-logs-${new Date().toISOString().slice(0, 10)}.csv"`);
+      res.send(auditLogsToCsv(output));
+    } catch (error) {
+      next(error);
+    }
+  });
 
   router.get("/", async (req, res, next) => {
     try {
@@ -42,7 +66,8 @@ export function createAuditLogsRouter(db: AuditLogsDb = prisma) {
         return;
       }
 
-      res.json({ items: logs.map(serializeAuditLog), page, pageSize });
+      const responseLogs = role === "manager" ? logs.map(redactLog) : logs;
+      res.json({ items: responseLogs.map(serializeAuditLog), page, pageSize });
     } catch (error) {
       next(error);
     }
@@ -66,7 +91,7 @@ export function createAuditLogsRouter(db: AuditLogsDb = prisma) {
         res.status(403).json({ message: "audit log is only visible to actor" });
         return;
       }
-      res.json(serializeAuditLog(auditLog));
+      res.json(serializeAuditLog(role === "manager" ? redactLog(auditLog) : auditLog));
     } catch (error) {
       next(error);
     }
@@ -82,11 +107,24 @@ function buildAuditWhere(query: Record<string, unknown>, organizationId: string)
   const entityType = clean(query.entityType);
   const userId = clean(query.userId);
   const action = clean(query.action);
-  const from = parseDate(query.from);
-  const to = parseDate(query.to);
+  const riskLevel = clean(query.riskLevel);
+  const entityId = clean(query.entityId);
+  const keyword = clean(query.keyword);
+  const from = parseDate(query.from || query.dateFrom);
+  const to = parseDate(query.to || query.dateTo);
   if (entityType) where.entityType = entityType;
+  if (entityId) where.entityId = entityId;
   if (userId) where.OR = [{ userId }, { actorId: userId }];
   if (action) where.action = action;
+  if (riskLevel) where.riskLevel = riskLevel;
+  if (keyword) {
+    where.OR = [
+      ...(Array.isArray(where.OR) ? where.OR as any[] : []),
+      { entityType: { contains: keyword, mode: "insensitive" } },
+      { action: { contains: keyword, mode: "insensitive" } },
+      { entityId: { contains: keyword, mode: "insensitive" } }
+    ];
+  }
   if (from || to) {
     where.createdAt = {
       ...(from ? { gte: from } : {}),
@@ -94,6 +132,17 @@ function buildAuditWhere(query: Record<string, unknown>, organizationId: string)
     };
   }
   return where;
+}
+
+function redactLog(log: any) {
+  return {
+    ...log,
+    before: redactAuditMetadata(log.before),
+    after: redactAuditMetadata(log.after),
+    metadata: redactAuditMetadata(log.metadata),
+    ipAddress: log.ipAddress ? "[redacted]" : null,
+    userAgent: log.userAgent ? "[redacted]" : null
+  };
 }
 
 function clean(value: unknown) {

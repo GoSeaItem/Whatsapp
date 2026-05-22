@@ -11,6 +11,7 @@ import {
   serializeQuote,
   validateQuotePayload
 } from "./quote-utils.js";
+import { requireConfirm } from "./permissions.js";
 
 type QuoteDb = Pick<typeof prisma, "quote" | "customer" | "product" | "knowledgeBase" | "organizationMember" | "organizationProduct"> &
   Partial<Pick<typeof prisma, "knowledgeBaseOrg" | "scriptOrg" | "auditLog">>;
@@ -249,6 +250,8 @@ export function createQuotesRouter(db: QuoteDb = prisma) {
         return;
       }
       const customer = await findOwnedCustomer(db, existing.customerId, req.user!.id);
+      const confirmError = requireConfirm(req, "quote.deleteOwn");
+      if (confirmError) return res.status(409).json(confirmError);
       const result = await db.quote.deleteMany({
         where: { id: req.params.id, ownerId: req.user!.id, createdBy: req.user!.id }
       });
@@ -256,7 +259,7 @@ export function createQuotesRouter(db: QuoteDb = prisma) {
         res.status(404).json({ message: "quote not found" });
         return;
       }
-      await writeAuditLog(db, { organizationId: (customer as any)?.organizationId, userId: req.user!.id, action: "delete", entityType: "Quote", entityId: existing.id, before: existing, after: null });
+      await writeAuditLog(db, { organizationId: (customer as any)?.organizationId, userId: req.user!.id, action: "delete", entityType: "Quote", entityId: existing.id, before: existing, after: null, riskLevel: "high", metadata: { confirmed: true } });
       res.status(204).send();
     } catch (error) {
       next(error);

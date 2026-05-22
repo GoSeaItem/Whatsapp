@@ -1,10 +1,217 @@
 ﻿# WhatsApp AI 销售助手 V1
 
-当前版本：`v0.4-v2-sales-enhancement`
+当前版本：`v0.6-v4-growth-ops`
 
-当前开发阶段：`V3-H 主管看板`
+当前开发阶段：`V4-N 全链路联调和版本标记`
+
+## v0.6-v4-growth-ops
+
+`v0.6-v4-growth-ops` 汇总 V4-A 到 V4-M：组织级导入导出、跨组织报表、AI 高级增强、高级权限与审计、经营预测与复购提醒、订单中心、履约看板、利润与成本复盘、复购运营、售后异常、A/B 话术测试、供应商/采购协同、多品牌/多店铺管理。
+
+V4 仍保持产品安全边界：不接入 WhatsApp 官方 API，不自动发送 WhatsApp 消息，不自动群发，不模拟点击发送按钮，不自动联系客户或供应商，不做真实支付、真实物流、完整 ERP、完整财务系统、店铺 API 同步或 WhatsApp 账号自动切换。所有 AI 内容都是草稿或建议，业务员必须人工确认价格、库存、交期、运费、付款、物流、售后、成本、供应商和品牌政策后再发送或执行。
 
 面向中国跨境电商业务员和外贸销售人员的 WhatsApp Web 销售辅助原型。V1 采用 Web 后台 + Chrome Extension 侧边栏 + Desktop 复制粘贴工作流，帮助业务员更快翻译客户消息、生成专业回复、管理客户标签、发送产品介绍、生成报价并设置跟进提醒。
+
+## V4-M 多品牌 / 多店铺管理
+
+V4-M 支持一个组织下维护多个品牌、店铺或业务线。业务员可以在 Web 后台管理品牌资料、品牌资源和品牌规则，也可以在 Chrome 侧边栏选择当前品牌，让 AI 草稿、产品筛选、素材筛选、报价规则、付款说明和售后政策优先使用品牌上下文。
+
+- 新增 `Brand`，记录品牌/店铺名称、展示名、Logo、网址、默认语言、默认币种、国家、状态和备注。
+- 新增 `BrandProduct`、`BrandMaterial`、`BrandKnowledgeBase`、`BrandScript`，将产品、素材、知识库和话术关联到品牌。
+- 新增 `BrandRule`，维护品牌级报价规则、付款方式、售后政策、物流说明、禁用表达和 FAQ。
+- 新增 `BrandAssignment`，手动将品牌分配给客户、报价、订单、售后、复购机会、供应商、样品单和定制需求。
+- 新增 API：`/api/brands`、`/api/brand-products`、`/api/brand-materials`、`/api/brand-knowledge-bases`、`/api/brand-scripts`、`/api/brand-rules`、`/api/brands/context`。
+- Web 后台新增 `Brands / stores` 入口；Chrome 插件侧边栏新增品牌选择器。
+- AI 回复、订单话术、履约话术、售后话术、复购运营话术、供应商草稿和 A/B 话术版本生成已支持 `brandId`，返回 `brandUsed` 和 `brandRulesUsed`；部分 V4-C 高级决策端点会继续做更深品牌规则接入。
+- 不做多 WhatsApp 账号自动切换、不做店铺 API 对接、不自动同步订单、不自动发送消息、不自动群发。
+
+详细说明见：[docs/v4-brand-store-management.md](docs/v4-brand-store-management.md)。
+
+## V4-L 供应商 / 采购协同，轻量版
+
+V4-L 在产品、订单、样品、定制、售后和利润复盘基础上增加轻量供应商与采购协同。它只做供应商资料、联系人、供应商报价、采购备注、供应商风险、业务对象关联、成本参考和采购沟通草稿，不做完整采购 ERP、库存系统、供应商付款或自动采购。
+
+- 新增 `Supplier`，记录供应商基础资料、标签、评分、状态、风险等级和备注。
+- 新增 `SupplierContact`，记录供应商联系人；联系方式属于敏感字段，导出和展示需按权限控制。
+- 新增 `SupplierQuote`，记录供应商 MOQ、单位成本、币种、交期、样品费、打样周期和大货周期。
+- 新增 `PurchaseNote`，记录产品、订单、样品、定制和售后相关采购备注。
+- 新增 `SupplierRisk`，记录交期、质量、价格、配合度、付款风险和复核风险。
+- 新增 `SupplierLink`，将供应商关联到产品、订单、样品单、定制需求和售后案例。
+- 新增 API：`/api/suppliers`、`/api/supplier-contacts`、`/api/supplier-quotes`、`/api/purchase-notes`、`/api/supplier-risks`、`/api/supplier-links`。
+- 新增 AI API：`POST /api/ai/supplier-script`，生成询价、MOQ、样品费、交期、大货成本、定制可行性、质量问题、补发成本、议价和采购细节确认草稿。
+- Web 后台新增 `Suppliers` 入口；Chrome 插件侧边栏新增供应商草稿生成入口。
+- 供应商报价应用到订单成本必须 `confirm=true`，不会自动确认真实成本、不会自动下采购单、不会自动联系供应商。
+
+详细说明见：[docs/v4-supplier-procurement.md](docs/v4-supplier-procurement.md)。
+
+## V4-K A/B 话术测试，轻量版
+
+V4-K 在 AI 回复、公共话术库、CRM、报价、订单、复购和售后能力基础上增加轻量 A/B 话术测试。它只记录草稿版本、使用次数、人工标记结果和轻量转化统计，不做复杂实验平台、自动营销、自动群发或 WhatsApp 自动发送。
+
+- 新增 `ScriptExperiment`，按销售场景、语言、客户阶段维护话术实验。
+- 新增 `ScriptVariant`，为同一实验维护 A/B/C 话术版本，支持启用/禁用。
+- 新增 `ScriptUsage`，记录业务员手动复制/插入草稿后的使用记录和人工标记结果。
+- 新增 API：`/api/script-experiments`、`/api/script-experiments/:id/variants`、`/api/script-variants/:id`、`/api/script-usages`、`/api/script-usages/:id/outcome`、`/api/script-experiments/:id/stats`。
+- 新增 AI API：`POST /api/ai/script-experiments/generate-variants`，生成 A/B/C 三种草稿策略。
+- Web 后台新增 `A/B scripts` 入口，可管理实验、版本、统计和使用记录。
+- Chrome 插件侧边栏新增 A/B 话术选择；复制/插入时仅记录 `used_draft`，最终发送仍由业务员手动完成。
+- 统计包含回复率、报价转化率、订单转化率、付款转化率、复购转化率、无回复率；样本量不足时只做方向参考。
+- 不编造价格、库存、交期、运费、优惠或虚假紧迫感；所有话术都是草稿。
+
+详细说明见：[docs/v4-script-ab-testing.md](docs/v4-script-ab-testing.md)。
+
+## V4-J 售后与异常管理
+
+V4-J 在订单中心、履约看板、利润复盘和复购运营基础上增加轻量售后记录与异常处理。它只做售后案例记录、状态管理、风险提醒、成本联动建议、跟进任务和话术草稿，不做自动退款、自动补发、真实物流查询或 WhatsApp 自动发送。
+
+- 新增 `AfterSalesCase`，记录质量问题、物流延误、少发/错发、退款请求、退货请求、补发请求、投诉和其他售后异常。
+- 新增 `AfterSalesEvent`，记录创建、状态变化、责任归因、方案变化、退款/补发记录、跟进任务和 AI 话术生成等事件时间线。
+- 新增 API：`GET /api/after-sales`、`POST /api/after-sales`、`GET /api/after-sales/:id`、`PATCH /api/after-sales/:id`、`DELETE /api/after-sales/:id`。
+- 新增状态、责任和方案 API：`PATCH /api/after-sales/:id/status`、`PATCH /api/after-sales/:id/responsibility`、`PATCH /api/after-sales/:id/solution`。
+- 新增售后跟进 API：`POST /api/after-sales/:id/create-follow-up-task`，必须用户手动确认。
+- 新增 AI 售后话术 API：`POST /api/ai/after-sales-script`，覆盖请求证据、安抚、物流延误解释、质量核实、退款政策说明、补发安排、方案确认、售后回访、投诉安抚和内部确认。
+- Web 后台新增 `After sales` 入口；客户详情中显示当前客户售后案例，并可跳转创建/处理售后。
+- 退款、补发、赔偿、责任归因和关闭售后都要求人工确认，并写入 `AuditLog`；AI 话术生成写入 `AIActionSuggestionLog`。
+- 不自动承诺退款、补发、赔偿、责任归因、物流状态或售后政策；涉及公司政策和主管意见时必须提醒业务员确认。
+
+详细说明见：[docs/v4-after-sales.md](docs/v4-after-sales.md)。
+
+## V4-I 复购运营增强
+
+V4-I 在复购预测、订单中心和利润复盘基础上增加老客户复购运营能力。它只做机会识别、计划建议、话术草稿和手动创建跟进任务，不做自动营销、自动群发或自动发送 WhatsApp 消息。
+
+- 新增 `ReorderCampaign`，用于按老客户复购、沉睡唤醒、新品/关联产品推荐、补货、节日、高价值客户等场景分组管理复购运营活动。
+- 新增 `ReorderOpportunity`，记录客户复购机会、沉睡唤醒机会、新品/关联产品推荐、补货提醒、高价值客户和流失风险。
+- 新增 `ReorderPlaybook`，维护复购运营话术模板，支持组织级和个人级使用。
+- 新增 API：`GET /api/reorder/opportunities`、`POST /api/reorder/opportunities/recalculate`、`PATCH /api/reorder/opportunities/:id`、`POST /api/reorder/opportunities/:id/create-follow-up-task`。
+- 新增活动和模板 API：`/api/reorder/campaigns`、`/api/reorder/playbooks`。
+- 新增 AI 复购运营话术 API：`POST /api/ai/reorder-operation-script`，覆盖复购、沉睡唤醒、关联产品推荐、补货确认、节日问候、高价值客户维护和流失挽回。
+- Web 后台新增 `Reorder ops` 入口，可查看复购机会池、创建复购活动、维护复购话术模板、生成草稿和手动转 `FollowUpTask`。
+- 复购机会计算遵守组织、角色、客户归属和账号隔离；`owner/manager` 可看团队，`sales/support` 只能看自己可访问客户。
+- 机会转跟进任务必须 `confirm=true`，并写入 `AuditLog`；AI 话术生成写入 `AIActionSuggestionLog`。
+- 不编造客户购买历史、库存、价格、优惠、交期或新品；没有订单数据时只说“之前咨询过/沟通过”，不能说“之前购买过”。
+
+详细说明见：[docs/v4-reorder-operations.md](docs/v4-reorder-operations.md)。
+
+## V4-H 利润与成本复盘，轻量版
+
+V4-H 在订单中心基础上增加轻量成本和预计毛利复盘，帮助业务员、主管和 owner 识别低毛利、亏损和成本未确认订单。该模块只做销售经营参考，不做完整财务系统、会计报表、税务申报、自动对账或真实支付。
+
+- 新增 `OrderCost`，记录商品成本、包装成本、国内运费、国际运费、支付手续费、平台费、退款金额、补发成本和其他成本。
+- 新增利润 API：`GET /api/orders/:id/cost`、`PUT /api/orders/:id/cost`、`PATCH /api/orders/:id/cost/confirm`、`DELETE /api/orders/:id/cost`。
+- 新增分析 API：`GET /api/profit/orders`、`GET /api/profit/summary`、`GET /api/profit/by-product`、`GET /api/profit/by-customer`、`GET /api/profit/by-salesperson`。
+- 新增 AI 利润复盘 API：`POST /api/ai/profit-review`，只给经营建议，不做财务或税务结论。
+- Web 后台新增 `Profit review` 入口，可查看总销售额、总成本、毛利、平均毛利率、低毛利订单、成本未确认订单，并编辑/确认订单成本。
+- 权限：`owner/manager` 可查看团队利润并编辑/确认成本；`sales` 默认只能查看自己可访问订单利润；`support` 默认不能查看利润。
+- 成本确认、删除、AI 复盘写入审计/AI 日志；删除成本必须 `confirm=true`。
+- 不自动确认真实成本、不自动确认收款、不做税务建议、不导出密钥、不自动发送 WhatsApp 消息。
+
+详细说明见：[docs/v4-profit-review.md](docs/v4-profit-review.md)。
+
+## V4-G 订单履约看板
+
+V4-G 在订单中心基础上增加履约看板，帮助业务员和主管发现待付款、待生产、生产延迟、待发货、已发货待签收、物流延迟、售后中和已完成订单。
+
+- 新增 `OrderFulfillmentAlert`，用于记录付款逾期、生产延迟、物流延迟、缺少物流单号、售后待处理、签收跟进和长期无跟进等异常。
+- `FollowUpTask` 新增可选 `orderId`，履约跟进任务可以关联到具体订单。
+- 新增履约 API：`GET /api/orders/fulfillment-board`、`GET /api/orders/:id/fulfillment`、`POST /api/orders/:id/recalculate-fulfillment-alerts`、`POST /api/orders/recalculate-fulfillment-alerts`。
+- 新增异常处理 API：`PATCH /api/order-fulfillment-alerts/:id`。
+- 新增手动创建履约跟进：`POST /api/orders/:id/create-fulfillment-follow-up`。
+- 新增 AI 履约话术：`POST /api/ai/order-fulfillment-script`，只生成草稿。
+- Web 后台新增 `Fulfillment` 入口，客户详情和订单详情可以查看履约异常并生成草稿。
+- Chrome 侧边栏轻量支持查看当前客户订单履约异常和生成履约话术草稿。
+- 不做真实物流查询、不自动发货、不自动确认收款、不自动修改订单状态、不自动创建任务、不自动发送 WhatsApp 消息。
+
+详细说明见：[docs/v4-order-fulfillment-board.md](docs/v4-order-fulfillment-board.md)。
+
+## V4-F 订单中心
+
+V4-F 增加轻量订单中心，把客户、报价、样品单、定制需求、产品和跟进任务串联起来，形成手动维护的销售订单记录。
+
+- 新增 `Order` 模型，支持普通订单、样品转大货、定制订单、复购订单和其他订单。
+- 新增订单 API：`GET /api/orders`、`POST /api/orders`、`GET /api/orders/:id`、`PATCH /api/orders/:id`、`DELETE /api/orders/:id`。
+- 支持 `POST /api/orders/from-quote/:quoteId`、`POST /api/orders/from-sample/:sampleOrderId`、`POST /api/orders/from-custom-request/:customRequestId`。
+- 支持付款、生产、发货、售后状态手动更新，并返回风险提醒。
+- 新增 AI 订单话术 API：`POST /api/ai/order-script`，只生成草稿。
+- Web 后台新增 Orders / 订单中心入口，客户详情显示订单并支持报价、样品、定制转订单。
+- Chrome 侧边栏轻量支持查看当前客户订单、手动创建订单和生成订单话术草稿。
+- 不做在线支付、不查真实物流、不自动确认收款、不自动承诺发货、不自动发送 WhatsApp 消息。
+
+详细说明见：[docs/v4-order-center.md](docs/v4-order-center.md)。
+
+## V4-E 经营预测 / 复购提醒
+
+V4-E 基于客户、产品、报价、跟进、样品单、定制需求和团队数据做轻量规则预测，帮助业务员发现复购机会、沉睡客户、高价值客户、流失风险和产品机会。它不是机器学习，也不是自动营销系统。
+
+- 新增 `CustomerPrediction` 和 `ReorderReminder`，记录复购、沉睡、高价值、流失风险和产品机会相关提示。
+- 新增预测 API：`GET /api/predictions/customers`、`POST /api/predictions/customers/recalculate`、`PATCH /api/predictions/customers/:id`、`GET /api/predictions/product-opportunities`。
+- 新增复购提醒 API：`GET /api/reorder-reminders`、`POST /api/reorder-reminders`、`PATCH /api/reorder-reminders/:id`、`POST /api/reorder-reminders/:id/create-follow-up-task`。
+- 新增 AI 复购话术 API：`POST /api/ai/reorder-script`，只生成草稿，不编造购买历史、价格、库存、优惠、交期或虚假紧迫感。
+- Web 后台新增“经营预测 / 复购提醒”入口；客户详情、首页工作台和 Chrome 侧边栏轻量展示复购建议。
+- 创建复购提醒、创建 `FollowUpTask`、忽略/转化预测都必须由用户手动点击，并写入审计日志。
+
+详细说明见：[docs/v4-reorder-prediction.md](docs/v4-reorder-prediction.md)。
+
+## V4-C AI 高级增强
+
+V4-C 将 AI 从简单回复升级为销售辅助建议，但仍然只生成草稿和建议，不会自动发送 WhatsApp 消息。
+
+- 新增 `AIActionSuggestionLog`，记录 AI 下一步建议、客户摘要、销售草稿、风险检查和跟进计划的输入摘要与输出结果。
+- 新增 AI 高级 API：`POST /api/ai/next-action`、`POST /api/ai/customer-sales-summary`、`POST /api/ai/sales-script`、`POST /api/ai/risk-check`、`POST /api/ai/follow-up-plan`。
+- 支持基于客户、产品、报价、跟进、知识库、素材、样品单和定制需求生成下一步行动建议。
+- 风险检查会识别 `lowest price`、`always in stock`、`100% guaranteed delivery`、`today shipping` 等高风险表达，并返回安全改写建议。
+- 跟进计划默认只生成计划；只有用户显式传入 `createTasks=true` 才创建 `FollowUpTask`。
+- 所有 AI 输出都包含 `riskWarnings`，并提醒业务员确认价格、库存、交期、运费、付款、物流和售后信息。
+
+详细说明见：[docs/v4-ai-advanced.md](docs/v4-ai-advanced.md)。
+
+## V4-D 高级权限和审计增强
+
+V4-D 在 V3 角色权限基础上补充统一权限矩阵、敏感操作二次确认、数据导出权限增强、审计日志增强和风险事件查询。
+
+- 新增统一权限配置 `PERMISSION_KEYS` 和后端权限工具，覆盖组织、成员、客户、产品、素材、知识库、话术、销售流程、报表、导入导出、审计和 AI。
+- 删除客户、产品、报价、样品单、定制需求、组织、成员移除/禁用、成员角色修改和敏感导出等高风险操作需要 `confirm=true`。
+- 组织导出支持 `fieldsScope=normal|sensitive`：`owner` 可导出敏感字段，`manager` 默认只能导出普通字段，`sales/support` 不可创建组织级导出。
+- `AuditLog` 增强 `metadata`、`ipAddress`、`userAgent`、`riskLevel`，审计 CSV 导出继续防 CSV 注入且不导出密钥。
+- 新增 `GET /api/security/risk-events`，组织 `owner/manager` 可查看 high/medium 风险事件。
+- Web 后台新增“权限矩阵”和“风险事件”入口；审计日志支持风险等级、实体 ID、关键词和时间筛选。
+- Chrome 插件遇到 `403` 会提示权限不足，不会自动发送或模拟点击 WhatsApp 发送按钮。
+
+详细说明见：[docs/v4-permissions-audit.md](docs/v4-permissions-audit.md)。
+
+## V4-A 组织级数据导入导出
+
+V4-A 在 V3 组织、角色、客户归属、公共资料、审计日志和主管看板基础上，新增组织级批量导入/导出任务。
+
+- 新增 `ImportJob` 和 `ExportJob`，记录组织级导入/导出任务状态。
+- 支持组织级数据类型：`customer`、`product`、`material`、`knowledge`、`script`。
+- 新增组织级导入 API：`POST /api/import/:type?organizationId=xxx&dryRun=true|false`。
+- 新增组织级导入状态 API：`GET /api/import/:id/status`。
+- 新增组织级导出 API：`POST /api/export/:type?organizationId=xxx`。
+- 新增组织级导出状态 API：`GET /api/export/:id/status`。
+- `dryRun=true` 只校验 CSV 格式、枚举、日期、数字、组织成员和唯一性，不写入数据库。
+- 正式导入会按组织防撞单逻辑处理重复客户，产品导入会创建个人产品并加入公共产品库，素材导入会创建个人素材并加入公共素材库。
+- 组织知识和组织话术导入直接写入公共知识库 / 公共话术库。
+- 所有组织级导入/导出任务都会写入 `AuditLog`。
+- 权限规则：仅组织 `owner` / `manager` 可以创建导入/导出任务；`sales` / `support` 只读，跨组织访问拒绝。
+- Web 后台 `导入/导出` 页面新增组织级导入/导出区域。
+
+V4-A 仍然不接入 WhatsApp 官方 API，不自动发送 WhatsApp 消息，不自动群发，不模拟点击发送按钮；导入/导出不会处理真实密钥、`.env`、token、session、cookie、OpenAI Key 或服务器密码。详细说明见：[docs/v4-team-collaboration.md](docs/v4-team-collaboration.md)。
+
+## V4-B 跨组织分析与报表
+
+V4-B 在 V3-H 主管看板基础上新增独立报表 API 和 Web 报表分析入口，用于组织 owner / manager 查看团队 KPI、业务员进度、高意向客户和异步报表任务。
+
+- 新增 `ReportJob`，记录报表生成任务、筛选条件、状态和结果。
+- 新增报表 API：`GET /api/reports/team-summary`、`GET /api/reports/high-intent-customers`、`POST /api/reports/generate`、`GET /api/reports/:id/status`。
+- 报表 KPI：今日新增客户、今日待跟进、逾期未跟进、高意向客户、已报价未跟进。
+- 业务员统计：客户总数、已完成跟进数、报价数。
+- 高意向客户列表支持按业务员、销售阶段和意向等级筛选，并隐藏联系方式。
+- 支持 CSV 导出和 Excel-compatible 导出。
+- 生成报表任务会写入 `AuditLog`。
+- 权限规则：仅组织 `owner` / `manager` 可访问报表和生成任务；`sales` / `support` 返回 `403`。
+
+V4-B 报表仅用于销售管理辅助，不代表客户一定成交；不会自动发送 WhatsApp 消息，不会自动群发，也不会模拟点击发送按钮。详细说明见：[docs/v4-team-collaboration.md](docs/v4-team-collaboration.md)。
 
 ## v0.4-v2-sales-enhancement
 

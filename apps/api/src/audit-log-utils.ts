@@ -13,6 +13,9 @@ export type AuditLogInput = {
   before?: unknown;
   after?: unknown;
   metadata?: Record<string, unknown>;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+  riskLevel?: "low" | "medium" | "high" | string | null;
 };
 
 const sensitiveKeyPattern = /(password|secret|token|cookie|api[_-]?key|session)/i;
@@ -30,7 +33,10 @@ export async function writeAuditLog(db: AuditLogDb, input: AuditLogInput) {
       entityId: input.entityId || null,
       before: toAuditJson(input.before),
       after: toAuditJson(input.after),
-      metadata: toAuditJson(input.metadata)
+      metadata: toAuditJson(input.metadata),
+      ipAddress: input.ipAddress || null,
+      userAgent: input.userAgent || null,
+      riskLevel: input.riskLevel || "low"
     } as any
   });
 }
@@ -47,12 +53,15 @@ export function serializeAuditLog(log: any) {
     before: log.before || null,
     after: log.after || null,
     metadata: log.metadata || null,
+    ipAddress: log.ipAddress || null,
+    userAgent: log.userAgent || null,
+    riskLevel: log.riskLevel || "low",
     createdAt: log.createdAt instanceof Date ? log.createdAt.toISOString() : String(log.createdAt)
   };
 }
 
 export function auditLogsToCsv(logs: any[]) {
-  const header = ["createdAt", "organizationId", "userId", "action", "entityType", "entityId", "before", "after"];
+  const header = ["createdAt", "organizationId", "userId", "action", "entityType", "entityId", "riskLevel", "before", "after"];
   const rows = logs.map((log) => {
     const item = serializeAuditLog(log);
     return [
@@ -62,6 +71,7 @@ export function auditLogsToCsv(logs: any[]) {
       item.action,
       item.entityType,
       item.entityId,
+      item.riskLevel,
       item.before ? JSON.stringify(item.before) : "",
       item.after ? JSON.stringify(item.after) : ""
     ];

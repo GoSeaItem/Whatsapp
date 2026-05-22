@@ -126,7 +126,7 @@ describe("SampleOrder API", () => {
       .send({ sampleName: "Blue Dress Size M Sample", trackingNumber: "TRK123" })
       .expect(200);
     expect(updated.body).toMatchObject({ sampleName: "Blue Dress Size M Sample", trackingNumber: "TRK123" });
-    await request(app).delete("/api/sample-orders/s1").set("x-user-id", "sales-1").expect(204);
+    await request(app).delete("/api/sample-orders/s1?confirm=true").set("x-user-id", "sales-1").expect(204);
     await request(app).get("/api/sample-orders/s1").set("x-user-id", "sales-1").expect(404);
   });
 
@@ -157,11 +157,11 @@ describe("SampleOrder API", () => {
   it("generates safe sample scripts", async () => {
     const { app } = createTestApp({ samples: [makeSample({ id: "s1", sampleFee: null, shippingCost: null })] });
     const quote = await request(app).post("/api/sample-orders/s1/script").send({ scenario: "sample_quote" }).expect(200);
-    expect(quote.body.riskWarnings.join(" ")).toContain("鏈～鍐欐牱鍝佽垂");
-    expect(quote.body.riskWarnings.join(" ")).toContain("鏀舵璐︽埛");
+    expect(quote.body.riskWarnings.join(" ")).toContain("未填写样品费");
+    expect(quote.body.riskWarnings.join(" ")).toContain("收款账户");
     expect(JSON.stringify(quote.body).toLowerCase()).not.toMatch(/click.*send|send button|automatic send|auto-send|bulk send/);
     const shipped = await request(app).post("/api/sample-orders/s1/script").send({ scenario: "sample_shipped" }).expect(200);
-    expect(shipped.body.riskWarnings.join(" ")).toContain("鐗╂祦鍗曞彿");
+    expect(shipped.body.riskWarnings.join(" ")).toContain("物流单号");
   });
 });
 

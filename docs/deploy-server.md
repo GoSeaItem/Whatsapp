@@ -1,6 +1,6 @@
 # Ubuntu 24.04 Staging Deployment
 
-Current release target: `v0.4-v2-sales-enhancement`.
+Current release target: `v0.6-v4-growth-ops`.
 
 Target:
 
@@ -13,7 +13,7 @@ Security rules:
 - Do not write server passwords, database passwords, `SESSION_SECRET`, `COOKIE_SECRET`, or `OPENAI_API_KEY` into code, docs, scripts, or logs.
 - Create `.env.production` manually on the server.
 - Do not commit `.env.production`.
-- V1 does not connect to WhatsApp official API, does not auto-send WhatsApp messages, does not bulk send, and does not bypass WhatsApp risk controls.
+- V4 does not connect to WhatsApp official API, does not auto-send WhatsApp messages, does not bulk send, does not simulate WhatsApp send-button clicks, does not auto-contact customers or suppliers, does not process real payments, does not query real logistics, does not switch WhatsApp accounts, and does not bypass WhatsApp risk controls.
 
 ## 1. Install Base Dependencies
 

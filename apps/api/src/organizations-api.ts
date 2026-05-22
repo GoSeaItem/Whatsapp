@@ -8,6 +8,7 @@ import {
 } from "@wa-ai/shared";
 import { prisma } from "./db.js";
 import { defaultRoleDescriptions } from "./organization-permissions.js";
+import { recordSecurityAudit, requireConfirm } from "./permissions.js";
 
 type OrganizationDb = Pick<typeof prisma, "organization" | "organizationMember" | "user">;
 type Membership = { id: string; organizationId: string; userId: string; role: string; status: string };
@@ -98,6 +99,11 @@ export function createOrganizationsRouter(db: OrganizationDb = prisma) {
       const organization = await loadVisibleOrganization(db, req.params.id, req.user!.id);
       if (!organization) return res.status(404).json({ message: "organization not found" });
       if (organization.ownerId !== req.user!.id) return res.status(403).json({ message: "owner role required" });
+      const confirmError = requireConfirm(req, "organization.delete");
+      if (confirmError) {
+        await recordSecurityAudit(db as any, req, { organizationId: req.params.id, action: "confirm_required", entityType: "Organization", entityId: req.params.id, riskLevel: "high", metadata: { confirmRequired: true } });
+        return res.status(409).json(confirmError);
+      }
       await db.organization.delete({ where: { id: req.params.id } });
       res.status(204).send();
     } catch (error) {
@@ -167,6 +173,14 @@ export function createOrganizationsRouter(db: OrganizationDb = prisma) {
       const errors = validateMemberPayload({ role, status }, { partial: true });
       if (role === "owner") errors.push({ field: "role", message: "owner role is reserved for organization creator" });
       if (errors.length) return res.status(400).json({ message: "validation failed", errors });
+      const sensitiveAction = role !== undefined ? "member.updateRole" : status === "inactive" ? "member.disable" : "";
+      if (sensitiveAction) {
+        const confirmError = requireConfirm(req, sensitiveAction);
+        if (confirmError) {
+          await recordSecurityAudit(db as any, req, { organizationId: req.params.id, action: "confirm_required", entityType: "OrganizationMember", entityId: target.id, riskLevel: "high", metadata: { confirmRequired: true, operation: sensitiveAction } });
+          return res.status(409).json(confirmError);
+        }
+      }
 
       const member = await db.organizationMember.update({
         where: { id: req.params.memberId },
@@ -192,6 +206,11 @@ export function createOrganizationsRouter(db: OrganizationDb = prisma) {
       const target = organization.members.find((member: Membership) => member.id === req.params.memberId);
       if (!target) return res.status(404).json({ message: "member not found" });
       if (target.role === "owner") return res.status(403).json({ message: "organization owner member cannot be removed" });
+      const confirmError = requireConfirm(req, "member.remove");
+      if (confirmError) {
+        await recordSecurityAudit(db as any, req, { organizationId: req.params.id, action: "confirm_required", entityType: "OrganizationMember", entityId: target.id, riskLevel: "high", metadata: { confirmRequired: true } });
+        return res.status(409).json(confirmError);
+      }
 
       await db.organizationMember.delete({ where: { id: req.params.memberId } });
       res.status(204).send();

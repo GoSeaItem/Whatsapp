@@ -4,6 +4,12 @@ import type {
   AuditLogDetail,
   AuditLogListQuery,
   AuditLogSummary,
+  AfterSalesCaseDetail,
+  AfterSalesCaseSummary,
+  AfterSalesListQuery,
+  AfterSalesScriptRequest,
+  AfterSalesScriptResponse,
+  AfterSalesUpsertRequest,
   CustomerAssignRequest,
   CustomerDuplicateCheckRequest,
   CustomerDuplicateCheckResponse,
@@ -17,6 +23,10 @@ import type {
   CustomScriptResponse,
   CustomerIntentResponse,
   CustomerListQuery,
+  CustomerPredictionListQuery,
+  CustomerPredictionRecalculateRequest,
+  CustomerPredictionRecalculateResponse,
+  CustomerPredictionSummary,
   CustomerSummary,
   CustomerUpsertRequest,
   FollowUpDetail,
@@ -53,13 +63,48 @@ import type {
   OrganizationProductSummary,
   OrganizationSummary,
   OrganizationUpsertRequest,
+  OrderDetail,
+  OrderCostSummary,
+  OrderCostUpsertRequest,
+  OrderFulfillmentAlertSummary,
+  OrderFulfillmentBoardResponse,
+  OrderFulfillmentDetailResponse,
+  OrderFulfillmentScriptRequest,
+  OrderListQuery,
+  OrderScriptRequest,
+  OrderScriptResponse,
+  OrderSummary,
+  OrderUpsertRequest,
   ProductDetail,
+  ProfitBreakdownRow,
+  ProfitOrderRow,
+  ProfitReviewRequest,
+  ProfitReviewResponse,
+  ProfitSummary,
+  ProductOpportunitySummary,
   ProductListQuery,
   ProductSummary,
   ProductUpsertRequest,
   QuoteGenerateRequest,
   QuoteResponse,
   QuoteSaveRequest,
+  ReportJobSummary,
+  ReorderCampaignSummary,
+  ReorderCampaignUpsertRequest,
+  ReorderOperationScriptRequest,
+  ReorderOperationScriptResponse,
+  ReorderOpportunityListQuery,
+  ReorderOpportunityRecalculateRequest,
+  ReorderOpportunityRecalculateResponse,
+  ReorderOpportunitySummary,
+  ReorderPlaybookSummary,
+  ReorderPlaybookUpsertRequest,
+  ReorderReminderListQuery,
+  ReorderReminderSummary,
+  ReorderReminderUpsertRequest,
+  ReorderScriptRequest,
+  ReorderScriptResponse,
+  ReportJobType,
   RoleSummary,
   RoleUpdateRequest,
   RoleUpsertRequest,
@@ -72,6 +117,17 @@ import type {
   SampleScriptRequest,
   SampleScriptResponse,
   SampleShippingStatus,
+  ScriptExperimentDetail,
+  ScriptExperimentStats,
+  ScriptExperimentSummary,
+  ScriptExperimentUpsertRequest,
+  ScriptUsageCreateRequest,
+  ScriptUsageOutcomeRequest,
+  ScriptUsageSummary,
+  ScriptVariantGenerationRequest,
+  ScriptVariantGenerationResponse,
+  ScriptVariantSummary,
+  ScriptVariantUpsertRequest,
   ScriptOrgDetail,
   ScriptOrgListQuery,
   ScriptOrgSummary,
@@ -170,6 +226,29 @@ export function getTeamSummary(organizationId: string) {
 
 export function teamSummaryCsvUrl(organizationId: string) {
   return `${API_BASE_URL}/api/dashboard/team-summary${toQuery({ organizationId, format: "csv" })}`;
+}
+
+export function getReportTeamSummary(organizationId: string) {
+  return request<TeamDashboardSummary>(`/api/reports/team-summary${toQuery({ organizationId })}`);
+}
+
+export function reportTeamSummaryUrl(organizationId: string, format: "csv" | "excel") {
+  return `${API_BASE_URL}/api/reports/team-summary${toQuery({ organizationId, format })}`;
+}
+
+export function getReportHighIntentCustomers(query: { organizationId: string; assignedTo?: string; stage?: string; intentLevel?: string }) {
+  return request<TeamDashboardSummary["highIntentCustomers"]>(`/api/reports/high-intent-customers${toQuery(query)}`);
+}
+
+export function generateReportJob(organizationId: string, type: ReportJobType, filters: Record<string, unknown> = {}) {
+  return request<{ job: ReportJobSummary }>(
+    `/api/reports/generate${toQuery({ organizationId })}`,
+    { method: "POST", body: JSON.stringify({ type, filters }) }
+  );
+}
+
+export function getReportJob(id: string) {
+  return request<ReportJobSummary>(`/api/reports/${id}/status`);
 }
 
 export function createCustomer(payload: CustomerUpsertRequest) {
@@ -296,7 +375,7 @@ export function updateOrganizationMember(id: string, memberId: string, payload: 
 }
 
 export function deleteOrganizationMember(id: string, memberId: string) {
-  return fetch(`${API_BASE_URL}/api/organizations/${id}/members/${memberId}`, {
+  return fetch(`${API_BASE_URL}/api/organizations/${id}/members/${memberId}?confirm=true`, {
     credentials: "include",
     method: "DELETE"
   }).then((response) => {
@@ -313,8 +392,11 @@ export function getAuditLogs(query: AuditLogListQuery) {
     `/api/audit-logs${toQuery({
       organizationId: query.organizationId,
       entityType: query.entityType,
+      entityId: query.entityId,
       userId: query.userId,
       action: query.action,
+      riskLevel: query.riskLevel,
+      keyword: query.keyword,
       from: query.from,
       to: query.to,
       page: query.page ? String(query.page) : undefined,
@@ -328,15 +410,21 @@ export function getAuditLog(id: string) {
 }
 
 export function auditLogsCsvUrl(query: AuditLogListQuery) {
-  return `${API_BASE_URL}/api/audit-logs${toQuery({
+  return `${API_BASE_URL}/api/audit-logs/export${toQuery({
     organizationId: query.organizationId,
     entityType: query.entityType,
+    entityId: query.entityId,
     userId: query.userId,
     action: query.action,
+    riskLevel: query.riskLevel,
+    keyword: query.keyword,
     from: query.from,
-    to: query.to,
-    format: "csv"
+    to: query.to
   })}`;
+}
+
+export function getRiskEvents(organizationId: string) {
+  return request<AuditLogSummary[]>(`/api/security/risk-events${toQuery({ organizationId })}`);
 }
 
 export function getRole(id: string) {
@@ -760,6 +848,7 @@ export function generateCustomScript(id: string, payload: CustomScriptRequest) {
 }
 
 export type ImportExportType = "customers" | "products" | "knowledge-base" | "materials" | "sample-orders" | "custom-requests";
+export type OrganizationImportExportType = "customer" | "product" | "material" | "knowledge" | "script";
 
 export type CsvImportResult = {
   totalRows: number;
@@ -768,6 +857,31 @@ export type CsvImportResult = {
   skippedCount: number;
   dryRun: boolean;
   errors: Array<{ row: number; field: string; message: string }>;
+};
+
+export type OrganizationImportJob = {
+  id: string;
+  organizationId: string;
+  type: OrganizationImportExportType;
+  filePath: string;
+  dryRun: boolean;
+  status: "pending" | "processing" | "completed" | "failed";
+  result?: CsvImportResult | null;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type OrganizationExportJob = {
+  id: string;
+  organizationId: string;
+  type: OrganizationImportExportType;
+  filePath: string;
+  status: "pending" | "processing" | "completed" | "failed";
+  filters?: unknown;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export function importCsv(type: ImportExportType, file: File, options: { dryRun?: boolean; skipDuplicates?: boolean; organizationId?: string } = {}) {
@@ -786,10 +900,616 @@ export function importCsv(type: ImportExportType, file: File, options: { dryRun?
   });
 }
 
+export function importOrganizationCsv(type: OrganizationImportExportType, file: File, options: { organizationId: string; dryRun?: boolean; skipDuplicates?: boolean }) {
+  const form = new FormData();
+  form.append("file", file);
+  return fetch(
+    `${API_BASE_URL}/api/import/${type}${toQuery({
+      organizationId: options.organizationId,
+      dryRun: options.dryRun ? "true" : "false",
+      skipDuplicates: options.skipDuplicates === false ? "false" : "true"
+    })}`,
+    { method: "POST", credentials: "include", body: form }
+  ).then(async (response) => {
+    if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+    return response.json() as Promise<{ job: OrganizationImportJob; result: CsvImportResult }>;
+  });
+}
+
+export function getOrganizationImportJob(id: string) {
+  return request<OrganizationImportJob>(`/api/import/${id}/status`);
+}
+
+export function createOrganizationExportJob(type: OrganizationImportExportType, organizationId: string, filters: Record<string, unknown> = {}, fieldsScope: "normal" | "sensitive" = "normal") {
+  return request<{ job: OrganizationExportJob; downloadUrl: string; fieldsScope: string; riskWarnings: string[] }>(
+    `/api/export/${type}${toQuery({ organizationId })}`,
+    { method: "POST", body: JSON.stringify({ filters, fieldsScope, confirm: fieldsScope === "sensitive" }) }
+  );
+}
+
+export function getOrganizationExportJob(id: string) {
+  return request<OrganizationExportJob>(`/api/export/${id}/status`);
+}
+
 export function exportCsvUrl(type: ImportExportType) {
   return `${API_BASE_URL}/api/export/${type}`;
 }
 
 export function templateCsvUrl(type: ImportExportType) {
   return `${API_BASE_URL}/api/import/templates/${type}`;
+}
+
+export function getCustomerPredictions(query: CustomerPredictionListQuery = {}) {
+  return request<CustomerPredictionSummary[]>(
+    `/api/predictions/customers${toQuery({
+      predictionType: query.predictionType,
+      level: query.level,
+      status: query.status,
+      assignedTo: query.assignedTo,
+      organizationId: query.organizationId,
+      page: query.page,
+      pageSize: query.pageSize
+    })}`
+  );
+}
+
+export function recalculatePredictions(payload: CustomerPredictionRecalculateRequest) {
+  return request<CustomerPredictionRecalculateResponse>("/api/predictions/customers/recalculate", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateCustomerPrediction(id: string, status: string) {
+  return request<CustomerPredictionSummary>(`/api/predictions/customers/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status })
+  });
+}
+
+export function getProductOpportunities(query: { organizationId?: string; productId?: string; category?: string; level?: string } = {}) {
+  return request<ProductOpportunitySummary[]>(
+    `/api/predictions/product-opportunities${toQuery({
+      organizationId: query.organizationId,
+      productId: query.productId,
+      category: query.category,
+      level: query.level
+    })}`
+  );
+}
+
+export function getReorderReminders(query: ReorderReminderListQuery = {}) {
+  return request<ReorderReminderSummary[]>(
+    `/api/reorder-reminders${toQuery({
+      status: query.status,
+      reminderType: query.reminderType,
+      remindAtFrom: query.remindAtFrom,
+      remindAtTo: query.remindAtTo,
+      assignedTo: query.assignedTo,
+      organizationId: query.organizationId,
+      page: query.page,
+      pageSize: query.pageSize
+    })}`
+  );
+}
+
+export function createReorderReminder(payload: ReorderReminderUpsertRequest) {
+  return request<ReorderReminderSummary>("/api/reorder-reminders", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateReorderReminder(id: string, status: string) {
+  return request<ReorderReminderSummary>(`/api/reorder-reminders/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status })
+  });
+}
+
+export function createReorderFollowUpTask(id: string) {
+  return request<{ followUpTask: FollowUpSummary; reminder: ReorderReminderSummary }>(`/api/reorder-reminders/${id}/create-follow-up-task`, {
+    method: "POST"
+  });
+}
+
+export function generateReorderScript(payload: ReorderScriptRequest) {
+  return request<ReorderScriptResponse>("/api/ai/reorder-script", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function getReorderOpportunities(query: ReorderOpportunityListQuery = {}) {
+  return request<ReorderOpportunitySummary[]>(
+    `/api/reorder/opportunities${toQuery({
+      organizationId: query.organizationId,
+      opportunityType: query.opportunityType,
+      level: query.level,
+      status: query.status,
+      ownerId: query.ownerId,
+      assignedTo: query.assignedTo,
+      productId: query.productId,
+      campaignId: query.campaignId,
+      customerId: query.customerId,
+      page: query.page,
+      pageSize: query.pageSize
+    })}`
+  );
+}
+
+export function recalculateReorderOpportunities(payload: ReorderOpportunityRecalculateRequest) {
+  return request<ReorderOpportunityRecalculateResponse>("/api/reorder/opportunities/recalculate", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateReorderOpportunity(id: string, status: string) {
+  return request<ReorderOpportunitySummary>(`/api/reorder/opportunities/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status })
+  });
+}
+
+export function createReorderOpportunityFollowUpTask(id: string, payload: { remindAt?: string; recommendedScript?: string; confirm: true }) {
+  return request<{ followUpTask: FollowUpSummary; opportunity: ReorderOpportunitySummary }>(`/api/reorder/opportunities/${id}/create-follow-up-task`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function generateReorderOperationScript(payload: ReorderOperationScriptRequest) {
+  return request<ReorderOperationScriptResponse>("/api/ai/reorder-operation-script", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function getReorderCampaigns(query: { organizationId?: string; campaignType?: string; status?: string } = {}) {
+  return request<ReorderCampaignSummary[]>(
+    `/api/reorder/campaigns${toQuery({
+      organizationId: query.organizationId,
+      campaignType: query.campaignType,
+      status: query.status
+    })}`
+  );
+}
+
+export function createReorderCampaign(payload: ReorderCampaignUpsertRequest) {
+  return request<ReorderCampaignSummary>("/api/reorder/campaigns", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateReorderCampaign(id: string, payload: Partial<ReorderCampaignUpsertRequest>) {
+  return request<ReorderCampaignSummary>(`/api/reorder/campaigns/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function deleteReorderCampaign(id: string) {
+  return request<void>(`/api/reorder/campaigns/${id}?confirm=true`, { method: "DELETE" });
+}
+
+export function getReorderPlaybooks(query: { organizationId?: string; scenario?: string; language?: string } = {}) {
+  return request<ReorderPlaybookSummary[]>(
+    `/api/reorder/playbooks${toQuery({
+      organizationId: query.organizationId,
+      scenario: query.scenario,
+      language: query.language
+    })}`
+  );
+}
+
+export function createReorderPlaybook(payload: ReorderPlaybookUpsertRequest) {
+  return request<ReorderPlaybookSummary>("/api/reorder/playbooks", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateReorderPlaybook(id: string, payload: Partial<ReorderPlaybookUpsertRequest>) {
+  return request<ReorderPlaybookSummary>(`/api/reorder/playbooks/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function deleteReorderPlaybook(id: string) {
+  return request<void>(`/api/reorder/playbooks/${id}?confirm=true`, { method: "DELETE" });
+}
+
+export function getOrders(query: OrderListQuery = {}) {
+  return request<OrderSummary[]>(
+    `/api/orders${toQuery({
+      organizationId: query.organizationId,
+      customerId: query.customerId,
+      assignedTo: query.assignedTo,
+      orderType: query.orderType,
+      orderStatus: query.orderStatus,
+      paymentStatus: query.paymentStatus,
+      productionStatus: query.productionStatus,
+      shippingStatus: query.shippingStatus,
+      afterSalesStatus: query.afterSalesStatus,
+      keyword: query.keyword,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+      page: query.page,
+      pageSize: query.pageSize
+    })}`
+  );
+}
+
+export function getOrder(id: string) {
+  return request<OrderDetail>(`/api/orders/${id}`);
+}
+
+export function createOrder(payload: OrderUpsertRequest) {
+  return request<OrderDetail>("/api/orders", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function updateOrder(id: string, payload: Partial<OrderUpsertRequest>) {
+  return request<OrderDetail>(`/api/orders/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+
+export function deleteOrder(id: string) {
+  return fetch(`${API_BASE_URL}/api/orders/${id}`, {
+    credentials: "include",
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ confirm: true })
+  }).then((response) => {
+    if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+  });
+}
+
+export function createOrderFromQuote(quoteId: string) {
+  return request<OrderDetail>(`/api/orders/from-quote/${quoteId}`, { method: "POST" });
+}
+
+export function createOrderFromSample(sampleOrderId: string) {
+  return request<OrderDetail>(`/api/orders/from-sample/${sampleOrderId}`, { method: "POST" });
+}
+
+export function createOrderFromCustomRequest(customRequestId: string) {
+  return request<OrderDetail>(`/api/orders/from-custom-request/${customRequestId}`, { method: "POST" });
+}
+
+export function updateOrderPaymentStatus(id: string, paymentStatus: string) {
+  return request<OrderDetail>(`/api/orders/${id}/payment-status`, { method: "PATCH", body: JSON.stringify({ paymentStatus }) });
+}
+
+export function updateOrderProductionStatus(id: string, productionStatus: string, notes?: string) {
+  return request<OrderDetail>(`/api/orders/${id}/production-status`, { method: "PATCH", body: JSON.stringify({ productionStatus, notes }) });
+}
+
+export function updateOrderShippingStatus(id: string, shippingStatus: string, trackingNumber?: string) {
+  return request<OrderDetail>(`/api/orders/${id}/shipping-status`, { method: "PATCH", body: JSON.stringify({ shippingStatus, trackingNumber }) });
+}
+
+export function updateOrderAfterSalesStatus(id: string, afterSalesStatus: string) {
+  return request<OrderDetail>(`/api/orders/${id}/after-sales-status`, { method: "PATCH", body: JSON.stringify({ afterSalesStatus }) });
+}
+
+export function createOrderFollowUpTask(id: string, recommendedScript?: string) {
+  return request<{ followUpTask: FollowUpSummary; riskWarnings: string[] }>(`/api/orders/${id}/create-follow-up-task`, {
+    method: "POST",
+    body: JSON.stringify({ recommendedScript })
+  });
+}
+
+export function generateOrderScript(payload: OrderScriptRequest) {
+  return request<OrderScriptResponse>("/api/ai/order-script", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function getOrderFulfillmentBoard(query: Record<string, string | undefined> = {}) {
+  return request<OrderFulfillmentBoardResponse>(`/api/orders/fulfillment-board${toQuery(query)}`);
+}
+
+export function getOrderFulfillment(id: string) {
+  return request<OrderFulfillmentDetailResponse>(`/api/orders/${id}/fulfillment`);
+}
+
+export function recalculateOrderFulfillmentAlerts(id: string) {
+  return request<{ alerts: OrderFulfillmentAlertSummary[]; createdCount: number; updatedCount: number; resolvedCount: number }>(`/api/orders/${id}/recalculate-fulfillment-alerts`, { method: "POST" });
+}
+
+export function recalculateOrganizationFulfillmentAlerts(organizationId: string) {
+  return request<{ createdCount: number; updatedCount: number; resolvedCount: number; skippedCount: number }>(`/api/orders/recalculate-fulfillment-alerts`, { method: "POST", body: JSON.stringify({ organizationId }) });
+}
+
+export function updateOrderFulfillmentAlert(id: string, status: "dismissed" | "resolved" | "task_created") {
+  return request<OrderFulfillmentAlertSummary>(`/api/order-fulfillment-alerts/${id}`, { method: "PATCH", body: JSON.stringify({ status }) });
+}
+
+export function createOrderFulfillmentFollowUp(id: string, payload: { taskType?: string; remindAt?: string; recommendedScript?: string; alertId?: string | null }) {
+  return request<{ followUpTask: FollowUpSummary; riskWarnings: string[] }>(`/api/orders/${id}/create-fulfillment-follow-up`, { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function generateOrderFulfillmentScript(payload: OrderFulfillmentScriptRequest) {
+  return request<OrderScriptResponse>("/api/ai/order-fulfillment-script", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function getOrderCost(orderId: string) {
+  return request<OrderCostSummary>(`/api/orders/${orderId}/cost`);
+}
+
+export function upsertOrderCost(orderId: string, payload: OrderCostUpsertRequest) {
+  return request<OrderCostSummary>(`/api/orders/${orderId}/cost`, { method: "PUT", body: JSON.stringify(payload) });
+}
+
+export function confirmOrderCost(orderId: string) {
+  return request<OrderCostSummary>(`/api/orders/${orderId}/cost/confirm`, { method: "PATCH", body: JSON.stringify({ confirm: true }) });
+}
+
+export function deleteOrderCost(orderId: string) {
+  return fetch(`${API_BASE_URL}/api/orders/${orderId}/cost?confirm=true`, { credentials: "include", method: "DELETE" }).then((response) => {
+    if (!response.ok) throw new Error("Failed to delete order cost");
+    return true;
+  });
+}
+
+export function getProfitOrders(query: Record<string, string | undefined> = {}) {
+  return request<ProfitOrderRow[]>(`/api/profit/orders${toQuery(query)}`);
+}
+
+export function getProfitSummary(query: Record<string, string | undefined> = {}) {
+  return request<ProfitSummary>(`/api/profit/summary${toQuery(query)}`);
+}
+
+export function getProfitByProduct(query: Record<string, string | undefined> = {}) {
+  return request<ProfitBreakdownRow[]>(`/api/profit/by-product${toQuery(query)}`);
+}
+
+export function getProfitByCustomer(query: Record<string, string | undefined> = {}) {
+  return request<ProfitBreakdownRow[]>(`/api/profit/by-customer${toQuery(query)}`);
+}
+
+export function getProfitBySalesperson(query: Record<string, string | undefined> = {}) {
+  return request<ProfitBreakdownRow[]>(`/api/profit/by-salesperson${toQuery(query)}`);
+}
+
+export function generateProfitReview(payload: ProfitReviewRequest) {
+  return request<ProfitReviewResponse>("/api/ai/profit-review", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function getAfterSalesCases(query: AfterSalesListQuery = {}) {
+  return request<AfterSalesCaseSummary[]>(
+    `/api/after-sales${toQuery({
+      organizationId: query.organizationId,
+      customerId: query.customerId,
+      orderId: query.orderId,
+      productId: query.productId,
+      caseType: query.caseType,
+      priority: query.priority,
+      status: query.status,
+      responsibility: query.responsibility,
+      assignedTo: query.assignedTo,
+      keyword: query.keyword,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+      page: query.page ? String(query.page) : undefined,
+      pageSize: query.pageSize ? String(query.pageSize) : undefined
+    })}`
+  );
+}
+
+export function getAfterSalesCase(id: string) {
+  return request<AfterSalesCaseDetail>(`/api/after-sales/${id}`);
+}
+
+export function createAfterSalesCase(payload: AfterSalesUpsertRequest) {
+  return request<AfterSalesCaseDetail>("/api/after-sales", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function updateAfterSalesCase(id: string, payload: Partial<AfterSalesUpsertRequest> & { confirm?: boolean; notes?: string }) {
+  return request<AfterSalesCaseDetail>(`/api/after-sales/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+
+export function deleteAfterSalesCase(id: string) {
+  return fetch(`${API_BASE_URL}/api/after-sales/${id}?confirm=true`, { credentials: "include", method: "DELETE" }).then((response) => {
+    if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+  });
+}
+
+export function updateAfterSalesStatus(id: string, payload: { status: string; notes?: string; resolutionNotes?: string; confirm?: boolean }) {
+  return request<AfterSalesCaseDetail>(`/api/after-sales/${id}/status`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+
+export function updateAfterSalesResponsibility(id: string, payload: { responsibility: string; notes?: string; confirm: true }) {
+  return request<AfterSalesCaseDetail>(`/api/after-sales/${id}/responsibility`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+
+export function updateAfterSalesSolution(
+  id: string,
+  payload: {
+    finalSolution: string;
+    refundAmount?: string;
+    reshipCost?: string;
+    compensationAmount?: string;
+    currency?: string;
+    notes?: string;
+    syncOrderCost?: boolean;
+    confirm: true;
+  }
+) {
+  return request<AfterSalesCaseDetail>(`/api/after-sales/${id}/solution`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+
+export function createAfterSalesFollowUpTask(id: string, payload: { remindAt?: string; taskType?: string; recommendedScript?: string; confirm: true }) {
+  return request<{ followUpTask: FollowUpSummary; riskWarnings: string[] }>(`/api/after-sales/${id}/create-follow-up-task`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function generateAfterSalesScript(payload: AfterSalesScriptRequest) {
+  return request<AfterSalesScriptResponse>("/api/ai/after-sales-script", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function getScriptExperiments(query: Record<string, string | undefined> = {}) {
+  return request<ScriptExperimentSummary[]>(`/api/script-experiments${toQuery(query)}`);
+}
+
+export function createScriptExperiment(payload: ScriptExperimentUpsertRequest) {
+  return request<ScriptExperimentSummary>("/api/script-experiments", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function getScriptExperiment(id: string) {
+  return request<ScriptExperimentDetail>(`/api/script-experiments/${id}`);
+}
+
+export function updateScriptExperiment(id: string, payload: Partial<ScriptExperimentUpsertRequest>) {
+  return request<ScriptExperimentSummary>(`/api/script-experiments/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+
+export function archiveScriptExperiment(id: string) {
+  return request<ScriptExperimentSummary>(`/api/script-experiments/${id}?confirm=true`, { method: "DELETE" });
+}
+
+export function createScriptVariant(experimentId: string, payload: ScriptVariantUpsertRequest) {
+  return request<ScriptVariantSummary>(`/api/script-experiments/${experimentId}/variants`, { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function updateScriptVariant(id: string, payload: Partial<ScriptVariantUpsertRequest>) {
+  return request<ScriptVariantSummary>(`/api/script-variants/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+
+export function deleteScriptVariant(id: string) {
+  return request<ScriptVariantSummary | { deleted: true }>(`/api/script-variants/${id}?confirm=true`, { method: "DELETE" });
+}
+
+export function createScriptUsage(payload: ScriptUsageCreateRequest) {
+  return request<ScriptUsageSummary & { usageId: string }>("/api/script-usages", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function updateScriptUsageOutcome(id: string, payload: ScriptUsageOutcomeRequest) {
+  return request<ScriptUsageSummary>(`/api/script-usages/${id}/outcome`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+
+export function getScriptExperimentStats(id: string) {
+  return request<ScriptExperimentStats>(`/api/script-experiments/${id}/stats`);
+}
+
+export function generateScriptExperimentVariants(payload: ScriptVariantGenerationRequest) {
+  return request<ScriptVariantGenerationResponse>("/api/ai/script-experiments/generate-variants", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function getSuppliers(query: Record<string, string | undefined> = {}) {
+  return request<any[]>(`/api/suppliers${toQuery(query)}`);
+}
+
+export function getSupplier(id: string) {
+  return request<any>(`/api/suppliers/${id}`);
+}
+
+export function createSupplier(payload: Record<string, unknown>) {
+  return request<any>("/api/suppliers", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function updateSupplier(id: string, payload: Record<string, unknown>) {
+  return request<any>(`/api/suppliers/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+
+export function deleteSupplier(id: string) {
+  return request<any>(`/api/suppliers/${id}?confirm=true`, { method: "DELETE" });
+}
+
+export function createSupplierContact(supplierId: string, payload: Record<string, unknown>) {
+  return request<any>(`/api/suppliers/${supplierId}/contacts`, { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function createSupplierQuote(payload: Record<string, unknown>) {
+  return request<any>("/api/supplier-quotes", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function applySupplierQuoteToOrderCost(id: string, payload: Record<string, unknown>) {
+  return request<any>(`/api/supplier-quotes/${id}/apply-to-order-cost`, { method: "POST", body: JSON.stringify({ ...payload, confirm: true }) });
+}
+
+export function createPurchaseNote(payload: Record<string, unknown>) {
+  return request<any>("/api/purchase-notes", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function createSupplierRisk(payload: Record<string, unknown>) {
+  return request<any>("/api/supplier-risks", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function generateSupplierScript(payload: Record<string, unknown>) {
+  return request<any>("/api/ai/supplier-script", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function getBrands(query: Record<string, string | undefined> = {}) {
+  return request<any[]>(`/api/brands${toQuery(query)}`);
+}
+
+export function getBrand(id: string) {
+  return request<any>(`/api/brands/${id}`);
+}
+
+export function createBrand(payload: Record<string, unknown>) {
+  return request<any>("/api/brands", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function updateBrand(id: string, payload: Record<string, unknown>) {
+  return request<any>(`/api/brands/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+
+export function archiveBrand(id: string) {
+  return request<any>(`/api/brands/${id}?confirm=true`, { method: "DELETE" });
+}
+
+export function linkBrandProduct(brandId: string, productId: string) {
+  return request<any>(`/api/brands/${brandId}/products`, { method: "POST", body: JSON.stringify({ productId }) });
+}
+
+export function unlinkBrandProduct(id: string) {
+  return request<any>(`/api/brand-products/${id}?confirm=true`, { method: "DELETE" });
+}
+
+export function linkBrandMaterial(brandId: string, materialId: string) {
+  return request<any>(`/api/brands/${brandId}/materials`, { method: "POST", body: JSON.stringify({ materialId }) });
+}
+
+export function unlinkBrandMaterial(id: string) {
+  return request<any>(`/api/brand-materials/${id}?confirm=true`, { method: "DELETE" });
+}
+
+export function linkBrandKnowledgeBase(brandId: string, knowledgeBaseId: string) {
+  return request<any>(`/api/brands/${brandId}/knowledge-bases`, { method: "POST", body: JSON.stringify({ knowledgeBaseId }) });
+}
+
+export function unlinkBrandKnowledgeBase(id: string) {
+  return request<any>(`/api/brand-knowledge-bases/${id}?confirm=true`, { method: "DELETE" });
+}
+
+export function linkBrandScript(brandId: string, payload: Record<string, unknown>) {
+  return request<any>(`/api/brands/${brandId}/scripts`, { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function unlinkBrandScript(id: string) {
+  return request<any>(`/api/brand-scripts/${id}?confirm=true`, { method: "DELETE" });
+}
+
+export function createBrandRule(brandId: string, payload: Record<string, unknown>) {
+  return request<any>(`/api/brands/${brandId}/rules`, { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function updateBrandRule(id: string, payload: Record<string, unknown>) {
+  return request<any>(`/api/brand-rules/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+
+export function deleteBrandRule(id: string) {
+  return request<any>(`/api/brand-rules/${id}?confirm=true`, { method: "DELETE" });
+}
+
+export function assignBrand(brandId: string, payload: Record<string, unknown>) {
+  return request<any>(`/api/brands/${brandId}/assign`, { method: "POST", body: JSON.stringify({ ...payload, confirm: true }) });
+}
+
+export function getBrandContext(query: Record<string, string | undefined> = {}) {
+  return request<any>(`/api/brands/context${toQuery(query)}`);
 }

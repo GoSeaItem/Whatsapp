@@ -12,6 +12,7 @@ import {
   validateCustomRequestPayload,
   validateCustomScriptPayload
 } from "./custom-request-utils.js";
+import { requireConfirm } from "./permissions.js";
 
 type CustomRequestDb = Pick<typeof prisma, "customRequest" | "customer" | "product" | "knowledgeBase">;
 
@@ -102,6 +103,10 @@ export function createCustomRequestsRouter(db: CustomRequestDb = prisma) {
 
   router.delete("/:id", async (req, res, next) => {
     try {
+      const existing = await findOwnedCustomRequest(db, req.params.id, req.user!.id);
+      if (!existing) return res.status(404).json({ message: "custom request not found" });
+      const confirmError = requireConfirm(req, "customRequest.updateOwn");
+      if (confirmError) return res.status(409).json(confirmError);
       const result = await db.customRequest.deleteMany({ where: { id: req.params.id, ownerId: req.user!.id } });
       if (result.count === 0) return res.status(404).json({ message: "custom request not found" });
       res.status(204).send();

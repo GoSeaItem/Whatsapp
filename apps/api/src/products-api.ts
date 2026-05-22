@@ -10,6 +10,7 @@ import {
   toProductUpdateData,
   validateProductPayload
 } from "./product-utils.js";
+import { requireConfirm } from "./permissions.js";
 
 type ProductDb = Pick<typeof prisma, "product" | "knowledgeBase">;
 
@@ -20,6 +21,7 @@ productsRouter.get("/", async (req, res, next) => {
   try {
     const q = cleanQuery(req.query.q);
     const category = cleanQuery(req.query.category);
+    const brandId = cleanQuery(req.query.brandId);
     const where: Prisma.ProductWhereInput = { ownerId: req.user!.id };
 
     if (category) where.category = { equals: category, mode: "insensitive" };
@@ -29,6 +31,10 @@ productsRouter.get("/", async (req, res, next) => {
         { sku: { contains: q, mode: "insensitive" } },
         { category: { contains: q, mode: "insensitive" } }
       ];
+    }
+    if (brandId) {
+      const links = await (db as any).brandProduct?.findMany?.({ where: { brandId }, select: { productId: true } }) || [];
+      where.id = { in: links.map((link: any) => link.productId) };
     }
 
     const products = await db.product.findMany({
@@ -114,6 +120,13 @@ productsRouter.patch("/:id", async (req, res, next) => {
 
 productsRouter.delete("/:id", async (req, res, next) => {
   try {
+    const existing = await db.product.findFirst({ where: { id: req.params.id, ownerId: req.user!.id } });
+    if (!existing) {
+      res.status(404).json({ message: "product not found" });
+      return;
+    }
+    const confirmError = requireConfirm(req, "product.deleteOwn");
+    if (confirmError) return res.status(409).json(confirmError);
     const result = await db.product.deleteMany({ where: { id: req.params.id, ownerId: req.user!.id } });
     if (result.count === 0) {
       res.status(404).json({ message: "product not found" });

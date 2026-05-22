@@ -23,6 +23,7 @@ export function createMaterialsRouter(db: MaterialDb = prisma) {
       const productId = cleanQuery(req.query.productId);
       const tag = cleanQuery(req.query.tag);
       const q = cleanQuery(req.query.q);
+      const brandId = cleanQuery(req.query.brandId);
       const where: Prisma.MaterialWhereInput = { ownerId: req.user!.id };
 
       if (type) where.type = type;
@@ -35,6 +36,10 @@ export function createMaterialsRouter(db: MaterialDb = prisma) {
           { description: { contains: q, mode: "insensitive" } },
           { tags: { has: q } }
         ];
+      }
+      if (brandId) {
+        const links = await (db as any).brandMaterial?.findMany?.({ where: { brandId }, select: { materialId: true } }) || [];
+        where.id = { in: links.map((link: any) => link.materialId) };
       }
 
       const materials = await db.material.findMany({

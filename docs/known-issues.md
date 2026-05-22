@@ -1,8 +1,112 @@
 # Known Issues
 
-Current release target: `v0.4-v2-sales-enhancement`.
+Current release target: `v0.6-v4-growth-ops`.
 
-Current development track: `V3-H Manager team dashboard`.
+## V4-N Full-chain Release Review
+
+- V4-N is a stabilization and release-marking pass only. No new business modules are added.
+- P2/P3 follow-ups after this pass: deepen brand context in the remaining V4-C advanced decision endpoints; complete import/export coverage for newer V4 resources such as brands, supplier details, after-sales cases, A/B script tests, profit exports, and fulfillment alerts; continue cleaning legacy mojibake text in older V1/V2 known-issue sections.
+- Dependency audit currently reports 5 moderate npm advisories. `npm audit fix --force` was not applied during release review because it may introduce breaking dependency upgrades; handle in a dedicated dependency-maintenance pass.
+- Release boundaries remain unchanged: no WhatsApp official API, no automatic sending, no bulk sending, no simulated send-button click, no automatic customer/supplier contact, no real payment, no real logistics, no full ERP, no full finance system, no automatic refund, no automatic shipment, no automatic inventory confirmation, no automatic cost confirmation, no store API sync, and no WhatsApp account switching.
+
+## V4-M Multi-brand / Multi-store Management
+
+- Brand/store management is an internal context layer only. It does not switch WhatsApp accounts, connect store APIs, sync store orders, or send messages.
+- Brand product/material/knowledge/script links are manual. Existing records are not auto-classified into brands.
+- `BrandAssignment` can record brand context for customers, orders, after-sales and other entities, but users must confirm changes manually.
+- `POST /api/ai/reply`, order scripts, fulfillment scripts, after-sales scripts, reorder operation scripts, supplier drafts, and A/B variant generation use brand context now. Some V4-C advanced decision endpoints still need a later hardening pass for full brand rule merging.
+- Brand import/export is documented as a future V4-A extension and is not fully wired in this lightweight pass.
+- If brand rules conflict with organization rules, the system warns the salesperson but does not resolve the conflict automatically.
+- Chrome sidebar brand support is intentionally lightweight: it filters product/material choices and passes brand context for drafts, but full brand resource management stays in the Web backend.
+
+## V4-L Supplier / Procurement Collaboration
+
+- V4-L is a lightweight supplier and procurement record module, not a purchase ERP, inventory system, supplier payment system, or automatic procurement workflow.
+- Supplier quotes are cost references only. Applying a supplier quote to `OrderCost` requires manual confirmation and does not confirm the true cost.
+- Supplier contacts are sensitive fields. Low-permission users see redacted summaries unless granted sensitive contact access.
+- Supplier links are available through API; the Web UI focuses on supplier profile, contacts, quotes, notes, risks, quote-to-cost, and draft generation.
+- Supplier import/export is documented as a future V4-A extension and is not fully wired in this lightweight pass.
+- Chrome sidebar supplier support is draft generation only. It does not contact suppliers, create purchase orders, apply costs, auto-send WhatsApp messages, bulk send, or click WhatsApp send buttons.
+
+## V4-I Reorder Operations
+
+- V4-I is rule-based and does not use machine learning. Scores are prioritization signals, not guaranteed conversion.
+- Reorder campaigns are grouping and planning records only. They do not send messages, create bulk tasks, or trigger marketing automation.
+- Holiday/activity reminders are lightweight and require manual configuration; the system does not include a full holiday calendar.
+- New-product recommendations avoid claiming “new arrival” unless the product data clearly supports it.
+- CSV import/export for reorder opportunities, campaigns, and playbooks is documented as a later V4-A follow-up.
+- Chrome sidebar integration remains lightweight; full campaign/playbook management is handled in the Web backend.
+
+## V4-H Profit and Cost Review
+
+- V4-H is a lightweight sales operation review, not a finance, accounting, tax, payment, or reconciliation module.
+- Costs are manually entered and manually confirmed. The system cannot verify true product cost, payment fees, refunds, reship costs, or bank settlement.
+- Currency conversion is not automatic. If order and cost currencies differ, users must manually convert before reviewing margin.
+- Profit import/export is documented as a future V4-A follow-up; current V4-H focuses on API, Web review, permission, and audit.
+- Chrome sidebar does not expose full cost details by default; sensitive profit review should be handled in the Web backend.
+
+## V4-G Order Fulfillment Board
+
+- Fulfillment alerts are rule-based snapshots and live calculations; they do not query real logistics or payment providers.
+- Batch alert recalculation is synchronous and limited to a bounded set of orders. A background queue can be added later.
+- Fulfillment board export and alert export are not fully wired into V4-A yet; add them in a later import/export pass.
+- The board does not automatically update order status. Users must manually update payment, production, shipping, and after-sales status.
+- Chrome sidebar fulfillment integration is lightweight and does not expose the full kanban/detail workflow.
+- Delivered orders can inform reorder suggestions, but V4-G does not automatically create reorder reminders.
+
+## V4-F Order Center
+
+- Order center is lightweight manual tracking, not ERP.
+- Files are URL strings only; no upload or object storage yet.
+- The system does not process online payment, query real logistics, automatically confirm payment, or automatically promise shipping.
+- Delivered/completed order linkage with reorder prediction is advisory in V4-F; no automatic reorder reminder is created.
+- Order import/export is not fully wired into V4-A yet and should be added in a later data import/export pass.
+- Chrome sidebar order integration is intentionally lightweight and does not expose the full order detail page.
+
+## V4-E Business Prediction and Reorder Reminders
+
+- V4-E uses deterministic rules, not machine learning. Scores help prioritize work but do not predict guaranteed conversion.
+- The system has no real order center, so reorder predictions are based on quotes, samples, custom requests, stages, tags, notes, summaries, and follow-up history. It must not claim the customer purchased before unless real order data is added later.
+- Product opportunity signals are lightweight and depend on accumulated product, quote, sample, custom request, and material data.
+- Reorder reminders are separate from `FollowUpTask` until the user explicitly creates a follow-up task.
+- Chrome sidebar integration is intentionally lightweight: it can show/generate reorder drafts but does not expose the full prediction dashboard.
+- V4-E does not add automatic marketing, automatic WhatsApp sending, bulk sending, simulated send-button clicking, payment, finance, procurement prediction, or full order management.
+
+## V4-D Advanced Permissions and Audit
+
+- Permission rules are intentionally fixed by role (`owner`, `manager`, `sales`, `support`). V4-D does not provide custom per-organization permission editing.
+- Sensitive operation confirmation is enforced in the main API paths. Any future destructive endpoint must explicitly call the shared confirmation utility before release.
+- Risk events are available in the Web backend only; there is no external notification channel in V4-D.
+- Manager audit views may redact sensitive metadata; owner review is required for full sensitive export/audit workflows.
+- Chrome extension permission failures show a friendly `403` message, but detailed role changes must be handled in the Web backend.
+
+## V4-C AI Advanced Enhancement
+
+- AI advanced outputs are rule/template based in this version. They can be upgraded to a real LLM later, but still must keep draft-only behavior.
+- `AIActionSuggestionLog` stores sanitized snapshots for troubleshooting, not full raw chat transcripts.
+- Follow-up plans do not create tasks unless `createTasks=true`; they never send WhatsApp messages automatically.
+
+
+Current development track: `V4-B Cross-organization reports`.
+
+## V4-B Cross-organization Reports
+
+- V4-B report jobs are generated synchronously and stored as `ReportJob`; a background queue and scheduled report delivery are later improvements.
+- Current report scope is one selected organization per request. Cross-organization comparison across multiple organization IDs is a later iteration.
+- Excel export is Excel-compatible tabular output from the same report dataset, not a styled `.xlsx` workbook.
+- `quotedNoFollowUpCustomers` still means customers with quote records and no pending follow-up task. It is not a true WhatsApp reply/read signal.
+- Reports are sales-management aids only and do not represent guaranteed conversion.
+- V4-B does not add WhatsApp official API integration, automatic WhatsApp sending, bulk sending, simulated send-button clicking, billing, payment, finance, or full order management.
+
+## V4-A Organization Import/Export Jobs
+
+- V4-A processes import/export jobs synchronously and records task status immediately. A background queue, retry worker, and persistent file storage are later improvements.
+- Export jobs currently return a task record and generated file path placeholder. Direct persisted file download storage is not implemented yet.
+- V4-A keeps CSV as the supported working format. Excel export/import is not implemented in this iteration.
+- Organization product/material imports create personal records owned by the operator and then share them into the selected organization.
+- Organization import duplicate detection is exact-match only for WhatsApp number, email, social links, and organization product SKU. Fuzzy matching and merge workflows remain future work.
+- `sales` and `support` can view organization resources but cannot create organization import/export jobs.
+- V4-A does not add WhatsApp official API integration, automatic WhatsApp sending, bulk sending, simulated send-button clicking, billing, payment, finance, or a full order system.
 
 ## V3-H Manager Team Dashboard
 
@@ -11,6 +115,24 @@ Current development track: `V3-H Manager team dashboard`.
 - `quotedNoFollowUpCustomers` currently means the customer has quote records and no pending follow-up task. It is not a true WhatsApp read/unread or reply-status signal.
 - Team high-intent rows intentionally hide WhatsApp numbers and email addresses.
 - This is not a finance, profit, performance-pay, order, procurement, or boss-dashboard module.
+
+## V4-J After-sales and Exception Management
+
+- V4-J stores evidence as URL text only. It does not upload files, scan attachments, verify screenshots, or store protected media.
+- After-sales cases can optionally sync refund/reship/compensation records into `OrderCost`, but this requires manual confirmation and is still an operational record, not accounting.
+- AI after-sales scripts are template/rule based with knowledge lookup. They cannot replace manual confirmation of company policy, responsibility, refund, reshipment, compensation, or logistics status.
+- After-sales CSV import/export is not fully implemented in this round; organization export and sensitive field handling should be added later through the V4-D/V4-A import-export pipeline.
+- Chrome sidebar has existing order, fulfillment, reorder, sample and custom workflows. A richer dedicated after-sales sidebar view is a future UX improvement.
+- No automatic refund, reshipment, compensation, responsibility attribution, WhatsApp auto-send, bulk send, or simulated send-button click is introduced.
+
+## V4-K A/B Script Testing
+
+- V4-K is a lightweight script test module, not a statistically rigorous experiment platform.
+- `bestVariant` is shown only when each candidate has enough `used_draft` records; small samples are directional only.
+- Outcomes such as customer reply, quote created, order created, payment received and reorder created are primarily manual labels in this version.
+- Automatic attribution from downstream quotes/orders is intentionally deferred to avoid overwriting salesperson judgment.
+- Chrome Extension records usage only after manual copy/insert. It does not auto-send, bulk-send, auto-click WhatsApp send buttons or automatically decide outcomes.
+- Experiment and usage exports/imports are noted as a future V4-A extension and are not fully wired in this lightweight pass.
 
 ## V3-G Audit Logs
 

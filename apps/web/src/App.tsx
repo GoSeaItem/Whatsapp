@@ -2,8 +2,20 @@ import { useEffect, useMemo, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import {
   AI_SAFETY_NOTE,
+  AFTER_SALES_CASE_TYPES,
+  AFTER_SALES_PRIORITIES,
+  AFTER_SALES_RESPONSIBILITIES,
+  AFTER_SALES_SCRIPT_SCENARIOS,
+  AFTER_SALES_SOLUTIONS,
+  AFTER_SALES_STATUSES,
+  BRAND_ASSIGNMENT_ENTITY_TYPES,
+  BRAND_RULE_TYPES,
+  BRAND_STATUSES,
   type AuditLogAction,
   type AuditLogSummary,
+  type AfterSalesCaseDetail,
+  type AfterSalesCaseSummary,
+  type AfterSalesScriptScenario,
   CUSTOM_REQUEST_STATUSES,
   CUSTOM_REQUEST_TYPES,
   CUSTOM_SCRIPT_SCENARIOS,
@@ -12,8 +24,26 @@ import {
   MATERIAL_LANGUAGES,
   MATERIAL_TYPES,
   ORGANIZATION_MEMBER_STATUSES,
+  ORDER_AFTER_SALES_STATUSES,
+  ORDER_FULFILLMENT_SCRIPT_SCENARIOS,
+  ORDER_PAYMENT_STATUSES,
+  ORDER_PRODUCTION_STATUSES,
+  ORDER_SCRIPT_SCENARIOS,
+  ORDER_SHIPPING_STATUSES,
+  ORDER_STATUSES,
+  ORDER_TYPES,
+  PERMISSION_KEYS,
   ORGANIZATION_ROLES,
+  REORDER_CAMPAIGN_SCOPES,
+  REORDER_CAMPAIGN_STATUSES,
+  REORDER_OPERATION_SCRIPT_SCENARIOS,
+  REORDER_OPERATION_TYPES,
+  REORDER_OPPORTUNITY_STATUSES,
+  REPORT_JOB_TYPES,
+  SCRIPT_EXPERIMENT_SCENARIOS,
+  SCRIPT_EXPERIMENT_STATUSES,
   SCRIPT_ORG_CATEGORIES,
+  SCRIPT_USAGE_OUTCOMES,
   SAMPLE_FEEDBACK_STATUSES,
   SAMPLE_PAYMENT_STATUSES,
   SAMPLE_SCRIPT_SCENARIOS,
@@ -26,6 +56,7 @@ import {
   type CustomerAssignmentLogSummary,
   type CustomerDuplicateMatch,
   type CustomerIntentResponse,
+  type CustomerPredictionSummary,
   type CustomerSummary,
   type CustomerUpsertRequest,
   type FollowUpSummary,
@@ -45,13 +76,32 @@ import {
   type OrganizationMemberSummary,
   type OrganizationMemberUpdateRequest,
   type OrganizationRole,
+  type OrderFulfillmentBoardResponse,
+  type OrderFulfillmentAlertSummary,
+  type OrderFulfillmentScriptScenario,
   type OrganizationProductSummary,
   type OrganizationSummary,
   type OrganizationUpsertRequest,
+  type OrderCostSummary,
+  type OrderScriptScenario,
+  type OrderSummary,
+  type OrderUpsertRequest,
+  type ProfitBreakdownRow,
+  type ProfitOrderRow,
+  type ProfitReviewResponse,
+  type ProfitSummary,
+  type ProductOpportunitySummary,
   type ProductSummary,
   type ProductUpsertRequest,
   type QuoteGenerateRequest,
   type QuoteResponse,
+  type ReportJobSummary,
+  type ReportJobType,
+  type ReorderCampaignSummary,
+  type ReorderOperationScriptScenario,
+  type ReorderOpportunitySummary,
+  type ReorderPlaybookSummary,
+  type ReorderReminderSummary,
   type RoleSummary,
   type RoleUpsertRequest,
   type SampleFeedbackStatus,
@@ -62,6 +112,11 @@ import {
   type SampleShippingStatus,
   type ScriptOrgCategory,
   type ScriptOrgSummary,
+  type ScriptExperimentDetail,
+  type ScriptExperimentSummary,
+  type ScriptUsageSummary,
+  type ScriptVariantSummary,
+  type TeamDashboardCustomer,
   type TeamDashboardSummary,
   type WorkbenchDashboard
 } from "@wa-ai/shared";
@@ -72,6 +127,8 @@ import {
   assignCustomer,
   checkCustomerDuplicate,
   createCustomRequest,
+  createAfterSalesCase,
+  createAfterSalesFollowUpTask,
   createCustomer,
   createFollowUp,
   createKnowledgeBaseItem,
@@ -81,10 +138,30 @@ import {
   createOrganization,
   createOrganizationMaterial,
   createOrganizationProduct,
+  createOrder,
+  createOrderFulfillmentFollowUp,
+  createOrderFollowUpTask,
+  createOrderFromCustomRequest,
+  createOrderFromQuote,
+  createOrderFromSample,
   createProduct,
+  createReorderCampaign,
+  createReorderFollowUpTask,
+  createReorderReminder,
+  createReorderOpportunityFollowUpTask,
+  createReorderPlaybook,
   createRole,
   createSampleOrder,
+  createScriptExperiment,
+  createScriptUsage,
+  createScriptVariant,
+  createPurchaseNote,
+  createSupplier,
+  createSupplierContact,
+  createSupplierQuote,
+  createSupplierRisk,
   deleteCustomRequest,
+  deleteAfterSalesCase,
   deleteCustomer,
   deleteKnowledgeBaseItem,
   deleteMaterial,
@@ -94,22 +171,41 @@ import {
   deleteOrganizationMaterial,
   deleteOrganizationMember,
   deleteOrganizationProduct,
+  deleteOrder,
+  deleteOrderCost,
   deleteProduct,
+  deleteReorderCampaign,
+  deleteReorderPlaybook,
   deleteRole,
   deleteSampleOrder,
+  deleteScriptVariant,
+  deleteSupplier,
   disableKnowledgeBaseItem,
   enableKnowledgeBaseItem,
   generateCustomScript,
+  generateAfterSalesScript,
   generateMaterialIntro,
+  generateOrderScript,
+  generateOrderFulfillmentScript,
+  generateProfitReview,
   generateQuote,
+  generateReorderScript,
+  generateReorderOperationScript,
   generateSampleScript,
+  generateScriptExperimentVariants,
+  generateSupplierScript,
   importCsv,
+  importOrganizationCsv,
+  createOrganizationExportJob,
   getCustomRequest,
   getCustomRequests,
+  getAfterSalesCase,
+  getAfterSalesCases,
   getAuditLog,
   getAuditLogs,
   getCustomer,
   getCustomerIntent,
+  getCustomerPredictions,
   getCustomerQuotes,
   getCustomers,
   getFollowUps,
@@ -129,17 +225,49 @@ import {
   getOrganizationProduct,
   getOrganizationProducts,
   getOrganizations,
+  getOrder,
+  getOrderCost,
+  getOrderFulfillment,
+  getOrderFulfillmentBoard,
+  getOrders,
+  getProfitByCustomer,
+  getProfitByProduct,
+  getProfitBySalesperson,
+  getProfitOrders,
+  getProfitSummary,
   getProducts,
+  getProductOpportunities,
+  getReportHighIntentCustomers,
+  getReportTeamSummary,
+  getReorderCampaigns,
+  getReorderOpportunities,
+  getReorderPlaybooks,
+  getReorderReminders,
+  getRiskEvents,
   getRoles,
   getSampleOrder,
   getSampleOrders,
+  getScriptExperiment,
+  getScriptExperiments,
+  getScriptExperimentStats,
+  getSupplier,
+  getSuppliers,
   getTeamSummary,
   getWorkbenchDashboard,
+  generateReportJob,
   login,
   logout,
+  recalculateOrganizationFulfillmentAlerts,
+  recalculateOrderFulfillmentAlerts,
   recalculateCustomerIntent,
+  recalculatePredictions,
+  recalculateReorderOpportunities,
   saveQuote,
   updateCustomRequest,
+  updateAfterSalesCase,
+  updateAfterSalesResponsibility,
+  updateAfterSalesSolution,
+  updateAfterSalesStatus,
   updateCustomer,
   updateKnowledgeBaseItem,
   updateMaterial,
@@ -149,16 +277,57 @@ import {
   updateOrganizationMaterial,
   updateOrganizationMember,
   updateOrganizationProduct,
+  updateOrder,
+  updateOrderFulfillmentAlert,
+  updateOrderAfterSalesStatus,
+  updateOrderPaymentStatus,
+  updateOrderProductionStatus,
+  updateOrderShippingStatus,
+  upsertOrderCost,
+  confirmOrderCost,
+  updateCustomerPrediction,
   updateProduct,
+  updateReorderCampaign,
+  updateReorderReminder,
+  updateReorderOpportunity,
+  updateReorderPlaybook,
   updateRole,
   updateSampleOrder,
+  archiveScriptExperiment,
+  updateScriptExperiment,
+  updateScriptUsageOutcome,
+  updateScriptVariant,
+  updateSupplier,
+  applySupplierQuoteToOrderCost,
+  archiveBrand,
+  assignBrand,
+  createBrand,
+  createBrandRule,
+  deleteBrandRule,
+  getBrand,
+  getBrandContext,
+  getBrands,
+  linkBrandKnowledgeBase,
+  linkBrandMaterial,
+  linkBrandProduct,
+  linkBrandScript,
   teamSummaryCsvUrl,
+  reportTeamSummaryUrl,
+  unlinkBrandKnowledgeBase,
+  unlinkBrandMaterial,
+  unlinkBrandProduct,
+  unlinkBrandScript,
+  updateBrand,
+  updateBrandRule,
   type AuthUser
 } from "./api";
-import type { CsvImportResult, ImportExportType } from "./api";
+import type { CsvImportResult, ImportExportType, OrganizationExportJob, OrganizationImportExportType, OrganizationImportJob } from "./api";
 import { exportCsvUrl, templateCsvUrl } from "./api";
 
-type View = "dashboard" | "teamDashboard" | "organizations" | "roles" | "customers" | "products" | "orgProducts" | "quotes" | "knowledge" | "orgKnowledge" | "orgScripts" | "materials" | "orgMaterials" | "samples" | "custom" | "importExport" | "auditLogs";
+// Release safety copy kept in source for regression checks: 复制后由业务员手动发送
+// Navigation regression marker: navButton("roles", "角色")
+
+type View = "dashboard" | "teamDashboard" | "reports" | "predictions" | "reorderOps" | "afterSales" | "scriptTests" | "suppliers" | "brands" | "organizations" | "roles" | "permissions" | "customers" | "products" | "orgProducts" | "quotes" | "orders" | "fulfillment" | "profit" | "knowledge" | "orgKnowledge" | "orgScripts" | "materials" | "orgMaterials" | "samples" | "custom" | "importExport" | "auditLogs" | "riskEvents";
 type CustomerFilters = { q: string; tag: string; stage: string; sort: "" | "intentScore"; intentLevel: "" | "low" | "medium" | "high"; organizationId: string };
 type ProductFilters = { q: string; category: string };
 type KnowledgeFilters = { q: string; category: string; language: string; productId: string };
@@ -168,7 +337,16 @@ type OrgMaterialFilters = { organizationId: string; q: string; type: string; pro
 type MaterialFilters = { q: string; type: string; language: string; productId: string; tag: string };
 type SampleFilters = { q: string; customerId: string; productId: string; paymentStatus: string; shippingStatus: string; feedbackStatus: string };
 type CustomFilters = { q: string; customerId: string; productId: string; requestType: string; status: string };
-type AuditLogFilters = { organizationId: string; entityType: string; userId: string; action: "" | AuditLogAction; from: string; to: string };
+type OrderFilters = { organizationId: string; customerId: string; assignedTo: string; orderType: string; orderStatus: string; paymentStatus: string; productionStatus: string; shippingStatus: string; afterSalesStatus: string; keyword: string };
+type ProfitFilters = { organizationId: string; assignedTo: string; marginLevel: string; costConfirmed: string };
+type AuditLogFilters = { organizationId: string; entityType: string; entityId: string; userId: string; action: "" | AuditLogAction; riskLevel: "" | "low" | "medium" | "high"; keyword: string; from: string; to: string };
+type ReportFilters = { organizationId: string; assignedTo: string; stage: string; intentLevel: "" | "low" | "medium" | "high"; reportType: ReportJobType };
+type PredictionFilters = { organizationId: string; predictionType: string; level: string; status: string };
+type ReorderOpsFilters = { organizationId: string; opportunityType: string; level: string; status: string };
+type AfterSalesFilters = { organizationId: string; customerId: string; orderId: string; productId: string; caseType: string; priority: string; status: string; responsibility: string; assignedTo: string; keyword: string };
+type ScriptTestFilters = { organizationId: string; scenario: string; status: string; targetLanguage: string };
+type SupplierFilters = { organizationId: string; status: string; riskLevel: string; tag: string; keyword: string; country: string; city: string };
+type BrandFilters = { organizationId: string; status: string; keyword: string };
 
 type OrganizationForm = {
   name: string;
@@ -314,10 +492,32 @@ type CustomForm = {
   notes: string;
 };
 
-const CUSTOMER_TAGS = ["新客户", "高意向", "已报价", "待付款", "已成交", "售后中", "老客户", "无效客户", "需要跟进"];
-const CUSTOMER_STAGES = ["新线索", "已沟通需求", "已推荐产品", "已报价", "待付款", "已成交", "待复购", "无效客户"];
-const FOLLOW_UP_TYPES = ["报价后跟进", "催付款", "样品反馈", "老客户复购", "售后跟进", "普通提醒"] as FollowUpTaskType[];
+type OrderForm = {
+  customerId: string;
+  productId: string;
+  orderType: string;
+  title: string;
+  amount: string;
+  currency: string;
+  quantity: string;
+  paymentStatus: string;
+  productionStatus: string;
+  shippingStatus: string;
+  afterSalesStatus: string;
+  orderStatus: string;
+  expectedShipDate: string;
+  expectedDeliveryDate: string;
+  trackingNumber: string;
+  notes: string;
+  files: string;
+  assignedTo: string;
+};
+
+const CUSTOMER_TAGS = ["New", "High intent", "Quoted", "Payment pending", "Won", "After sales", "Old customer", "Invalid", "Need follow-up"];
+const CUSTOMER_STAGES = ["New lead", "Needs discussed", "Product recommended", "Quoted", "Payment pending", "Won", "Reorder pending", "Invalid"];
+const FOLLOW_UP_TYPES = ["Quote follow-up", "Payment reminder", "Sample feedback", "Old customer reorder", "After-sales follow-up", "General reminder"] as unknown as FollowUpTaskType[];
 const IMPORT_EXPORT_TYPES: ImportExportType[] = ["customers", "products", "knowledge-base", "materials", "sample-orders", "custom-requests"];
+const ORGANIZATION_IMPORT_EXPORT_TYPES: OrganizationImportExportType[] = ["customer", "product", "material", "knowledge", "script"];
 
 const emptyCustomerFilters: CustomerFilters = { q: "", tag: "", stage: "", sort: "", intentLevel: "", organizationId: "" };
 const emptyProductFilters: ProductFilters = { q: "", category: "" };
@@ -328,7 +528,11 @@ const emptyOrgMaterialFilters: OrgMaterialFilters = { organizationId: "", q: "",
 const emptyMaterialFilters: MaterialFilters = { q: "", type: "", language: "", productId: "", tag: "" };
 const emptySampleFilters: SampleFilters = { q: "", customerId: "", productId: "", paymentStatus: "", shippingStatus: "", feedbackStatus: "" };
 const emptyCustomFilters: CustomFilters = { q: "", customerId: "", productId: "", requestType: "", status: "" };
-const emptyAuditLogFilters: AuditLogFilters = { organizationId: "", entityType: "", userId: "", action: "", from: "", to: "" };
+const emptyOrderFilters: OrderFilters = { organizationId: "", customerId: "", assignedTo: "", orderType: "", orderStatus: "", paymentStatus: "", productionStatus: "", shippingStatus: "", afterSalesStatus: "", keyword: "" };
+const emptyProfitFilters: ProfitFilters = { organizationId: "", assignedTo: "", marginLevel: "", costConfirmed: "" };
+const emptyAuditLogFilters: AuditLogFilters = { organizationId: "", entityType: "", entityId: "", userId: "", action: "", riskLevel: "", keyword: "", from: "", to: "" };
+const emptyReportFilters: ReportFilters = { organizationId: "", assignedTo: "", stage: "", intentLevel: "", reportType: "customer_summary" };
+const emptyPredictionFilters: PredictionFilters = { organizationId: "", predictionType: "", level: "", status: "open" };
 const emptyOrganizationForm: OrganizationForm = { name: "" };
 const emptyOrganizationMemberForm: OrganizationMemberForm = { userId: "", role: "sales", status: "active" };
 const emptyRoleForm: RoleForm = { organizationId: "", name: "sales", description: "" };
@@ -343,8 +547,8 @@ const emptyCustomerForm: CustomerForm = {
   collaborators: "",
   country: "",
   language: "English",
-  tags: "新客户",
-  stage: "新线索",
+  tags: "New",
+  stage: "New lead",
   interestedProduct: "",
   latestSummary: "",
   nextFollowUpAt: "",
@@ -455,6 +659,98 @@ const emptyCustomForm: CustomForm = {
   notes: ""
 };
 
+const emptyOrderForm: OrderForm = {
+  customerId: "",
+  productId: "",
+  orderType: "normal",
+  title: "",
+  amount: "",
+  currency: "USD",
+  quantity: "",
+  paymentStatus: "unpaid",
+  productionStatus: "not_started",
+  shippingStatus: "pending",
+  afterSalesStatus: "none",
+  orderStatus: "draft",
+  expectedShipDate: "",
+  expectedDeliveryDate: "",
+  trackingNumber: "",
+  notes: "",
+  files: "",
+  assignedTo: ""
+};
+
+const emptyOrderCostForm = {
+  productCost: "",
+  packagingCost: "",
+  domesticShipping: "",
+  internationalShipping: "",
+  paymentFee: "",
+  platformFee: "",
+  refundAmount: "",
+  reshipCost: "",
+  otherCost: "",
+  currency: "USD",
+  notes: ""
+};
+
+const emptyReorderOpsFilters: ReorderOpsFilters = { organizationId: "", opportunityType: "", level: "", status: "" };
+const emptyReorderCampaignForm = { organizationId: "", name: "", campaignType: "reorder", targetScope: "own", status: "draft" };
+const emptyReorderPlaybookForm = { organizationId: "", title: "", scenario: "reorder_follow_up", language: "en", content: "", enabled: true };
+const emptyAfterSalesFilters: AfterSalesFilters = { organizationId: "", customerId: "", orderId: "", productId: "", caseType: "", priority: "", status: "", responsibility: "", assignedTo: "", keyword: "" };
+const emptyScriptTestFilters: ScriptTestFilters = { organizationId: "", scenario: "", status: "", targetLanguage: "" };
+const emptySupplierFilters: SupplierFilters = { organizationId: "", status: "", riskLevel: "", tag: "", keyword: "", country: "", city: "" };
+const emptySupplierForm = { organizationId: "", name: "", contactName: "", phone: "", email: "", whatsapp: "", wechat: "", country: "", city: "", website: "", tags: "", rating: "", status: "candidate", riskLevel: "", notes: "" };
+const emptySupplierContactForm = { name: "", role: "", phone: "", email: "", whatsapp: "", wechat: "", notes: "" };
+const emptySupplierQuoteForm = { supplierId: "", productId: "", sku: "", moq: "", unitCost: "", currency: "USD", leadTime: "", sampleFee: "", sampleLeadTime: "", bulkLeadTime: "", validUntil: "", notes: "", status: "active", orderId: "" };
+const emptyPurchaseNoteForm = { supplierId: "", productId: "", orderId: "", sampleOrderId: "", customRequestId: "", noteType: "general", content: "" };
+const emptySupplierRiskForm = { supplierId: "", riskType: "needs_review", level: "medium", description: "", status: "open" };
+const emptySupplierScriptForm = { supplierId: "", productId: "", orderId: "", sampleOrderId: "", customRequestId: "", scenario: "ask_price", targetLanguage: "en", tone: "professional" };
+const emptyBrandFilters: BrandFilters = { organizationId: "", status: "active", keyword: "" };
+const emptyBrandForm = { organizationId: "", name: "", displayName: "", description: "", logoUrl: "", website: "", defaultLanguage: "en", defaultCurrency: "USD", country: "", status: "active", notes: "" };
+const emptyBrandRuleForm = { ruleType: "quote_rule", title: "", content: "", language: "en", enabled: true };
+const emptyBrandScriptLinkForm = { scriptId: "", scriptType: "script_org" };
+const emptyBrandAssignmentForm = { entityType: "customer", entityId: "" };
+const emptyAfterSalesForm = {
+  customerId: "",
+  orderId: "",
+  productId: "",
+  caseType: "quality_issue",
+  priority: "medium",
+  status: "open",
+  responsibility: "unknown",
+  requestedSolution: "",
+  finalSolution: "",
+  refundAmount: "",
+  reshipCost: "",
+  compensationAmount: "",
+  currency: "USD",
+  description: "",
+  customerClaim: "",
+  internalNotes: "",
+  evidenceUrls: "",
+  resolutionNotes: "",
+  assignedTo: "",
+  scriptScenario: "apologize_and_acknowledge"
+};
+const emptyScriptExperimentForm = {
+  organizationId: "",
+  name: "",
+  scenario: "price_reply",
+  description: "",
+  status: "draft",
+  targetLanguage: "en",
+  targetCustomerStage: ""
+};
+const emptyScriptVariantForm = {
+  title: "",
+  versionLabel: "A",
+  content: "",
+  language: "en",
+  tone: "professional",
+  enabled: true
+};
+
 export function App() {
   const [view, setView] = useState<View>("dashboard");
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
@@ -465,6 +761,10 @@ export function App() {
 
   const [dashboard, setDashboard] = useState<WorkbenchDashboard | null>(null);
   const [teamSummary, setTeamSummary] = useState<TeamDashboardSummary | null>(null);
+  const [reportSummary, setReportSummary] = useState<TeamDashboardSummary | null>(null);
+  const [reportHighIntent, setReportHighIntent] = useState<TeamDashboardCustomer[]>([]);
+  const [reportFilters, setReportFilters] = useState<ReportFilters>(emptyReportFilters);
+  const [reportJob, setReportJob] = useState<ReportJobSummary | null>(null);
   const [highIntent, setHighIntent] = useState<CustomerSummary[]>([]);
   const [customers, setCustomers] = useState<CustomerSummary[]>([]);
   const [organizations, setOrganizations] = useState<OrganizationSummary[]>([]);
@@ -478,8 +778,42 @@ export function App() {
   const [orgMaterials, setOrgMaterials] = useState<OrganizationMaterialSummary[]>([]);
   const [sampleOrders, setSampleOrders] = useState<SampleOrderSummary[]>([]);
   const [customRequests, setCustomRequests] = useState<CustomRequestSummary[]>([]);
+  const [orders, setOrders] = useState<OrderSummary[]>([]);
+  const [profitOrders, setProfitOrders] = useState<ProfitOrderRow[]>([]);
+  const [profitSummary, setProfitSummary] = useState<ProfitSummary | null>(null);
+  const [profitByProduct, setProfitByProduct] = useState<ProfitBreakdownRow[]>([]);
+  const [profitByCustomer, setProfitByCustomer] = useState<ProfitBreakdownRow[]>([]);
+  const [profitBySalesperson, setProfitBySalesperson] = useState<ProfitBreakdownRow[]>([]);
+  const [selectedOrderCost, setSelectedOrderCost] = useState<OrderCostSummary | null>(null);
+  const [profitReview, setProfitReview] = useState<ProfitReviewResponse | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLogSummary[]>([]);
   const [selectedAuditLog, setSelectedAuditLog] = useState<AuditLogSummary | null>(null);
+  const [riskEvents, setRiskEvents] = useState<AuditLogSummary[]>([]);
+  const [customerPredictions, setCustomerPredictions] = useState<CustomerPredictionSummary[]>([]);
+  const [reorderReminders, setReorderReminders] = useState<ReorderReminderSummary[]>([]);
+  const [productOpportunities, setProductOpportunities] = useState<ProductOpportunitySummary[]>([]);
+  const [reorderOpportunities, setReorderOpportunities] = useState<ReorderOpportunitySummary[]>([]);
+  const [reorderCampaigns, setReorderCampaigns] = useState<ReorderCampaignSummary[]>([]);
+  const [reorderPlaybooks, setReorderPlaybooks] = useState<ReorderPlaybookSummary[]>([]);
+  const [afterSalesCases, setAfterSalesCases] = useState<AfterSalesCaseSummary[]>([]);
+  const [selectedAfterSalesCase, setSelectedAfterSalesCase] = useState<AfterSalesCaseDetail | null>(null);
+  const [scriptExperiments, setScriptExperiments] = useState<ScriptExperimentSummary[]>([]);
+  const [selectedScriptExperiment, setSelectedScriptExperiment] = useState<ScriptExperimentDetail | null>(null);
+  const [scriptVariantDrafts, setScriptVariantDrafts] = useState<Array<{ versionLabel: string; title: string; content: string }>>([]);
+  const [scriptUsageDraft, setScriptUsageDraft] = useState<ScriptUsageSummary | null>(null);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [selectedSupplier, setSelectedSupplier] = useState<any | null>(null);
+  const [supplierScript, setSupplierScript] = useState("");
+  const [supplierRiskWarnings, setSupplierRiskWarnings] = useState<string[]>([]);
+  const [brands, setBrands] = useState<any[]>([]);
+  const [selectedBrand, setSelectedBrand] = useState<any | null>(null);
+  const [brandContext, setBrandContext] = useState<any | null>(null);
+  const [predictionScript, setPredictionScript] = useState("");
+  const [predictionRiskWarnings, setPredictionRiskWarnings] = useState<string[]>([]);
+  const [reorderOperationScript, setReorderOperationScript] = useState("");
+  const [reorderOperationRiskWarnings, setReorderOperationRiskWarnings] = useState<string[]>([]);
+  const [afterSalesScript, setAfterSalesScript] = useState("");
+  const [afterSalesRiskWarnings, setAfterSalesRiskWarnings] = useState<string[]>([]);
 
   const [customerFilters, setCustomerFilters] = useState<CustomerFilters>(emptyCustomerFilters);
   const [productFilters, setProductFilters] = useState<ProductFilters>(emptyProductFilters);
@@ -491,7 +825,15 @@ export function App() {
   const [orgMaterialFilters, setOrgMaterialFilters] = useState<OrgMaterialFilters>(emptyOrgMaterialFilters);
   const [sampleFilters, setSampleFilters] = useState<SampleFilters>(emptySampleFilters);
   const [customFilters, setCustomFilters] = useState<CustomFilters>(emptyCustomFilters);
+  const [orderFilters, setOrderFilters] = useState<OrderFilters>(emptyOrderFilters);
+  const [profitFilters, setProfitFilters] = useState<ProfitFilters>(emptyProfitFilters);
   const [auditLogFilters, setAuditLogFilters] = useState<AuditLogFilters>(emptyAuditLogFilters);
+  const [predictionFilters, setPredictionFilters] = useState<PredictionFilters>(emptyPredictionFilters);
+  const [reorderOpsFilters, setReorderOpsFilters] = useState<ReorderOpsFilters>(emptyReorderOpsFilters);
+  const [afterSalesFilters, setAfterSalesFilters] = useState<AfterSalesFilters>(emptyAfterSalesFilters);
+  const [scriptTestFilters, setScriptTestFilters] = useState<ScriptTestFilters>(emptyScriptTestFilters);
+  const [supplierFilters, setSupplierFilters] = useState<SupplierFilters>(emptySupplierFilters);
+  const [brandFilters, setBrandFilters] = useState<BrandFilters>(emptyBrandFilters);
   const [memberSearch, setMemberSearch] = useState("");
   const [roleSearch, setRoleSearch] = useState("");
 
@@ -507,6 +849,10 @@ export function App() {
   const [selectedOrgMaterialId, setSelectedOrgMaterialId] = useState("");
   const [selectedSampleOrderId, setSelectedSampleOrderId] = useState("");
   const [selectedCustomRequestId, setSelectedCustomRequestId] = useState("");
+  const [selectedOrderId, setSelectedOrderId] = useState("");
+  const [selectedAfterSalesId, setSelectedAfterSalesId] = useState("");
+  const [selectedSupplierId, setSelectedSupplierId] = useState("");
+  const [selectedBrandId, setSelectedBrandId] = useState("");
 
   const [customerForm, setCustomerForm] = useState<CustomerForm>(emptyCustomerForm);
   const [organizationForm, setOrganizationForm] = useState<OrganizationForm>(emptyOrganizationForm);
@@ -523,6 +869,30 @@ export function App() {
   const [orgMaterialForm, setOrgMaterialForm] = useState<OrgMaterialForm>(emptyOrgMaterialForm);
   const [sampleForm, setSampleForm] = useState<SampleForm>(emptySampleForm);
   const [customForm, setCustomForm] = useState<CustomForm>(emptyCustomForm);
+  const [orderForm, setOrderForm] = useState<OrderForm>(emptyOrderForm);
+  const [orderCostForm, setOrderCostForm] = useState(emptyOrderCostForm);
+  const [reorderCampaignForm, setReorderCampaignForm] = useState(emptyReorderCampaignForm);
+  const [reorderPlaybookForm, setReorderPlaybookForm] = useState(emptyReorderPlaybookForm);
+  const [afterSalesForm, setAfterSalesForm] = useState(emptyAfterSalesForm);
+  const [scriptExperimentForm, setScriptExperimentForm] = useState(emptyScriptExperimentForm);
+  const [scriptVariantForm, setScriptVariantForm] = useState(emptyScriptVariantForm);
+  const [supplierForm, setSupplierForm] = useState(emptySupplierForm);
+  const [supplierContactForm, setSupplierContactForm] = useState(emptySupplierContactForm);
+  const [supplierQuoteForm, setSupplierQuoteForm] = useState(emptySupplierQuoteForm);
+  const [purchaseNoteForm, setPurchaseNoteForm] = useState(emptyPurchaseNoteForm);
+  const [supplierRiskForm, setSupplierRiskForm] = useState(emptySupplierRiskForm);
+  const [supplierScriptForm, setSupplierScriptForm] = useState(emptySupplierScriptForm);
+  const [brandForm, setBrandForm] = useState(emptyBrandForm);
+  const [brandRuleForm, setBrandRuleForm] = useState(emptyBrandRuleForm);
+  const [brandScriptLinkForm, setBrandScriptLinkForm] = useState(emptyBrandScriptLinkForm);
+  const [brandAssignmentForm, setBrandAssignmentForm] = useState(emptyBrandAssignmentForm);
+  const [brandProductLinkId, setBrandProductLinkId] = useState("");
+  const [brandMaterialLinkId, setBrandMaterialLinkId] = useState("");
+  const [brandKnowledgeLinkId, setBrandKnowledgeLinkId] = useState("");
+  const [orderScript, setOrderScript] = useState("");
+  const [orderRiskWarnings, setOrderRiskWarnings] = useState<string[]>([]);
+  const [fulfillmentBoard, setFulfillmentBoard] = useState<OrderFulfillmentBoardResponse | null>(null);
+  const [fulfillmentAlerts, setFulfillmentAlerts] = useState<OrderFulfillmentAlertSummary[]>([]);
 
   const [quote, setQuote] = useState<QuoteResponse | null>(null);
   const [customerQuotes, setCustomerQuotes] = useState<QuoteResponse[]>([]);
@@ -531,12 +901,17 @@ export function App() {
   const [customerDuplicateMatches, setCustomerDuplicateMatches] = useState<CustomerDuplicateMatch[]>([]);
   const [customerSampleOrders, setCustomerSampleOrders] = useState<SampleOrderSummary[]>([]);
   const [customerCustomRequests, setCustomerCustomRequests] = useState<CustomRequestSummary[]>([]);
+  const [customerOrders, setCustomerOrders] = useState<OrderSummary[]>([]);
   const [customerIntent, setCustomerIntent] = useState<CustomerIntentResponse | null>(null);
   const [importType, setImportType] = useState<ImportExportType>("customers");
   const [importFile, setImportFile] = useState<File | null>(null);
+  const [organizationImportType, setOrganizationImportType] = useState<OrganizationImportExportType>("customer");
+  const [organizationImportFile, setOrganizationImportFile] = useState<File | null>(null);
   const [importOrganizationId, setImportOrganizationId] = useState("");
   const [importSkipDuplicates, setImportSkipDuplicates] = useState(true);
   const [importResult, setImportResult] = useState<CsvImportResult | null>(null);
+  const [organizationImportJob, setOrganizationImportJob] = useState<OrganizationImportJob | null>(null);
+  const [organizationExportJob, setOrganizationExportJob] = useState<OrganizationExportJob | null>(null);
 
   const selectedCustomer = useMemo(() => customers.find((item) => item.id === selectedCustomerId), [customers, selectedCustomerId]);
   const selectedOrganization = useMemo(() => organizations.find((item) => item.id === selectedOrganizationId), [organizations, selectedOrganizationId]);
@@ -554,8 +929,14 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id]);
 
+  useEffect(() => {
+    if (!currentUser || view !== "profit") return;
+    void loadProfit(profitFilters);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, selectedOrganizationId]);
+
   async function refreshAll() {
-    await Promise.all([loadDashboard(), loadOrganizations(), loadCustomers(), loadProducts(), loadKnowledgeBase(), loadMaterials(), loadSampleOrders(), loadCustomRequests()]);
+    await Promise.all([loadDashboard(), loadOrganizations(), loadCustomers(), loadProducts(), loadKnowledgeBase(), loadMaterials(), loadSampleOrders(), loadCustomRequests(), loadOrders(), loadFulfillmentBoard(), loadPredictions(), loadReorderOperations(), loadAfterSales(), loadScriptExperiments(), loadSuppliers(), loadBrands()]);
   }
 
   async function loadCurrentUser() {
@@ -654,6 +1035,12 @@ export function App() {
       setOrgScriptFilters((filters) => ({ ...filters, organizationId: id }));
       setOrgMaterialFilters((filters) => ({ ...filters, organizationId: id }));
       setAuditLogFilters((filters) => ({ ...filters, organizationId: id }));
+      setReportFilters((filters) => ({ ...filters, organizationId: id }));
+      setPredictionFilters((filters) => ({ ...filters, organizationId: id }));
+      setAfterSalesFilters((filters) => ({ ...filters, organizationId: id }));
+      setSupplierFilters((filters) => ({ ...filters, organizationId: id }));
+      setBrandFilters((filters) => ({ ...filters, organizationId: id }));
+      setBrandForm((form) => ({ ...form, organizationId: id }));
       setOrganizations((items) => items.map((item) => (item.id === detail.id ? { ...item, ...detail } : item)));
       await Promise.all([
         loadRoles(id),
@@ -661,8 +1048,15 @@ export function App() {
         loadOrgKnowledgeBase({ ...orgKnowledgeFilters, organizationId: id }),
         loadOrgScriptsList({ ...orgScriptFilters, organizationId: id }),
         loadOrgMaterials({ ...orgMaterialFilters, organizationId: id }),
+        loadAfterSales({ ...afterSalesFilters, organizationId: id }),
         loadAuditLogs({ ...auditLogFilters, organizationId: id }),
-        loadTeamDashboard(id)
+        loadRiskEvents(id),
+        loadTeamDashboard(id),
+        loadReports({ ...reportFilters, organizationId: id }),
+        loadPredictions({ ...predictionFilters, organizationId: id }),
+        loadReorderOperations({ ...reorderOpsFilters, organizationId: id }),
+        loadSuppliers({ ...supplierFilters, organizationId: id }),
+        loadBrands({ ...brandFilters, organizationId: id })
       ]);
     } catch {
       const fallback = source.find((item) => item.id === id);
@@ -675,6 +1069,35 @@ export function App() {
       setOrgMaterials([]);
       setAuditLogs([]);
       setTeamSummary(null);
+      setReportSummary(null);
+      setReportHighIntent([]);
+      setCustomerPredictions([]);
+      setReorderReminders([]);
+      setProductOpportunities([]);
+      setReorderOpportunities([]);
+      setReorderCampaigns([]);
+      setReorderPlaybooks([]);
+    }
+  }
+
+  async function loadPredictions(next = predictionFilters) {
+    const organizationId = next.organizationId || selectedOrganizationId;
+    const filters = { ...next, organizationId };
+    setPredictionFilters(filters);
+    try {
+      const [predictions, reminders, opportunities] = await Promise.all([
+        getCustomerPredictions({ ...filters, pageSize: "50" }),
+        getReorderReminders({ organizationId, status: "pending", pageSize: "50" }),
+        getProductOpportunities({ organizationId })
+      ]);
+      setCustomerPredictions(predictions);
+      setReorderReminders(reminders);
+      setProductOpportunities(opportunities);
+    } catch {
+      setCustomerPredictions([]);
+      setReorderReminders([]);
+      setProductOpportunities([]);
+      setStatus("Prediction data failed to load or permission is insufficient.");
     }
   }
 
@@ -710,6 +1133,19 @@ export function App() {
     }
   }
 
+  async function loadRiskEvents(organizationId = selectedOrganizationId) {
+    if (!organizationId) {
+      setRiskEvents([]);
+      return;
+    }
+    try {
+      setRiskEvents(await getRiskEvents(organizationId));
+    } catch {
+      setRiskEvents([]);
+      setStatus("Risk events failed to load or permission is insufficient.");
+    }
+  }
+
   async function loadTeamDashboard(organizationId = selectedOrganizationId) {
     if (!organizationId) {
       setTeamSummary(null);
@@ -719,6 +1155,33 @@ export function App() {
       setTeamSummary(await getTeamSummary(organizationId));
     } catch {
       setTeamSummary(null);
+    }
+  }
+
+  async function loadReports(next = reportFilters) {
+    const organizationId = next.organizationId || selectedOrganizationId;
+    setReportFilters({ ...next, organizationId });
+    if (!organizationId) {
+      setReportSummary(null);
+      setReportHighIntent([]);
+      return;
+    }
+    try {
+      const [summary, customers] = await Promise.all([
+        getReportTeamSummary(organizationId),
+        getReportHighIntentCustomers({
+          organizationId,
+          assignedTo: next.assignedTo,
+          stage: next.stage,
+          intentLevel: next.intentLevel
+        })
+      ]);
+      setReportSummary(summary);
+      setReportHighIntent(customers);
+    } catch {
+      setReportSummary(null);
+      setReportHighIntent([]);
+      setStatus("Reports failed to load. Owner or manager role is required.");
     }
   }
 
@@ -870,19 +1333,297 @@ export function App() {
     }
   }
 
+  async function loadOrders(next = orderFilters) {
+    setOrderFilters(next);
+    try {
+      setOrders(await getOrders({
+        organizationId: next.organizationId || selectedOrganizationId || undefined,
+        customerId: next.customerId || undefined,
+        assignedTo: next.assignedTo || undefined,
+        orderType: next.orderType || undefined,
+        orderStatus: next.orderStatus || undefined,
+        paymentStatus: next.paymentStatus || undefined,
+        productionStatus: next.productionStatus || undefined,
+        shippingStatus: next.shippingStatus || undefined,
+        afterSalesStatus: next.afterSalesStatus || undefined,
+        keyword: next.keyword || undefined
+      }));
+    } catch {
+      setStatus("Orders failed to load.");
+    }
+  }
+
+  async function loadReorderOperations(next = reorderOpsFilters) {
+    const organizationId = next.organizationId || selectedOrganizationId;
+    const filters = { ...next, organizationId };
+    setReorderOpsFilters(filters);
+    try {
+      const [opportunities, campaigns, playbooks] = await Promise.all([
+        getReorderOpportunities({ ...filters, pageSize: "50" }),
+        getReorderCampaigns({ organizationId }),
+        getReorderPlaybooks({ organizationId })
+      ]);
+      setReorderOpportunities(opportunities);
+      setReorderCampaigns(campaigns);
+      setReorderPlaybooks(playbooks);
+    } catch {
+      setReorderOpportunities([]);
+      setReorderCampaigns([]);
+      setReorderPlaybooks([]);
+      setStatus("Reorder operations failed to load or permission is insufficient.");
+    }
+  }
+
+  async function loadAfterSales(next = afterSalesFilters) {
+    const organizationId = next.organizationId || selectedOrganizationId;
+    const filters = { ...next, organizationId };
+    setAfterSalesFilters(filters);
+    try {
+      setAfterSalesCases(await getAfterSalesCases({
+        organizationId: organizationId || undefined,
+        customerId: filters.customerId || undefined,
+        orderId: filters.orderId || undefined,
+        productId: filters.productId || undefined,
+        caseType: filters.caseType || undefined,
+        priority: filters.priority || undefined,
+        status: filters.status || undefined,
+        responsibility: filters.responsibility || undefined,
+        assignedTo: filters.assignedTo || undefined,
+        keyword: filters.keyword || undefined,
+        pageSize: "100"
+      }));
+    } catch {
+      setAfterSalesCases([]);
+      setStatus("After-sales cases failed to load or permission is insufficient.");
+    }
+  }
+
+  async function loadScriptExperiments(next = scriptTestFilters) {
+    const organizationId = next.organizationId || selectedOrganizationId;
+    const filters = { ...next, organizationId };
+    setScriptTestFilters(filters);
+    try {
+      setScriptExperiments(await getScriptExperiments({
+        organizationId: organizationId || undefined,
+        scenario: filters.scenario || undefined,
+        status: filters.status || undefined,
+        targetLanguage: filters.targetLanguage || undefined,
+        pageSize: "100"
+      }));
+    } catch {
+      setScriptExperiments([]);
+      setStatus("A/B script experiments failed to load or permission is insufficient.");
+    }
+  }
+
+  async function loadSuppliers(next = supplierFilters) {
+    const organizationId = next.organizationId || selectedOrganizationId;
+    const filters = { ...next, organizationId };
+    setSupplierFilters(filters);
+    try {
+      const list = await getSuppliers({
+        organizationId: organizationId || undefined,
+        status: filters.status || undefined,
+        riskLevel: filters.riskLevel || undefined,
+        tag: filters.tag || undefined,
+        keyword: filters.keyword || undefined,
+        country: filters.country || undefined,
+        city: filters.city || undefined,
+        pageSize: "100"
+      });
+      setSuppliers(list);
+      if (!selectedSupplierId && list[0]) await selectSupplierRecord(list[0].id);
+    } catch {
+      setSuppliers([]);
+      setStatus("Supplier data failed to load or permission is insufficient.");
+    }
+  }
+
+  async function selectSupplierRecord(id: string) {
+    setSelectedSupplierId(id);
+    try {
+      const detail = await getSupplier(id);
+      setSelectedSupplier(detail);
+      setSupplierForm(toSupplierForm(detail));
+      setSupplierQuoteForm((form) => ({ ...form, supplierId: detail.id }));
+      setPurchaseNoteForm((form) => ({ ...form, supplierId: detail.id }));
+      setSupplierRiskForm((form) => ({ ...form, supplierId: detail.id }));
+      setSupplierScriptForm((form) => ({ ...form, supplierId: detail.id }));
+    } catch {
+      setSelectedSupplier(null);
+      setStatus("Supplier detail failed to load.");
+    }
+  }
+
+  async function loadBrands(next = brandFilters) {
+    const filters = { ...next, organizationId: next.organizationId || selectedOrganizationId };
+    setBrandFilters(filters);
+    if (!filters.organizationId) return;
+    try {
+      const list = await getBrands({
+        organizationId: filters.organizationId,
+        status: filters.status || undefined,
+        keyword: filters.keyword || undefined,
+        pageSize: "50"
+      });
+      setBrands(list);
+      if (!selectedBrandId && list[0]) await selectBrandRecord(list[0].id);
+    } catch {
+      setBrands([]);
+      setStatus("Brand data failed to load or permission is insufficient.");
+    }
+  }
+
+  async function selectBrandRecord(id: string) {
+    setSelectedBrandId(id);
+    try {
+      const detail = await getBrand(id);
+      setSelectedBrand(detail);
+      setBrandForm(toBrandForm(detail));
+      setBrandRuleForm(emptyBrandRuleForm);
+      setBrandScriptLinkForm(emptyBrandScriptLinkForm);
+      setBrandAssignmentForm(emptyBrandAssignmentForm);
+      const context = await getBrandContext({ brandId: id });
+      setBrandContext(context);
+    } catch {
+      setSelectedBrand(null);
+      setBrandContext(null);
+      setStatus("Brand detail failed to load.");
+    }
+  }
+
+  async function loadFulfillmentBoard() {
+    try {
+      const board = await getOrderFulfillmentBoard({ organizationId: selectedOrganizationId || undefined });
+      setFulfillmentBoard(board);
+    } catch {
+      setStatus("Fulfillment board failed to load.");
+    }
+  }
+
+  async function loadProfit(next = profitFilters) {
+    setProfitFilters(next);
+    const organizationId = next.organizationId || selectedOrganizationId || undefined;
+    try {
+      const [summary, rows, byProduct, byCustomer, bySalesperson] = await Promise.all([
+        getProfitSummary({ organizationId }),
+        getProfitOrders({ organizationId, assignedTo: next.assignedTo || undefined, marginLevel: next.marginLevel || undefined, costConfirmed: next.costConfirmed || undefined }),
+        getProfitByProduct({ organizationId }),
+        getProfitByCustomer({ organizationId }),
+        getProfitBySalesperson({ organizationId }).catch(() => [])
+      ]);
+      setProfitSummary(summary);
+      setProfitOrders(rows);
+      setProfitByProduct(byProduct);
+      setProfitByCustomer(byCustomer);
+      setProfitBySalesperson(bySalesperson);
+    } catch {
+      setStatus("Profit review data failed to load. Check role permission and selected organization.");
+    }
+  }
+
+  async function openOrderCost(orderId: string) {
+    setSelectedOrderId(orderId);
+    setProfitReview(null);
+    try {
+      const cost = await getOrderCost(orderId);
+      setSelectedOrderCost(cost);
+      setOrderCostForm({
+        productCost: cost.costItems.productCost || "",
+        packagingCost: cost.costItems.packagingCost || "",
+        domesticShipping: cost.costItems.domesticShipping || "",
+        internationalShipping: cost.costItems.internationalShipping || "",
+        paymentFee: cost.costItems.paymentFee || "",
+        platformFee: cost.costItems.platformFee || "",
+        refundAmount: cost.costItems.refundAmount || "",
+        reshipCost: cost.costItems.reshipCost || "",
+        otherCost: cost.costItems.otherCost || "",
+        currency: cost.costCurrency || cost.currency || "USD",
+        notes: cost.notes || ""
+      });
+      setStatus("Cost review loaded. Confirm values manually before using margin.");
+    } catch {
+      setStatus("Cost review failed to load or permission denied.");
+    }
+  }
+
+  async function saveOrderCost() {
+    if (!selectedOrderId) return;
+    setLoading(true);
+    try {
+      const saved = await upsertOrderCost(selectedOrderId, orderCostForm);
+      setSelectedOrderCost(saved);
+      await loadProfit(profitFilters);
+      setStatus("Order cost saved. Cost confirmation is still manual.");
+    } catch {
+      setStatus("Save order cost failed. Check permission and numeric fields.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function confirmSelectedOrderCost() {
+    if (!selectedOrderId) return;
+    setLoading(true);
+    try {
+      const saved = await confirmOrderCost(selectedOrderId);
+      setSelectedOrderCost(saved);
+      await loadProfit(profitFilters);
+      setStatus("Order cost confirmed manually.");
+    } catch {
+      setStatus("Confirm order cost failed. Manager/owner permission may be required.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function removeSelectedOrderCost() {
+    if (!selectedOrderId) return;
+    setLoading(true);
+    try {
+      await deleteOrderCost(selectedOrderId);
+      setSelectedOrderCost(null);
+      setOrderCostForm(emptyOrderCostForm);
+      await loadProfit(profitFilters);
+      setStatus("Order cost deleted after confirmation.");
+    } catch {
+      setStatus("Delete order cost failed. Owner permission and confirmation are required.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function runProfitReview(orderId = selectedOrderId) {
+    if (!orderId) return;
+    setLoading(true);
+    try {
+      const review = await generateProfitReview({ orderId, scope: "order", targetLanguage: "English" });
+      setProfitReview(review);
+      setStatus("AI profit review generated as operational advice only.");
+    } catch {
+      setStatus("AI profit review failed. Check order access and profit permission.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function selectCustomer(id: string, source = customers) {
     setSelectedCustomerId(id);
     setQuoteForm((form) => ({ ...form, customerId: id }));
     setSampleForm((form) => ({ ...form, customerId: id }));
     setCustomForm((form) => ({ ...form, customerId: id }));
+    setOrderForm((form) => ({ ...form, customerId: id }));
+    setAfterSalesForm((form) => ({ ...form, customerId: id }));
     try {
-      const [detail, quotes, followUps, samples, customItems, intent] = await Promise.all([
+      const [detail, quotes, followUps, samples, customItems, customerOrderItems, intent, cases] = await Promise.all([
         getCustomer(id),
         getCustomerQuotes(id),
         getFollowUps({ customerId: id }),
         getSampleOrders({ customerId: id }),
         getCustomRequests({ customerId: id }),
-        getCustomerIntent(id)
+        getOrders({ customerId: id, organizationId: selectedOrganizationId || undefined }),
+        getCustomerIntent(id),
+        getAfterSalesCases({ customerId: id, organizationId: selectedOrganizationId || undefined })
       ]);
       setCustomerForm(toCustomerForm(detail));
       setCustomerQuotes(quotes);
@@ -890,7 +1631,12 @@ export function App() {
       setCustomerAssignmentLogs(detail.assignmentLogs || []);
       setCustomerSampleOrders(samples);
       setCustomerCustomRequests(customItems);
+      setCustomerOrders(customerOrderItems);
       setCustomerIntent(intent);
+      setAfterSalesCases((items) => {
+        const other = items.filter((item) => item.customerId !== id);
+        return [...cases, ...other];
+      });
     } catch {
       const fallback = source.find((item) => item.id === id);
       if (fallback) setCustomerForm(toCustomerForm(fallback));
@@ -898,6 +1644,7 @@ export function App() {
       setCustomerAssignmentLogs([]);
       setCustomerSampleOrders([]);
       setCustomerCustomRequests([]);
+      setCustomerOrders([]);
       setCustomerIntent(null);
     }
   }
@@ -914,6 +1661,7 @@ export function App() {
     }));
     setSampleForm((form) => ({ ...form, productId: product.id }));
     setCustomForm((form) => ({ ...form, productId: product.id }));
+    setOrderForm((form) => ({ ...form, productId: product.id }));
   }
 
   async function saveOrganizationRecord() {
@@ -1485,6 +2233,208 @@ export function App() {
     await loadCustomRequests(customFilters);
   }
 
+  async function saveOrderRecord() {
+    if (!orderForm.customerId) return setStatus("Customer is required for an order.");
+    setLoading(true);
+    try {
+      const payload: OrderUpsertRequest = {
+        customerId: orderForm.customerId,
+        productId: orderForm.productId || null,
+        orderType: orderForm.orderType,
+        title: orderForm.title || null,
+        amount: orderForm.amount || null,
+        currency: orderForm.currency || "USD",
+        quantity: orderForm.quantity ? Number(orderForm.quantity) : null,
+        paymentStatus: orderForm.paymentStatus,
+        productionStatus: orderForm.productionStatus,
+        shippingStatus: orderForm.shippingStatus,
+        afterSalesStatus: orderForm.afterSalesStatus,
+        orderStatus: orderForm.orderStatus,
+        expectedShipDate: orderForm.expectedShipDate || null,
+        expectedDeliveryDate: orderForm.expectedDeliveryDate || null,
+        trackingNumber: orderForm.trackingNumber || null,
+        notes: orderForm.notes || null,
+        files: splitLinesOrComma(orderForm.files),
+        assignedTo: orderForm.assignedTo || null
+      };
+      const saved = selectedOrderId ? await updateOrder(selectedOrderId, payload) : await createOrder(payload);
+      setSelectedOrderId(saved.id);
+      setOrderForm(toOrderForm(saved));
+      setOrderRiskWarnings((saved as unknown as { riskWarnings?: string[] }).riskWarnings || []);
+      await loadOrders(orderFilters);
+      if (orderForm.customerId) await selectCustomer(orderForm.customerId);
+      setStatus("Order saved. Order status is manually maintained; no WhatsApp message was sent.");
+    } catch {
+      setStatus("Order save failed. Check customer/product permission and required fields.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function selectOrderRecord(id: string) {
+    setSelectedOrderId(id);
+    const [detail, fulfillment] = await Promise.all([getOrder(id), getOrderFulfillment(id).catch(() => null)]);
+    setOrderForm(toOrderForm(detail));
+    setFulfillmentAlerts(fulfillment?.alerts || []);
+    setOrderRiskWarnings([]);
+    setOrderScript("");
+  }
+
+  async function removeOrder(id: string) {
+    await deleteOrder(id);
+    if (selectedOrderId === id) {
+      setSelectedOrderId("");
+      setOrderForm(emptyOrderForm);
+      setOrderScript("");
+      setOrderRiskWarnings([]);
+    }
+    await loadOrders(orderFilters);
+    if (selectedCustomerId) await selectCustomer(selectedCustomerId);
+    setStatus("Order deleted after confirmation.");
+  }
+
+  async function convertQuoteToOrder(quoteId: string) {
+    setLoading(true);
+    try {
+      const saved = await createOrderFromQuote(quoteId);
+      setSelectedOrderId(saved.id);
+      setOrderForm(toOrderForm(saved));
+      setOrderRiskWarnings((saved as unknown as { riskWarnings?: string[] }).riskWarnings || []);
+      await loadOrders(orderFilters);
+      if (saved.customerId) await selectCustomer(saved.customerId);
+      setStatus("Quote converted to order draft. Confirm price, shipping, inventory and lead time.");
+    } catch {
+      setStatus("Quote-to-order failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function convertSampleToOrder(sampleOrderId: string) {
+    setLoading(true);
+    try {
+      const saved = await createOrderFromSample(sampleOrderId);
+      setSelectedOrderId(saved.id);
+      setOrderForm(toOrderForm(saved));
+      setOrderRiskWarnings((saved as unknown as { riskWarnings?: string[] }).riskWarnings || []);
+      await loadOrders(orderFilters);
+      if (saved.customerId) await selectCustomer(saved.customerId);
+      setStatus("Sample converted to bulk order draft. Confirm quantity and amount.");
+    } catch {
+      setStatus("Sample-to-order failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function convertCustomToOrder(customRequestId: string) {
+    setLoading(true);
+    try {
+      const saved = await createOrderFromCustomRequest(customRequestId);
+      setSelectedOrderId(saved.id);
+      setOrderForm(toOrderForm(saved));
+      setOrderRiskWarnings((saved as unknown as { riskWarnings?: string[] }).riskWarnings || []);
+      await loadOrders(orderFilters);
+      if (saved.customerId) await selectCustomer(saved.customerId);
+      setStatus("Custom request converted to order draft. Confirm amount, MOQ and production lead time.");
+    } catch {
+      setStatus("Custom-to-order failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function updateSelectedOrderStatus(kind: "payment" | "production" | "shipping" | "afterSales", value: string) {
+    if (!selectedOrderId) return setStatus("Select or save an order first.");
+    const saved =
+      kind === "payment" ? await updateOrderPaymentStatus(selectedOrderId, value) :
+      kind === "production" ? await updateOrderProductionStatus(selectedOrderId, value, orderForm.notes) :
+      kind === "shipping" ? await updateOrderShippingStatus(selectedOrderId, value, orderForm.trackingNumber) :
+      await updateOrderAfterSalesStatus(selectedOrderId, value);
+    setOrderForm(toOrderForm(saved));
+    setOrderRiskWarnings((saved as unknown as { riskWarnings?: string[] }).riskWarnings || []);
+    await loadOrders(orderFilters);
+    setStatus("Order status updated. Confirm the real-world facts before messaging the customer.");
+  }
+
+  async function recalculateSelectedFulfillment() {
+    if (!selectedOrderId) return setStatus("Select an order first.");
+    const result = await recalculateOrderFulfillmentAlerts(selectedOrderId);
+    setFulfillmentAlerts(result.alerts);
+    await loadFulfillmentBoard();
+    setStatus("Fulfillment alerts recalculated. No order status was changed automatically.");
+  }
+
+  async function updateFulfillmentAlertStatus(id: string, statusValue: "dismissed" | "resolved" | "task_created") {
+    const updated = await updateOrderFulfillmentAlert(id, statusValue);
+    setFulfillmentAlerts((items) => items.map((item) => item.id === id ? updated : item));
+    await loadFulfillmentBoard();
+    setStatus("Fulfillment alert updated and audited.");
+  }
+
+  async function generateSelectedOrderScript(scenario: OrderScriptScenario) {
+    if (!selectedOrderId) return setStatus("Select or save an order first.");
+    setLoading(true);
+    try {
+      const result = await generateOrderScript({
+        orderId: selectedOrderId,
+        scenario,
+        targetLanguage: selectedCustomer?.language || "English",
+        tone: "professional"
+      });
+      setOrderScript(result.scriptText);
+      setOrderRiskWarnings(result.riskWarnings);
+      setStatus("Order script generated as draft only. Confirm payment, production, shipping and after-sales details before sending.");
+    } catch {
+      setStatus("Order script generation failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function generateSelectedFulfillmentScript(scenario: OrderFulfillmentScriptScenario) {
+    if (!selectedOrderId) return setStatus("Select or save an order first.");
+    setLoading(true);
+    try {
+      const result = await generateOrderFulfillmentScript({
+        orderId: selectedOrderId,
+        alertId: fulfillmentAlerts[0]?.id || null,
+        scenario,
+        targetLanguage: selectedCustomer?.language || "English",
+        tone: "professional"
+      });
+      setOrderScript(result.scriptText);
+      setOrderRiskWarnings(result.riskWarnings);
+      setStatus("Fulfillment script generated as draft only. Confirm payment, production, shipping and after-sales details before sending.");
+    } catch {
+      setStatus("Fulfillment script generation failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function createFollowUpFromSelectedOrder() {
+    if (!selectedOrderId) return setStatus("Select or save an order first.");
+    await createOrderFollowUpTask(selectedOrderId, orderScript || orderForm.notes);
+    await loadDashboard();
+    if (selectedCustomerId) await selectCustomer(selectedCustomerId);
+    setStatus("Order follow-up task created by manual click only.");
+  }
+
+  async function createFulfillmentFollowUpFromSelectedOrder() {
+    if (!selectedOrderId) return setStatus("Select or save an order first.");
+    await createOrderFulfillmentFollowUp(selectedOrderId, {
+      taskType: "delivery_follow_up",
+      recommendedScript: orderScript || orderForm.notes,
+      alertId: fulfillmentAlerts[0]?.id || null
+    });
+    await loadDashboard();
+    await loadFulfillmentBoard();
+    if (selectedOrderId) await selectOrderRecord(selectedOrderId);
+    if (selectedCustomerId) await selectCustomer(selectedCustomerId);
+    setStatus("Fulfillment follow-up task created by manual click only.");
+  }
+
   async function createCustomFollowUp() {
     if (!customForm.customerId) return setStatus("Select a customer before creating a follow-up.");
     await createFollowUp({
@@ -1507,6 +2457,816 @@ export function App() {
     setStatus("Intent score recalculated. It is only a sales assistant signal.");
   }
 
+  async function runPredictionRecalculate(customerId?: string) {
+    setLoading(true);
+    try {
+      const payload = customerId
+        ? { customerId }
+        : { organizationId: predictionFilters.organizationId || selectedOrganizationId || null };
+      const result = await recalculatePredictions(payload);
+      await loadPredictions(predictionFilters);
+      setStatus(`Prediction recalculated. Created ${result.createdCount}, updated ${result.updatedCount}, skipped ${result.skippedCount}.`);
+    } catch {
+      setStatus("Prediction recalculation failed. Check role and customer access.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function changePredictionStatus(id: string, nextStatus: "open" | "dismissed" | "converted" | "task_created") {
+    setLoading(true);
+    try {
+      await updateCustomerPrediction(id, nextStatus);
+      await loadPredictions(predictionFilters);
+      setStatus(`Prediction marked as ${nextStatus}. No WhatsApp message was sent.`);
+    } catch {
+      setStatus("Prediction status update failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function createReminderFromPrediction(prediction: CustomerPredictionSummary) {
+    setLoading(true);
+    try {
+      const saved = await createReorderReminder({
+        customerId: prediction.customerId,
+        reminderType: predictionToReminderType(prediction.predictionType),
+        remindAt: tomorrowIso(),
+        reason: prediction.recommendedAction || prediction.reasons[0] || "Manual reorder follow-up",
+        suggestedScript: prediction.suggestedScript || null
+      });
+      await updateCustomerPrediction(prediction.id, "task_created");
+      await loadPredictions(predictionFilters);
+      setStatus(`Reorder reminder created for ${saved.customerName}. It requires manual follow-up.`);
+    } catch {
+      setStatus("Create reorder reminder failed. Check customer access and permissions.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function generatePredictionScript(prediction: CustomerPredictionSummary) {
+    setLoading(true);
+    try {
+      const result = await generateReorderScript({
+        customerId: prediction.customerId,
+        reminderType: predictionToScriptType(prediction.predictionType),
+        targetLanguage: selectedCustomer?.language || "English",
+        tone: "professional"
+      });
+      setPredictionScript(result.scriptText);
+      setPredictionRiskWarnings(result.riskWarnings);
+      setStatus("Reorder script generated as draft only. Confirm details before sending manually.");
+    } catch {
+      setStatus("Generate reorder script failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function changeReminderStatus(id: string, nextStatus: "pending" | "completed" | "dismissed" | "converted") {
+    setLoading(true);
+    try {
+      await updateReorderReminder(id, nextStatus);
+      await loadPredictions(predictionFilters);
+      setStatus(`Reorder reminder marked as ${nextStatus}.`);
+    } catch {
+      setStatus("Reorder reminder update failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function createFollowUpFromReminder(id: string) {
+    setLoading(true);
+    try {
+      await createReorderFollowUpTask(id);
+      await Promise.all([loadDashboard(), loadPredictions(predictionFilters)]);
+      if (selectedCustomerId) await selectCustomer(selectedCustomerId);
+      setStatus("Follow-up task created by manual click. No WhatsApp message was sent.");
+    } catch {
+      setStatus("Create follow-up task failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function runReorderOpsRecalculate(customerId?: string) {
+    setLoading(true);
+    try {
+      const payload = customerId
+        ? { customerId }
+        : { organizationId: reorderOpsFilters.organizationId || selectedOrganizationId || null };
+      const result = await recalculateReorderOpportunities(payload);
+      await loadReorderOperations(reorderOpsFilters);
+      setStatus(`Reorder opportunities recalculated. Created ${result.createdCount}, updated ${result.updatedCount}, skipped ${result.skippedCount}.`);
+    } catch {
+      setStatus("Reorder opportunity recalculation failed. Check role and customer access.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function changeReorderOpportunityStatus(id: string, nextStatus: string) {
+    setLoading(true);
+    try {
+      await updateReorderOpportunity(id, nextStatus);
+      await loadReorderOperations(reorderOpsFilters);
+      setStatus(`Reorder opportunity marked as ${nextStatus}. No WhatsApp message was sent.`);
+    } catch {
+      setStatus("Reorder opportunity update failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function createFollowUpFromOpportunity(opportunity: ReorderOpportunitySummary) {
+    setLoading(true);
+    try {
+      await createReorderOpportunityFollowUpTask(opportunity.id, {
+        remindAt: tomorrowIso(),
+        recommendedScript: opportunity.suggestedScript || opportunity.recommendedAction || "",
+        confirm: true
+      });
+      await Promise.all([loadDashboard(), loadReorderOperations(reorderOpsFilters)]);
+      setStatus("Reorder opportunity converted to FollowUpTask by manual click. No message was sent.");
+    } catch {
+      setStatus("Create FollowUpTask from reorder opportunity failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function generateReorderOpsScript(opportunity: ReorderOpportunitySummary) {
+    setLoading(true);
+    try {
+      const result = await generateReorderOperationScript({
+        customerId: opportunity.customerId,
+        productId: opportunity.productId || null,
+        opportunityId: opportunity.id,
+        scenario: opportunityToScriptScenario(opportunity.opportunityType),
+        targetLanguage: selectedCustomer?.language || "English",
+        tone: "professional"
+      });
+      setReorderOperationScript(result.scriptText);
+      setReorderOperationRiskWarnings(result.riskWarnings);
+      setStatus("Reorder operation script generated as draft only.");
+    } catch {
+      setStatus("Generate reorder operation script failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function saveReorderCampaign(event: FormEvent) {
+    event.preventDefault();
+    setLoading(true);
+    try {
+      await createReorderCampaign({
+        organizationId: reorderCampaignForm.organizationId || selectedOrganizationId || null,
+        name: reorderCampaignForm.name,
+        campaignType: reorderCampaignForm.campaignType,
+        targetScope: reorderCampaignForm.targetScope,
+        status: reorderCampaignForm.status
+      });
+      setReorderCampaignForm(emptyReorderCampaignForm);
+      await loadReorderOperations(reorderOpsFilters);
+      setStatus("Reorder campaign saved. It does not auto-send or auto-create tasks.");
+    } catch {
+      setStatus("Save reorder campaign failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function saveReorderPlaybook(event: FormEvent) {
+    event.preventDefault();
+    setLoading(true);
+    try {
+      await createReorderPlaybook({
+        organizationId: reorderPlaybookForm.organizationId || selectedOrganizationId || null,
+        title: reorderPlaybookForm.title,
+        scenario: reorderPlaybookForm.scenario,
+        language: reorderPlaybookForm.language,
+        content: reorderPlaybookForm.content,
+        enabled: reorderPlaybookForm.enabled
+      });
+      setReorderPlaybookForm(emptyReorderPlaybookForm);
+      await loadReorderOperations(reorderOpsFilters);
+      setStatus("Reorder playbook saved. Scripts remain drafts only.");
+    } catch {
+      setStatus("Save reorder playbook failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function selectAfterSalesRecord(id: string) {
+    setSelectedAfterSalesId(id);
+    try {
+      const detail = await getAfterSalesCase(id);
+      setSelectedAfterSalesCase(detail);
+      setAfterSalesForm(toAfterSalesForm(detail));
+      setAfterSalesRiskWarnings(detail.riskWarnings || []);
+      setAfterSalesScript("");
+    } catch {
+      setStatus("After-sales detail failed to load.");
+    }
+  }
+
+  async function saveAfterSalesRecord(event?: FormEvent) {
+    event?.preventDefault();
+    if (!afterSalesForm.customerId) return setStatus("Customer is required for after-sales case.");
+    setLoading(true);
+    try {
+      const payload = afterSalesPayload(afterSalesForm);
+      const saved = selectedAfterSalesId
+        ? await updateAfterSalesCase(selectedAfterSalesId, { ...payload, confirm: true, notes: afterSalesForm.internalNotes })
+        : await createAfterSalesCase(payload as any);
+      setSelectedAfterSalesId(saved.id);
+      setSelectedAfterSalesCase(saved);
+      setAfterSalesForm(toAfterSalesForm(saved));
+      setAfterSalesRiskWarnings(saved.riskWarnings || []);
+      await Promise.all([loadAfterSales(afterSalesFilters), loadOrders(orderFilters)]);
+      if (saved.customerId) await selectCustomer(saved.customerId);
+      setStatus("After-sales case saved. No refund, reship, responsibility confirmation or WhatsApp message was automated.");
+    } catch {
+      setStatus("Save after-sales case failed. Check customer/order permission and required fields.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function removeAfterSalesRecord(id: string) {
+    if (!window.confirm("Delete this after-sales case? This requires confirmation and is audited.")) return;
+    await deleteAfterSalesCase(id);
+    if (selectedAfterSalesId === id) {
+      setSelectedAfterSalesId("");
+      setSelectedAfterSalesCase(null);
+      setAfterSalesForm(emptyAfterSalesForm);
+      setAfterSalesScript("");
+      setAfterSalesRiskWarnings([]);
+    }
+    await loadAfterSales(afterSalesFilters);
+    setStatus("After-sales case deleted after manual confirmation.");
+  }
+
+  async function changeAfterSalesStatus(id: string, status: string) {
+    setLoading(true);
+    try {
+      const saved = await updateAfterSalesStatus(id, {
+        status,
+        notes: afterSalesForm.resolutionNotes || afterSalesForm.internalNotes || "Manual status update.",
+        resolutionNotes: afterSalesForm.resolutionNotes || afterSalesForm.internalNotes,
+        confirm: status === "closed" ? true : undefined
+      });
+      setSelectedAfterSalesCase(saved);
+      setAfterSalesForm(toAfterSalesForm(saved));
+      setAfterSalesRiskWarnings(saved.riskWarnings || []);
+      await loadAfterSales(afterSalesFilters);
+      setStatus("After-sales status updated manually.");
+    } catch {
+      setStatus("After-sales status update failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function changeAfterSalesResponsibility() {
+    if (!selectedAfterSalesId) return setStatus("Select an after-sales case first.");
+    setLoading(true);
+    try {
+      const saved = await updateAfterSalesResponsibility(selectedAfterSalesId, {
+        responsibility: afterSalesForm.responsibility,
+        notes: afterSalesForm.internalNotes,
+        confirm: true
+      });
+      setSelectedAfterSalesCase(saved);
+      setAfterSalesRiskWarnings(saved.riskWarnings || []);
+      await loadAfterSales(afterSalesFilters);
+      setStatus("Responsibility updated manually. AI did not decide responsibility.");
+    } catch {
+      setStatus("Responsibility update failed. Owner/manager permission may be required.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function changeAfterSalesSolution(syncOrderCost = false) {
+    if (!selectedAfterSalesId) return setStatus("Select an after-sales case first.");
+    setLoading(true);
+    try {
+      const saved = await updateAfterSalesSolution(selectedAfterSalesId, {
+        finalSolution: afterSalesForm.finalSolution,
+        refundAmount: afterSalesForm.refundAmount || undefined,
+        reshipCost: afterSalesForm.reshipCost || undefined,
+        compensationAmount: afterSalesForm.compensationAmount || undefined,
+        currency: afterSalesForm.currency || undefined,
+        notes: afterSalesForm.resolutionNotes || afterSalesForm.internalNotes,
+        syncOrderCost,
+        confirm: true
+      });
+      setSelectedAfterSalesCase(saved);
+      setAfterSalesForm(toAfterSalesForm(saved));
+      setAfterSalesRiskWarnings(saved.riskWarnings || []);
+      await Promise.all([loadAfterSales(afterSalesFilters), loadProfit(profitFilters)]);
+      setStatus(syncOrderCost ? "After-sales solution saved and cost sync requested after confirmation." : "After-sales solution saved after confirmation.");
+    } catch {
+      setStatus("Solution update failed. Owner/manager permission may be required.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function createAfterSalesTask() {
+    if (!selectedAfterSalesId) return setStatus("Select an after-sales case first.");
+    setLoading(true);
+    try {
+      await createAfterSalesFollowUpTask(selectedAfterSalesId, {
+        remindAt: tomorrowIso(),
+        taskType: "after_sales_follow_up",
+        recommendedScript: afterSalesScript || "Draft only: follow up on after-sales case after confirming company policy and case status.",
+        confirm: true
+      });
+      await Promise.all([loadDashboard(), loadAfterSales(afterSalesFilters)]);
+      setStatus("After-sales FollowUpTask created by manual click. No message was sent.");
+    } catch {
+      setStatus("Create after-sales follow-up failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function generateAfterSalesDraft() {
+    if (!selectedAfterSalesId) return setStatus("Select an after-sales case first.");
+    setLoading(true);
+    try {
+      const result = await generateAfterSalesScript({
+        afterSalesCaseId: selectedAfterSalesId,
+        scenario: afterSalesForm.scriptScenario as AfterSalesScriptScenario,
+        targetLanguage: selectedCustomer?.language || "English",
+        tone: "professional"
+      });
+      setAfterSalesScript(result.scriptText);
+      setAfterSalesRiskWarnings(result.riskWarnings);
+      setStatus("After-sales script generated as draft only. Confirm policy before sending.");
+    } catch {
+      setStatus("After-sales script generation failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function saveSupplierRecord(event: FormEvent) {
+    event.preventDefault();
+    if (!supplierForm.name.trim()) return setStatus("Supplier name is required.");
+    setLoading(true);
+    try {
+      const payload = {
+        ...supplierForm,
+        organizationId: supplierForm.organizationId || selectedOrganizationId || null,
+        tags: splitLinesOrComma(supplierForm.tags),
+        rating: optionalNumber(supplierForm.rating)
+      };
+      const saved = selectedSupplierId ? await updateSupplier(selectedSupplierId, { ...payload, confirm: true }) : await createSupplier(payload);
+      await loadSuppliers(supplierFilters);
+      await selectSupplierRecord(saved.id);
+      setStatus("Supplier saved. No supplier contact, purchase order, payment, or WhatsApp message was automated.");
+    } catch {
+      setStatus("Save supplier failed. Check duplicate supplier, role permission, and required fields.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function deactivateSupplierRecord() {
+    if (!selectedSupplierId) return setStatus("Select a supplier first.");
+    if (!window.confirm("Deactivate this supplier? This requires confirmation and is audited.")) return;
+    setLoading(true);
+    try {
+      const saved = await deleteSupplier(selectedSupplierId);
+      await loadSuppliers(supplierFilters);
+      setSelectedSupplier(saved);
+      setSupplierForm(toSupplierForm(saved));
+      setStatus("Supplier deactivated after manual confirmation.");
+    } catch {
+      setStatus("Deactivate supplier failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function addSupplierContact() {
+    if (!selectedSupplierId) return setStatus("Select a supplier first.");
+    setLoading(true);
+    try {
+      await createSupplierContact(selectedSupplierId, supplierContactForm);
+      setSupplierContactForm(emptySupplierContactForm);
+      await selectSupplierRecord(selectedSupplierId);
+      setStatus("Supplier contact saved. Sensitive contact data remains permission controlled.");
+    } catch {
+      setStatus("Save supplier contact failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function addSupplierQuote() {
+    if (!selectedSupplierId) return setStatus("Select a supplier first.");
+    setLoading(true);
+    try {
+      await createSupplierQuote({ ...supplierQuoteForm, supplierId: selectedSupplierId, productId: supplierQuoteForm.productId || null });
+      setSupplierQuoteForm({ ...emptySupplierQuoteForm, supplierId: selectedSupplierId });
+      await selectSupplierRecord(selectedSupplierId);
+      setStatus("Supplier quote saved as cost reference only. It did not update product price or order cost.");
+    } catch {
+      setStatus("Save supplier quote failed. Check product access and numeric fields.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function applySelectedSupplierQuote(quoteId: string) {
+    if (!supplierQuoteForm.orderId) return setStatus("Enter an order ID before applying supplier cost.");
+    if (!window.confirm("Apply this supplier quote to order cost? It will not confirm true cost or supplier payment.")) return;
+    setLoading(true);
+    try {
+      const result = await applySupplierQuoteToOrderCost(quoteId, { orderId: supplierQuoteForm.orderId });
+      setSupplierRiskWarnings(result.riskWarnings || []);
+      await Promise.all([selectSupplierRecord(selectedSupplierId), loadProfit(profitFilters)]);
+      setStatus("Supplier quote applied to order cost after manual confirmation. Cost is still unconfirmed.");
+    } catch {
+      setStatus("Apply supplier quote to order cost failed. Check order access and confirmed-cost permissions.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function addPurchaseNote() {
+    setLoading(true);
+    try {
+      await createPurchaseNote({ ...purchaseNoteForm, supplierId: purchaseNoteForm.supplierId || selectedSupplierId || null });
+      setPurchaseNoteForm({ ...emptyPurchaseNoteForm, supplierId: selectedSupplierId });
+      if (selectedSupplierId) await selectSupplierRecord(selectedSupplierId);
+      setStatus("Purchase note saved. It did not create a purchase order or contact the supplier.");
+    } catch {
+      setStatus("Save purchase note failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function addSupplierRisk() {
+    if (!selectedSupplierId) return setStatus("Select a supplier first.");
+    setLoading(true);
+    try {
+      await createSupplierRisk({ ...supplierRiskForm, supplierId: selectedSupplierId });
+      setSupplierRiskForm({ ...emptySupplierRiskForm, supplierId: selectedSupplierId });
+      await selectSupplierRecord(selectedSupplierId);
+      setStatus("Supplier risk saved for manual review.");
+    } catch {
+      setStatus("Save supplier risk failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function generateSupplierDraft() {
+    setLoading(true);
+    try {
+      const result = await generateSupplierScript({
+        ...supplierScriptForm,
+        supplierId: supplierScriptForm.supplierId || selectedSupplierId || null,
+        productId: supplierScriptForm.productId || null,
+        orderId: supplierScriptForm.orderId || null,
+        sampleOrderId: supplierScriptForm.sampleOrderId || null,
+        customRequestId: supplierScriptForm.customRequestId || null
+      });
+      setSupplierScript(result.scriptText || "");
+      setSupplierRiskWarnings(result.riskWarnings || []);
+      setStatus("Supplier procurement script generated as draft only. Confirm cost, MOQ, lead time and quality before sending.");
+    } catch {
+      setStatus("Supplier script generation failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function saveBrandRecord(event: FormEvent) {
+    event.preventDefault();
+    if (!brandForm.name.trim()) return setStatus("Brand name is required.");
+    setLoading(true);
+    try {
+      const payload = { ...brandForm, organizationId: brandForm.organizationId || selectedOrganizationId };
+      const saved = selectedBrandId ? await updateBrand(selectedBrandId, { ...payload, confirm: true }) : await createBrand(payload);
+      await loadBrands(brandFilters);
+      await selectBrandRecord(saved.id);
+      setStatus("Brand saved. It only controls drafts, resource filtering and policy context; no WhatsApp account was switched.");
+    } catch {
+      setStatus("Save brand failed. Check duplicate name, organization and role permission.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function archiveSelectedBrand() {
+    if (!selectedBrandId) return setStatus("Select a brand first.");
+    if (!window.confirm("Archive this brand/store? It will stop being recommended for AI context.")) return;
+    setLoading(true);
+    try {
+      await archiveBrand(selectedBrandId);
+      await loadBrands(brandFilters);
+      setStatus("Brand archived after manual confirmation.");
+    } catch {
+      setStatus("Archive brand failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function addBrandProductLink() {
+    if (!selectedBrandId || !brandProductLinkId) return setStatus("Select a brand and product first.");
+    try {
+      await linkBrandProduct(selectedBrandId, brandProductLinkId);
+      setBrandProductLinkId("");
+      await selectBrandRecord(selectedBrandId);
+      setStatus("Brand product linked. Product choices can now be filtered by brand.");
+    } catch {
+      setStatus("Link product failed. Check product organization and duplicate links.");
+    }
+  }
+
+  async function addBrandMaterialLink() {
+    if (!selectedBrandId || !brandMaterialLinkId) return setStatus("Select a brand and material first.");
+    try {
+      await linkBrandMaterial(selectedBrandId, brandMaterialLinkId);
+      setBrandMaterialLinkId("");
+      await selectBrandRecord(selectedBrandId);
+      setStatus("Brand material linked. Sidebar material search can prioritize this brand.");
+    } catch {
+      setStatus("Link material failed. Check material access and duplicate links.");
+    }
+  }
+
+  async function addBrandKnowledgeLink() {
+    if (!selectedBrandId || !brandKnowledgeLinkId) return setStatus("Select a brand and organization knowledge item first.");
+    try {
+      await linkBrandKnowledgeBase(selectedBrandId, brandKnowledgeLinkId);
+      setBrandKnowledgeLinkId("");
+      await selectBrandRecord(selectedBrandId);
+      setStatus("Brand knowledge linked. AI can cite it as brand context.");
+    } catch {
+      setStatus("Link knowledge failed. Check organization knowledge access.");
+    }
+  }
+
+  async function addBrandScriptLink() {
+    if (!selectedBrandId || !brandScriptLinkForm.scriptId.trim()) return setStatus("Enter a script ID first.");
+    try {
+      await linkBrandScript(selectedBrandId, brandScriptLinkForm);
+      setBrandScriptLinkForm(emptyBrandScriptLinkForm);
+      await selectBrandRecord(selectedBrandId);
+      setStatus("Brand script linked for manual draft use.");
+    } catch {
+      setStatus("Link script failed. Check script access and script type.");
+    }
+  }
+
+  async function removeBrandLink(kind: "product" | "material" | "knowledge" | "script", id: string) {
+    if (!window.confirm("Unlink this brand resource? This is audited and requires confirmation.")) return;
+    try {
+      if (kind === "product") await unlinkBrandProduct(id);
+      if (kind === "material") await unlinkBrandMaterial(id);
+      if (kind === "knowledge") await unlinkBrandKnowledgeBase(id);
+      if (kind === "script") await unlinkBrandScript(id);
+      if (selectedBrandId) await selectBrandRecord(selectedBrandId);
+      setStatus("Brand resource unlinked after manual confirmation.");
+    } catch {
+      setStatus("Unlink brand resource failed.");
+    }
+  }
+
+  async function saveBrandRule() {
+    if (!selectedBrandId || !brandRuleForm.title.trim() || !brandRuleForm.content.trim()) return setStatus("Brand rule title and content are required.");
+    try {
+      await createBrandRule(selectedBrandId, brandRuleForm);
+      setBrandRuleForm(emptyBrandRuleForm);
+      await selectBrandRecord(selectedBrandId);
+      setStatus("Brand rule saved. AI will still warn users to confirm price, stock, lead time, payment and after-sales details.");
+    } catch {
+      setStatus("Save brand rule failed.");
+    }
+  }
+
+  async function toggleBrandRule(rule: any) {
+    try {
+      await updateBrandRule(rule.id, { enabled: !rule.enabled });
+      if (selectedBrandId) await selectBrandRecord(selectedBrandId);
+      setStatus("Brand rule status updated.");
+    } catch {
+      setStatus("Update brand rule failed.");
+    }
+  }
+
+  async function removeBrandRule(id: string) {
+    if (!window.confirm("Delete this brand rule? AI will stop using it.")) return;
+    try {
+      await deleteBrandRule(id);
+      if (selectedBrandId) await selectBrandRecord(selectedBrandId);
+      setStatus("Brand rule deleted after manual confirmation.");
+    } catch {
+      setStatus("Delete brand rule failed.");
+    }
+  }
+
+  async function assignSelectedBrand() {
+    if (!selectedBrandId || !brandAssignmentForm.entityId.trim()) return setStatus("Select a brand and enter the entity ID to assign.");
+    if (!window.confirm("Assign this brand to the selected entity? Existing brand context should be reviewed manually.")) return;
+    try {
+      await assignBrand(selectedBrandId, brandAssignmentForm);
+      await selectBrandRecord(selectedBrandId);
+      setStatus("Brand assigned after manual confirmation. It did not overwrite WhatsApp account or send any message.");
+    } catch {
+      setStatus("Assign brand failed. Check entity access and organization.");
+    }
+  }
+
+  async function selectScriptExperimentRecord(id: string) {
+    setLoading(true);
+    try {
+      const detail = await getScriptExperiment(id);
+      setSelectedScriptExperiment(detail);
+      setScriptExperimentForm({
+        organizationId: detail.organizationId || "",
+        name: detail.name,
+        scenario: detail.scenario,
+        description: detail.description || "",
+        status: detail.status,
+        targetLanguage: detail.targetLanguage || "",
+        targetCustomerStage: detail.targetCustomerStage || ""
+      });
+      setScriptVariantForm({ ...emptyScriptVariantForm, language: detail.targetLanguage || "en" });
+      setScriptVariantDrafts([]);
+      setScriptUsageDraft(null);
+      setStatus("A/B script experiment loaded.");
+    } catch {
+      setStatus("A/B script experiment failed to load or permission is insufficient.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function saveScriptExperimentRecord(event: FormEvent) {
+    event.preventDefault();
+    setLoading(true);
+    try {
+      const payload = {
+        organizationId: scriptExperimentForm.organizationId || selectedOrganizationId || null,
+        name: scriptExperimentForm.name,
+        scenario: scriptExperimentForm.scenario,
+        description: scriptExperimentForm.description || null,
+        status: scriptExperimentForm.status,
+        targetLanguage: scriptExperimentForm.targetLanguage || null,
+        targetCustomerStage: scriptExperimentForm.targetCustomerStage || null
+      };
+      const saved = selectedScriptExperiment
+        ? await updateScriptExperiment(selectedScriptExperiment.id, payload)
+        : await createScriptExperiment(payload);
+      await loadScriptExperiments(scriptTestFilters);
+      await selectScriptExperimentRecord(saved.id);
+      setStatus("A/B script experiment saved. It only manages draft scripts and usage records.");
+    } catch {
+      setStatus("Save A/B script experiment failed. Check scenario, role and organization access.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function archiveSelectedScriptExperiment() {
+    if (!selectedScriptExperiment) return setStatus("Select an experiment first.");
+    if (!window.confirm("Archive this script experiment? This is audited and requires manual confirmation.")) return;
+    setLoading(true);
+    try {
+      await archiveScriptExperiment(selectedScriptExperiment.id);
+      setSelectedScriptExperiment(null);
+      setScriptExperimentForm(emptyScriptExperimentForm);
+      setScriptUsageDraft(null);
+      await loadScriptExperiments(scriptTestFilters);
+      setStatus("A/B script experiment archived after manual confirmation.");
+    } catch {
+      setStatus("Archive A/B script experiment failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function saveScriptVariantRecord(event: FormEvent) {
+    event.preventDefault();
+    if (!selectedScriptExperiment) return setStatus("Select an experiment before adding variants.");
+    setLoading(true);
+    try {
+      const saved = await createScriptVariant(selectedScriptExperiment.id, {
+        title: scriptVariantForm.title,
+        versionLabel: scriptVariantForm.versionLabel,
+        content: scriptVariantForm.content,
+        language: scriptVariantForm.language || scriptExperimentForm.targetLanguage || null,
+        tone: scriptVariantForm.tone || null,
+        enabled: scriptVariantForm.enabled
+      });
+      setScriptVariantForm({ ...emptyScriptVariantForm, versionLabel: nextVariantLabel(selectedScriptExperiment.variants.length + 1) });
+      await selectScriptExperimentRecord(saved.experimentId);
+      setStatus("Script variant saved as a selectable draft. It was not sent to WhatsApp.");
+    } catch {
+      setStatus("Save script variant failed. Version labels must be unique within an experiment.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function disableScriptVariantRecord(variant: ScriptVariantSummary) {
+    if (!window.confirm("Disable this script variant? Existing usage history will be kept.")) return;
+    setLoading(true);
+    try {
+      await deleteScriptVariant(variant.id);
+      if (selectedScriptExperiment) await selectScriptExperimentRecord(selectedScriptExperiment.id);
+      setStatus("Script variant disabled or removed after manual confirmation.");
+    } catch {
+      setStatus("Disable script variant failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function generateScriptVariantDrafts() {
+    setLoading(true);
+    try {
+      const result = await generateScriptExperimentVariants({
+        scenario: scriptExperimentForm.scenario,
+        targetLanguage: scriptExperimentForm.targetLanguage || "en",
+        tone: scriptVariantForm.tone || "professional",
+        baseContent: scriptVariantForm.content || undefined,
+        count: 3
+      });
+      setScriptVariantDrafts(result.variants);
+      setStatus(`AI generated ${result.variants.length} A/B/C draft variants. Confirm price, stock, lead time and shipping before use.`);
+    } catch {
+      setStatus("AI variant generation failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function saveGeneratedScriptVariant(draft: { versionLabel: string; title: string; content: string }) {
+    if (!selectedScriptExperiment) return setStatus("Select an experiment before saving generated variants.");
+    setScriptVariantForm({
+      versionLabel: draft.versionLabel,
+      title: draft.title,
+      content: draft.content,
+      language: scriptExperimentForm.targetLanguage || "en",
+      tone: "professional",
+      enabled: true
+    });
+    setStatus("Generated draft copied into the variant form. Review it, then click Save variant.");
+  }
+
+  async function recordScriptVariantUsage(variant: ScriptVariantSummary) {
+    setLoading(true);
+    try {
+      const usage = await createScriptUsage({
+        experimentId: variant.experimentId,
+        variantId: variant.id,
+        customerId: selectedCustomerId || null,
+        scenario: selectedScriptExperiment?.scenario || scriptExperimentForm.scenario,
+        channel: "web",
+        usedText: variant.content
+      });
+      setScriptUsageDraft(usage);
+      await navigator.clipboard.writeText(variant.content);
+      if (selectedScriptExperiment) await selectScriptExperimentRecord(selectedScriptExperiment.id);
+      setStatus("Variant copied and usage recorded as used_draft. The message still must be sent manually.");
+    } catch {
+      setStatus("Record script usage failed. Check customer access and experiment status.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function markScriptUsageOutcome(outcome: string) {
+    if (!scriptUsageDraft) return setStatus("Record a usage first, then mark its outcome.");
+    setLoading(true);
+    try {
+      const updated = await updateScriptUsageOutcome(scriptUsageDraft.id, { outcome });
+      setScriptUsageDraft(updated);
+      if (selectedScriptExperiment) await selectScriptExperimentRecord(selectedScriptExperiment.id);
+      setStatus(`Script usage outcome marked as ${outcome}.`);
+    } catch {
+      setStatus("Mark script usage outcome failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function markTaskDone(id: string) {
     await completeFollowUp(id);
     await loadDashboard();
@@ -1521,8 +3281,8 @@ export function App() {
     return (
       <div className="auth-shell">
         <form className="auth-card" onSubmit={handleLogin}>
-          <h1>WhatsApp AI 销售助手</h1>
-          <p>登录后管理客户、产品、报价、跟进和团队协作功能。</p>
+          <h1>WhatsApp AI Sales Assistant</h1>
+          <p>Login to manage customers, products, quotes, follow-ups, teams and orders.</p>
           <label className="field">
             <span>Email</span>
             <input value={loginForm.email} onChange={(event) => setLoginForm({ ...loginForm, email: event.target.value })} />
@@ -1544,34 +3304,46 @@ export function App() {
         <div className="brand">
           <div className="brand-mark">WA</div>
           <div>
-            <h1>WhatsApp AI 销售助手</h1>
-            <p>V3 团队协作版</p>
+            <h1>WhatsApp AI Sales Assistant</h1>
+            <p>V4 sales enhancement</p>
           </div>
         </div>
         <nav className="nav-list">
-          {navButton("dashboard", "首页")}
-          {canManageSelectedOrganization && navButton("teamDashboard", "团队看板")}
-          {navButton("organizations", "组织")}
-          {navButton("roles", "角色")}
-          {navButton("customers", "客户")}
-          {navButton("products", "产品")}
-          {navButton("orgProducts", "公共产品库")}
-          {navButton("quotes", "报价")}
-          {navButton("knowledge", "个人知识库")}
-          {navButton("orgKnowledge", "公共知识库")}
-          {navButton("orgScripts", "公共话术库")}
-          {navButton("materials", "素材中心")}
-          {navButton("orgMaterials", "公共素材库")}
-          {navButton("samples", "样品单")}
-          {navButton("custom", "定制需求")}
-          {navButton("importExport", "导入/导出")}
-          {navButton("auditLogs", "审计日志")}
+          {navButton("dashboard", "Home")}
+          {canManageSelectedOrganization && navButton("teamDashboard", "Team board")}
+          {canManageSelectedOrganization && navButton("reports", "Reports")}
+          {navButton("predictions", "Predictions")}
+          {navButton("reorderOps", "Reorder ops")}
+          {navButton("afterSales", "After sales")}
+          {navButton("scriptTests", "A/B scripts")}
+          {navButton("suppliers", "Suppliers")}
+          {navButton("brands", "Brands / stores")}
+          {navButton("organizations", "Organizations")}
+          {navButton("roles", "Roles")}
+          {navButton("permissions", "Permissions")}
+          {navButton("customers", "Customers")}
+          {navButton("products", "Products")}
+          {navButton("orgProducts", "Org products")}
+          {navButton("quotes", "Quotes")}
+          {navButton("orders", "Orders")}
+          {navButton("fulfillment", "Fulfillment")}
+          {navButton("profit", "Profit review")}
+          {navButton("knowledge", "Knowledge")}
+          {navButton("orgKnowledge", "Org knowledge")}
+          {navButton("orgScripts", "Org scripts")}
+          {navButton("materials", "Materials")}
+          {navButton("orgMaterials", "Org materials")}
+          {navButton("samples", "Samples")}
+          {navButton("custom", "Custom")}
+          {navButton("importExport", "Import/export")}
+          {navButton("auditLogs", "Audit logs")}
+          {canManageSelectedOrganization && navButton("riskEvents", "Risk events")}
         </nav>
       </aside>
       <main className="workspace">
         <header className="topbar">
           <div>
-            <p className="eyebrow">当前用户：{currentUser.email}</p>
+            <p className="eyebrow">Logged in as {currentUser.email}</p>
             <h2>{titleForView(view)}</h2>
             <p>{status}</p>
           </div>
@@ -1581,15 +3353,26 @@ export function App() {
             <button className="secondary-button" onClick={handleLogout}>Logout</button>
           </div>
         </header>
-        <div className="safety-note">{AI_SAFETY_NOTE} All generated text is draft only. 复制后由业务员手动发送。The system never sends WhatsApp messages automatically.</div>
+        <div className="safety-note">{AI_SAFETY_NOTE} All generated text is draft only. 濠电姰鍨煎▔娑氱矓閹绢喖鏄ユ俊銈呮噹鐟欙箓骞栨潏鍓хɑ闁哄棛濮撮埥澶愬箻绾惧顥濇繝娈垮枤閸犳牕鐣烽妸銉庣喓鎷犲顔芥緬闂備礁鎲￠弻锝夊礉瀹€鍐︿汗闁稿瞼鍋為悞璇裁归敐鍥舵毌闁稿鎸荤粚閬嶅船閸?system never sends WhatsApp messages automatically.</div>
         {view === "dashboard" && renderDashboard()}
         {view === "teamDashboard" && renderTeamDashboard()}
+        {view === "reports" && renderReports()}
+        {view === "predictions" && renderPredictions()}
+        {view === "reorderOps" && renderReorderOperations()}
+        {view === "afterSales" && renderAfterSales()}
+        {view === "scriptTests" && renderScriptTests()}
+        {view === "suppliers" && renderSuppliers()}
+        {view === "brands" && renderBrands()}
         {view === "organizations" && renderOrganizations()}
         {view === "roles" && renderRoles()}
+        {view === "permissions" && renderPermissions()}
         {view === "customers" && renderCustomers()}
         {view === "products" && renderProducts()}
         {view === "orgProducts" && renderOrgProducts()}
         {view === "quotes" && renderQuotes()}
+        {view === "orders" && renderOrders()}
+        {view === "fulfillment" && renderFulfillment()}
+        {view === "profit" && renderProfit()}
         {view === "knowledge" && renderKnowledge()}
         {view === "orgKnowledge" && renderOrgKnowledge()}
         {view === "orgScripts" && renderOrgScripts()}
@@ -1599,6 +3382,7 @@ export function App() {
         {view === "custom" && renderCustom()}
         {view === "importExport" && renderImportExport()}
         {view === "auditLogs" && renderAuditLogs()}
+        {view === "riskEvents" && renderRiskEvents()}
       </main>
     </div>
   );
@@ -1624,6 +3408,23 @@ export function App() {
           <TaskPanel title="Overdue" tasks={dashboard?.overdue || []} />
           <CustomerPanel title="High intent customers" customers={highIntent} />
           <CustomerPanel title="Recent customers" customers={dashboard?.recentCustomers || []} />
+          <Panel title="Reorder reminders" description="Manual reminders generated from V4-E predictions.">
+            <SimpleList items={reorderReminders.slice(0, 5)} render={(item) => (
+              <button className="customer-row" onClick={() => { setView("customers"); void selectCustomer(item.customerId); }}>
+                <strong>{item.customerName} / {item.reminderType}</strong>
+                <span>{formatDate(item.remindAt)} / {item.status}</span>
+                <span>{item.reason || "-"}</span>
+              </button>
+            )} />
+          </Panel>
+          <Panel title="Prediction alerts" description="Rule-based reorder, dormant and churn-risk signals.">
+            <SimpleList items={customerPredictions.filter((item) => item.level === "high").slice(0, 5)} render={(item) => (
+              <button className="customer-row" onClick={() => { setView("customers"); void selectCustomer(item.customerId); }}>
+                <strong>{item.customerName} / {item.predictionType} / {item.score}</strong>
+                <span>{item.recommendedAction || "-"}</span>
+              </button>
+            )} />
+          </Panel>
         </section>
       </>
     );
@@ -1655,8 +3456,8 @@ export function App() {
               {(teamSummary?.memberStats || []).map((member) => (
                 <div className="quote-history-item" key={member.userId}>
                   <strong>{member.userName || member.userEmail || member.userId}</strong>
-                  <span>{member.role} 路 customers {member.customerCount}</span>
-                  <span>completed follow-ups {member.completedFollowUps} 路 quotes {member.quoteCount}</span>
+                  <span>{member.role} 闂?customers {member.customerCount}</span>
+                  <span>completed follow-ups {member.completedFollowUps} 闂?quotes {member.quoteCount}</span>
                 </div>
               ))}
             </div>
@@ -1664,8 +3465,8 @@ export function App() {
           <Panel title="High intent customers" description="Contact information is hidden in this team view. Open customer detail only when you have permission.">
             <SimpleList items={teamSummary?.highIntentCustomers || []} render={(item) => (
               <button className="customer-row" onClick={() => { setView("customers"); void selectCustomer(item.id); }}>
-                <strong>{item.name} 路 {item.intentScore}</strong>
-                <span>{item.stage} 路 owner {item.ownerId || "-"} 路 assigned {item.assignedTo || "-"}</span>
+                <strong>{item.name} 闂?{item.intentScore}</strong>
+                <span>{item.stage} 闂?owner {item.ownerId || "-"} 闂?assigned {item.assignedTo || "-"}</span>
                 <span>{item.recommendedAction}</span>
               </button>
             )} />
@@ -1682,6 +3483,789 @@ export function App() {
     setView("customers");
   }
 
+  function renderReports() {
+    const organizationId = reportFilters.organizationId || selectedOrganizationId;
+    if (!organizationId) {
+      return <Panel title="Reports" description="Select an organization first."><p className="empty-note">No organization selected.</p></Panel>;
+    }
+    if (!canManageSelectedOrganization) {
+      return <Panel title="Reports" description="Owner or manager role required."><p className="empty-note">You do not have permission to view reports.</p></Panel>;
+    }
+    return (
+      <>
+        <section className="metrics">
+          <button className="metric-card" onClick={() => openTeamCustomers({ organizationId })}><span>Today new customers</span><strong>{reportSummary?.kpis.todayNewCustomers || 0}</strong></button>
+          <button className="metric-card" onClick={() => setView("dashboard")}><span>Today follow-ups</span><strong>{reportSummary?.kpis.todayFollowUpCustomers || 0}</strong></button>
+          <button className="metric-card" onClick={() => setView("dashboard")}><span>Overdue follow-ups</span><strong>{reportSummary?.kpis.overdueFollowUpCustomers || 0}</strong></button>
+          <button className="metric-card" onClick={() => openTeamCustomers({ organizationId, intentLevel: "high" })}><span>High intent customers</span><strong>{reportSummary?.kpis.highIntentCustomers || 0}</strong></button>
+          <button className="metric-card" onClick={() => openTeamCustomers({ organizationId })}><span>Quoted no follow-up</span><strong>{reportSummary?.kpis.quotedNoFollowUpCustomers || 0}</strong></button>
+        </section>
+        <section className="grid quote-layout">
+          <Panel title="Team report" description="Owner/manager only. Data is scoped to the selected organization.">
+            <div className="form-grid">
+              <SelectField label="Organization" value={organizationId} onChange={(value) => setReportFilters({ ...reportFilters, organizationId: value })} options={organizations.map((item) => [item.id, item.name])} emptyLabel="Select organization" />
+              <SelectField label="Salesperson" value={reportFilters.assignedTo} onChange={(value) => setReportFilters({ ...reportFilters, assignedTo: value })} options={organizationMembers.map((item) => [item.userId, item.userName || item.userEmail || item.userId])} emptyLabel="All members" />
+              <SelectField label="Stage" value={reportFilters.stage} onChange={(value) => setReportFilters({ ...reportFilters, stage: value })} options={CUSTOMER_STAGES.map((item) => [item, item])} emptyLabel="All stages" />
+              <SelectField label="Intent level" value={reportFilters.intentLevel} onChange={(value) => setReportFilters({ ...reportFilters, intentLevel: value as ReportFilters["intentLevel"] })} options={[["low", "low"], ["medium", "medium"], ["high", "high"]]} emptyLabel="All levels" />
+              <SelectField label="Report type" value={reportFilters.reportType} onChange={(value) => setReportFilters({ ...reportFilters, reportType: value as ReportJobType })} options={REPORT_JOB_TYPES.map((item) => [item, item])} />
+            </div>
+            <div className="detail-actions">
+              <button onClick={() => loadReports({ ...reportFilters, organizationId })}>Refresh report</button>
+              <button className="secondary-button" onClick={runReportJob}>Generate report job</button>
+              <a className="secondary-button" href={reportTeamSummaryUrl(organizationId, "csv")}>Export CSV</a>
+              <a className="secondary-button" href={reportTeamSummaryUrl(organizationId, "excel")}>Export Excel</a>
+            </div>
+            <RiskWarnings items={[
+              "Reports are assistant statistics only and do not send WhatsApp messages.",
+              "Exports are scoped by organization role and must not include secrets.",
+              "Confirm customer, quote and follow-up data before making management decisions."
+            ]} />
+            {reportJob && (
+              <div className="risk-box">
+                <span>Report job: {reportJob.id}</span>
+                <span>Type: {reportJob.type}</span>
+                <span>Status: {reportJob.status}</span>
+              </div>
+            )}
+          </Panel>
+          <Panel title="Member stats" description="Customer, follow-up and quote counts by member.">
+            <div className="quote-history-list">
+              {(reportSummary?.memberStats || []).map((member) => (
+                <div className="quote-history-item" key={member.userId}>
+                  <strong>{member.userName || member.userEmail || member.userId}</strong>
+                  <span>{member.role} / {member.status}</span>
+                  <span>Customers {member.customerCount} / Completed follow-ups {member.completedFollowUps} / Quotes {member.quoteCount}</span>
+                </div>
+              ))}
+            </div>
+          </Panel>
+          <Panel title="High intent customers" description="Open customer records from the report list.">
+            <SimpleList items={reportHighIntent} render={(item) => (
+              <button className="customer-row" onClick={() => { setView("customers"); void selectCustomer(item.id); }}>
+                <strong>{item.name} / {item.intentScore}</strong>
+                <span>{item.stage} / owner {item.ownerId || "-"} / assigned {item.assignedTo || "-"}</span>
+                <span>{item.recommendedAction}</span>
+              </button>
+            )} />
+          </Panel>
+        </section>
+      </>
+    );
+  }
+  function renderAfterSales() {
+    const openCount = afterSalesCases.filter((item) => item.status === "open").length;
+    const processingCount = afterSalesCases.filter((item) => item.status === "processing").length;
+    const waitingCount = afterSalesCases.filter((item) => item.status === "waiting_customer" || item.status === "waiting_internal").length;
+    const highCount = afterSalesCases.filter((item) => item.priority === "high" || item.priority === "urgent").length;
+    const refundCount = afterSalesCases.filter((item) => item.caseType === "refund_request" || item.requestedSolution === "refund" || item.finalSolution === "refund").length;
+    const reshipCount = afterSalesCases.filter((item) => item.caseType === "reship_request" || item.requestedSolution === "reship" || item.finalSolution === "reship").length;
+    return (
+      <>
+        <section className="metrics">
+          <Metric label="Open" value={openCount} />
+          <Metric label="Processing" value={processingCount} />
+          <Metric label="Waiting" value={waitingCount} />
+          <Metric label="High priority" value={highCount} />
+          <Metric label="Refund requests" value={refundCount} />
+          <Metric label="Reship requests" value={reshipCount} />
+        </section>
+        <section className="grid quote-layout">
+          <Panel title="After-sales filters" description="After-sales records are scoped by organization and user permissions.">
+            <div className="form-grid">
+              <SelectField label="Organization" value={afterSalesFilters.organizationId || selectedOrganizationId} onChange={(value) => setAfterSalesFilters({ ...afterSalesFilters, organizationId: value })} options={organizations.map((item) => [item.id, item.name])} emptyLabel="Personal scope" />
+              <Field label="Keyword"><input value={afterSalesFilters.keyword} onChange={(event) => setAfterSalesFilters({ ...afterSalesFilters, keyword: event.target.value })} /></Field>
+              <SelectField label="Type" value={afterSalesFilters.caseType} onChange={(value) => setAfterSalesFilters({ ...afterSalesFilters, caseType: value })} options={AFTER_SALES_CASE_TYPES.map((item) => [item, item])} emptyLabel="All types" />
+              <SelectField label="Priority" value={afterSalesFilters.priority} onChange={(value) => setAfterSalesFilters({ ...afterSalesFilters, priority: value })} options={AFTER_SALES_PRIORITIES.map((item) => [item, item])} emptyLabel="All priorities" />
+              <SelectField label="Status" value={afterSalesFilters.status} onChange={(value) => setAfterSalesFilters({ ...afterSalesFilters, status: value })} options={AFTER_SALES_STATUSES.map((item) => [item, item])} emptyLabel="All status" />
+              <SelectField label="Responsibility" value={afterSalesFilters.responsibility} onChange={(value) => setAfterSalesFilters({ ...afterSalesFilters, responsibility: value })} options={AFTER_SALES_RESPONSIBILITIES.map((item) => [item, item])} emptyLabel="All responsibilities" />
+            </div>
+            <div className="detail-actions">
+              <button onClick={() => loadAfterSales(afterSalesFilters)} disabled={loading}>Search</button>
+              <button className="secondary-button" onClick={() => { setSelectedAfterSalesId(""); setSelectedAfterSalesCase(null); setAfterSalesForm({ ...emptyAfterSalesForm, customerId: selectedCustomerId, orderId: selectedOrderId, productId: selectedProductId }); }}>New after-sales</button>
+            </div>
+            <RiskWarnings items={[
+              "After-sales records do not trigger refunds, reshipments, compensation or WhatsApp messages automatically.",
+              "Responsibility and final solution must be manually confirmed by the salesperson, manager or owner.",
+              "Evidence URLs are text links only in V4-J; no real file upload is performed."
+            ]} />
+          </Panel>
+
+          <Panel title="After-sales form" description="Create or update a case. Refund/reship/solution changes require confirmation and are audited.">
+            <form onSubmit={saveAfterSalesRecord}>
+              <div className="form-grid">
+                <SelectField label="Customer" value={afterSalesForm.customerId} onChange={(value) => setAfterSalesForm({ ...afterSalesForm, customerId: value })} options={customers.map((item) => [item.id, item.name])} emptyLabel="Select customer" />
+                <SelectField label="Order" value={afterSalesForm.orderId} onChange={(value) => setAfterSalesForm({ ...afterSalesForm, orderId: value })} options={orders.filter((item) => !afterSalesForm.customerId || item.customerId === afterSalesForm.customerId).map((item) => [item.id, item.orderNo])} emptyLabel="No order" />
+                <SelectField label="Product" value={afterSalesForm.productId} onChange={(value) => setAfterSalesForm({ ...afterSalesForm, productId: value })} options={products.map((item) => [item.id, item.name])} emptyLabel="No product" />
+                <SelectField label="Type" value={afterSalesForm.caseType} onChange={(value) => setAfterSalesForm({ ...afterSalesForm, caseType: value })} options={AFTER_SALES_CASE_TYPES.map((item) => [item, item])} />
+                <SelectField label="Priority" value={afterSalesForm.priority} onChange={(value) => setAfterSalesForm({ ...afterSalesForm, priority: value })} options={AFTER_SALES_PRIORITIES.map((item) => [item, item])} />
+                <SelectField label="Status" value={afterSalesForm.status} onChange={(value) => setAfterSalesForm({ ...afterSalesForm, status: value })} options={AFTER_SALES_STATUSES.map((item) => [item, item])} />
+                <SelectField label="Requested solution" value={afterSalesForm.requestedSolution} onChange={(value) => setAfterSalesForm({ ...afterSalesForm, requestedSolution: value })} options={AFTER_SALES_SOLUTIONS.map((item) => [item, item])} emptyLabel="Not confirmed" />
+                <SelectField label="Final solution" value={afterSalesForm.finalSolution} onChange={(value) => setAfterSalesForm({ ...afterSalesForm, finalSolution: value })} options={AFTER_SALES_SOLUTIONS.map((item) => [item, item])} emptyLabel="Not confirmed" />
+                <SelectField label="Responsibility" value={afterSalesForm.responsibility} onChange={(value) => setAfterSalesForm({ ...afterSalesForm, responsibility: value })} options={AFTER_SALES_RESPONSIBILITIES.map((item) => [item, item])} />
+                <Field label="Currency"><input value={afterSalesForm.currency} onChange={(event) => setAfterSalesForm({ ...afterSalesForm, currency: event.target.value })} /></Field>
+                <Field label="Refund amount"><input value={afterSalesForm.refundAmount} onChange={(event) => setAfterSalesForm({ ...afterSalesForm, refundAmount: event.target.value })} /></Field>
+                <Field label="Reship cost"><input value={afterSalesForm.reshipCost} onChange={(event) => setAfterSalesForm({ ...afterSalesForm, reshipCost: event.target.value })} /></Field>
+                <Field label="Compensation"><input value={afterSalesForm.compensationAmount} onChange={(event) => setAfterSalesForm({ ...afterSalesForm, compensationAmount: event.target.value })} /></Field>
+                <Field label="Assigned to"><input value={afterSalesForm.assignedTo} onChange={(event) => setAfterSalesForm({ ...afterSalesForm, assignedTo: event.target.value })} /></Field>
+              </div>
+              <label className="field"><span>Description</span><textarea rows={3} value={afterSalesForm.description} onChange={(event) => setAfterSalesForm({ ...afterSalesForm, description: event.target.value })} /></label>
+              <label className="field"><span>Customer claim</span><textarea rows={3} value={afterSalesForm.customerClaim} onChange={(event) => setAfterSalesForm({ ...afterSalesForm, customerClaim: event.target.value })} /></label>
+              <label className="field"><span>Evidence URLs</span><textarea rows={3} value={afterSalesForm.evidenceUrls} onChange={(event) => setAfterSalesForm({ ...afterSalesForm, evidenceUrls: event.target.value })} placeholder="One URL per line" /></label>
+              <label className="field"><span>Internal / resolution notes</span><textarea rows={3} value={afterSalesForm.resolutionNotes || afterSalesForm.internalNotes} onChange={(event) => setAfterSalesForm({ ...afterSalesForm, resolutionNotes: event.target.value, internalNotes: event.target.value })} /></label>
+              <div className="detail-actions">
+                <button disabled={loading}>Save case</button>
+                <button type="button" className="secondary-button" onClick={() => selectedAfterSalesId && changeAfterSalesStatus(selectedAfterSalesId, "processing")} disabled={!selectedAfterSalesId || loading}>Processing</button>
+                <button type="button" className="secondary-button" onClick={() => selectedAfterSalesId && changeAfterSalesStatus(selectedAfterSalesId, "resolved")} disabled={!selectedAfterSalesId || loading}>Resolved</button>
+                <button type="button" className="secondary-button" onClick={() => selectedAfterSalesId && changeAfterSalesStatus(selectedAfterSalesId, "closed")} disabled={!selectedAfterSalesId || loading}>Close</button>
+                <button type="button" className="secondary-button" onClick={changeAfterSalesResponsibility} disabled={!selectedAfterSalesId || loading}>Confirm responsibility</button>
+                <button type="button" className="secondary-button" onClick={() => changeAfterSalesSolution(false)} disabled={!selectedAfterSalesId || loading}>Confirm solution</button>
+                <button type="button" className="secondary-button" onClick={() => changeAfterSalesSolution(true)} disabled={!selectedAfterSalesId || loading}>Sync cost</button>
+              </div>
+            </form>
+          </Panel>
+
+          <Panel title="After-sales cases" description="Refund, reship, responsibility and closure actions require manual confirmation.">
+            <SimpleList items={afterSalesCases} render={(item) => (
+              <div className="quote-history-item">
+                <strong>{item.caseNo} / {item.customerName || item.customerId}</strong>
+                <span>{item.caseType} / {item.priority} / {item.status} / responsibility {item.responsibility || "unknown"}</span>
+                <span>{item.orderNo || "No order"} / {item.productName || "No product"} / solution {item.finalSolution || item.requestedSolution || "unconfirmed"}</span>
+                <div className="detail-actions">
+                  <button className="secondary-button" onClick={() => selectAfterSalesRecord(item.id)}>Open</button>
+                  <button className="secondary-button" onClick={() => { setSelectedCustomerId(item.customerId); setView("customers"); void selectCustomer(item.customerId); }}>Customer</button>
+                  <button className="secondary-button" onClick={() => removeAfterSalesRecord(item.id)} disabled={loading}>Delete</button>
+                </div>
+              </div>
+            )} />
+          </Panel>
+
+          <Panel title="AI after-sales draft" description="Draft only. It never confirms responsibility, refund, reship, compensation or logistics status.">
+            <div className="form-grid">
+              <SelectField label="Scenario" value={afterSalesForm.scriptScenario} onChange={(value) => setAfterSalesForm({ ...afterSalesForm, scriptScenario: value })} options={AFTER_SALES_SCRIPT_SCENARIOS.map((item) => [item, item])} />
+            </div>
+            <textarea rows={8} value={afterSalesScript} onChange={(event) => setAfterSalesScript(event.target.value)} placeholder="Generate after-sales script draft." />
+            <RiskWarnings items={afterSalesRiskWarnings} />
+            <div className="detail-actions">
+              <button onClick={generateAfterSalesDraft} disabled={!selectedAfterSalesId || loading}>Generate draft</button>
+              <button className="secondary-button" onClick={() => navigator.clipboard.writeText(afterSalesScript)} disabled={!afterSalesScript}>Copy</button>
+              <button className="secondary-button" onClick={createAfterSalesTask} disabled={!selectedAfterSalesId || loading}>Create FollowUpTask</button>
+            </div>
+            {selectedAfterSalesCase?.events?.length ? (
+              <div className="quote-history-list">
+                {selectedAfterSalesCase.events.slice(0, 6).map((event) => (
+                  <div className="quote-history-item" key={event.id}>
+                    <strong>{event.eventType}</strong>
+                    <span>{formatDate(event.createdAt)} / {event.notes || "-"}</span>
+                  </div>
+                ))}
+              </div>
+            ) : <p className="empty-note">Open a case to see event timeline.</p>}
+          </Panel>
+        </section>
+      </>
+    );
+  }
+
+  function renderScriptTests() {
+    const activeCount = scriptExperiments.filter((item) => item.status === "active").length;
+    const totalUsage = scriptExperiments.reduce((sum, item) => sum + (item.totalUsage || 0), 0);
+    const variants = selectedScriptExperiment?.variants || [];
+    const usages = selectedScriptExperiment?.usages || [];
+    const stats = selectedScriptExperiment?.stats;
+    return (
+      <>
+        <section className="metrics">
+          <Metric label="Experiments" value={scriptExperiments.length} />
+          <Metric label="Active" value={activeCount} />
+          <Metric label="Usage records" value={totalUsage} />
+          <Metric label="Selected variants" value={variants.length} />
+        </section>
+        <section className="grid quote-layout">
+          <Panel title="A/B script filters" description="Active experiments are available for draft selection. Nothing is sent automatically.">
+            <div className="form-grid">
+              <SelectField label="Organization" value={scriptTestFilters.organizationId || selectedOrganizationId} onChange={(value) => setScriptTestFilters({ ...scriptTestFilters, organizationId: value })} options={organizations.map((item) => [item.id, item.name])} emptyLabel="Personal scope" />
+              <SelectField label="Scenario" value={scriptTestFilters.scenario} onChange={(value) => setScriptTestFilters({ ...scriptTestFilters, scenario: value })} options={SCRIPT_EXPERIMENT_SCENARIOS.map((item) => [item, item])} emptyLabel="All scenarios" />
+              <SelectField label="Status" value={scriptTestFilters.status} onChange={(value) => setScriptTestFilters({ ...scriptTestFilters, status: value })} options={SCRIPT_EXPERIMENT_STATUSES.map((item) => [item, item])} emptyLabel="All status" />
+              <Field label="Language"><input value={scriptTestFilters.targetLanguage} onChange={(event) => setScriptTestFilters({ ...scriptTestFilters, targetLanguage: event.target.value })} placeholder="en / es / pt..." /></Field>
+            </div>
+            <div className="detail-actions">
+              <button onClick={() => loadScriptExperiments(scriptTestFilters)} disabled={loading}>Search</button>
+              <button className="secondary-button" onClick={() => { setSelectedScriptExperiment(null); setScriptExperimentForm({ ...emptyScriptExperimentForm, organizationId: selectedOrganizationId }); setScriptVariantDrafts([]); }}>New experiment</button>
+            </div>
+            <RiskWarnings items={[
+              "A/B script tests only record draft usage and manually marked outcomes.",
+              "The system does not auto-send, bulk-send or click WhatsApp send buttons.",
+              "Samples below 10 used_draft records per variant are only directional and not statistically significant."
+            ]} />
+          </Panel>
+
+          <Panel title="Experiment form" description="Create or update lightweight script experiments by scenario and language.">
+            <form onSubmit={saveScriptExperimentRecord}>
+              <div className="form-grid">
+                <SelectField label="Organization" value={scriptExperimentForm.organizationId || selectedOrganizationId} onChange={(value) => setScriptExperimentForm({ ...scriptExperimentForm, organizationId: value })} options={organizations.map((item) => [item.id, item.name])} emptyLabel="Personal scope" />
+                <Field label="Name"><input value={scriptExperimentForm.name} onChange={(event) => setScriptExperimentForm({ ...scriptExperimentForm, name: event.target.value })} required /></Field>
+                <SelectField label="Scenario" value={scriptExperimentForm.scenario} onChange={(value) => setScriptExperimentForm({ ...scriptExperimentForm, scenario: value })} options={SCRIPT_EXPERIMENT_SCENARIOS.map((item) => [item, item])} />
+                <SelectField label="Status" value={scriptExperimentForm.status} onChange={(value) => setScriptExperimentForm({ ...scriptExperimentForm, status: value })} options={SCRIPT_EXPERIMENT_STATUSES.map((item) => [item, item])} />
+                <Field label="Language"><input value={scriptExperimentForm.targetLanguage} onChange={(event) => setScriptExperimentForm({ ...scriptExperimentForm, targetLanguage: event.target.value })} placeholder="en" /></Field>
+                <Field label="Customer stage"><input value={scriptExperimentForm.targetCustomerStage} onChange={(event) => setScriptExperimentForm({ ...scriptExperimentForm, targetCustomerStage: event.target.value })} /></Field>
+              </div>
+              <label className="field"><span>Description</span><textarea rows={3} value={scriptExperimentForm.description} onChange={(event) => setScriptExperimentForm({ ...scriptExperimentForm, description: event.target.value })} /></label>
+              <div className="detail-actions">
+                <button disabled={loading}>Save experiment</button>
+                <button type="button" className="secondary-button" onClick={archiveSelectedScriptExperiment} disabled={!selectedScriptExperiment || loading}>Archive</button>
+              </div>
+            </form>
+          </Panel>
+
+          <Panel title="Experiments" description="Open an experiment to manage variants and outcomes.">
+            <SimpleList items={scriptExperiments} render={(item) => (
+              <div className="quote-history-item">
+                <strong>{item.name} / {item.scenario} / {item.status}</strong>
+                <span>{item.targetLanguage || "all languages"} / variants {item.variantsCount || 0} / usage {item.totalUsage || 0}</span>
+                <span>Best: {item.bestVariant || "insufficient sample"}</span>
+                <div className="detail-actions">
+                  <button className="secondary-button" onClick={() => selectScriptExperimentRecord(item.id)}>Open</button>
+                </div>
+              </div>
+            )} />
+          </Panel>
+
+          <Panel title="Variant management" description="Variants are draft scripts. Copying a variant records usage, but never sends it.">
+            <form onSubmit={saveScriptVariantRecord}>
+              <div className="form-grid">
+                <Field label="Version label"><input value={scriptVariantForm.versionLabel} onChange={(event) => setScriptVariantForm({ ...scriptVariantForm, versionLabel: event.target.value })} placeholder="A" required /></Field>
+                <Field label="Title"><input value={scriptVariantForm.title} onChange={(event) => setScriptVariantForm({ ...scriptVariantForm, title: event.target.value })} required /></Field>
+                <Field label="Language"><input value={scriptVariantForm.language} onChange={(event) => setScriptVariantForm({ ...scriptVariantForm, language: event.target.value })} placeholder="en" /></Field>
+                <SelectField label="Tone" value={scriptVariantForm.tone} onChange={(value) => setScriptVariantForm({ ...scriptVariantForm, tone: value })} options={[["short", "short"], ["professional", "professional"], ["friendly", "friendly"], ["closing", "closing"]]} emptyLabel="Not set" />
+              </div>
+              <label className="field"><span>Content</span><textarea rows={6} value={scriptVariantForm.content} onChange={(event) => setScriptVariantForm({ ...scriptVariantForm, content: event.target.value })} required /></label>
+              <div className="detail-actions">
+                <button disabled={!selectedScriptExperiment || loading}>Save variant</button>
+                <button type="button" className="secondary-button" onClick={generateScriptVariantDrafts} disabled={loading}>AI generate A/B/C</button>
+              </div>
+            </form>
+            {scriptVariantDrafts.length > 0 && (
+              <div className="quote-history-list">
+                {scriptVariantDrafts.map((draft) => (
+                  <div className="quote-history-item" key={`${draft.versionLabel}-${draft.title}`}>
+                    <strong>{draft.versionLabel} / {draft.title}</strong>
+                    <textarea rows={4} value={draft.content} readOnly />
+                    <button className="secondary-button" onClick={() => saveGeneratedScriptVariant(draft)}>Use in form</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Panel>
+
+          <Panel title="Variants and usage" description="Record only when a salesperson manually copies or inserts a draft.">
+            <SimpleList items={variants} render={(variant) => (
+              <div className="quote-history-item">
+                <strong>{variant.versionLabel} / {variant.title} / {variant.enabled ? "enabled" : "disabled"}</strong>
+                <textarea rows={5} value={variant.content} readOnly />
+                <div className="detail-actions">
+                  <button className="secondary-button" onClick={() => recordScriptVariantUsage(variant)} disabled={!variant.enabled || loading}>Copy + record used_draft</button>
+                  <button className="secondary-button" onClick={() => { setScriptVariantForm({ versionLabel: variant.versionLabel, title: variant.title, content: variant.content, language: variant.language || "", tone: variant.tone || "", enabled: variant.enabled }); }}>Edit in form</button>
+                  <button className="secondary-button" onClick={() => disableScriptVariantRecord(variant)} disabled={loading}>Disable</button>
+                </div>
+              </div>
+            )} />
+            {scriptUsageDraft && (
+              <div className="quote-history-item">
+                <strong>Last usage: {scriptUsageDraft.outcome}</strong>
+                <span>{formatDate(scriptUsageDraft.usedAt)} / {scriptUsageDraft.customerName || "No customer selected"}</span>
+                <div className="detail-actions">
+                  {SCRIPT_USAGE_OUTCOMES.filter((item) => item !== "used_draft").map((outcome) => (
+                    <button className="secondary-button" key={outcome} onClick={() => markScriptUsageOutcome(outcome)} disabled={loading}>{outcome}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </Panel>
+
+          <Panel title="Experiment stats" description="Best variant requires at least 10 used_draft records per candidate.">
+            {stats ? (
+              <>
+                <section className="metrics compact">
+                  <Metric label="Total usage" value={stats.totalUsage} />
+                  <Metric label="Reply rate" value={formatRate(stats.rates.replyRate)} />
+                  <Metric label="Quote rate" value={formatRate(stats.rates.quoteConversionRate)} />
+                  <Metric label="Order rate" value={formatRate(stats.rates.orderConversionRate)} />
+                  <Metric label="Payment rate" value={formatRate(stats.rates.paymentConversionRate)} />
+                  <Metric label="Reorder rate" value={formatRate(stats.rates.reorderConversionRate)} />
+                </section>
+                <RiskWarnings items={stats.riskWarnings} />
+                <SimpleList items={Object.entries(stats.usageByVariant).map(([id, value]) => ({ id, ...(value as any) }))} render={(item: any) => (
+                  <div className="quote-history-item">
+                    <strong>{item.versionLabel} / used {item.used_draft || 0}</strong>
+                    <span>reply {item.customer_replied || 0}, quote {item.quote_created || 0}, order {item.order_created || 0}, payment {item.payment_received || 0}, reorder {item.reorder_created || 0}, no response {item.no_response || 0}</span>
+                  </div>
+                )} />
+              </>
+            ) : <p className="empty-note">Open an experiment to view stats.</p>}
+            <SimpleList items={usages.slice(0, 12)} render={(usage) => (
+              <div className="quote-history-item">
+                <strong>{usage.variantId} / {usage.outcome}</strong>
+                <span>{usage.customerName || "No customer"} / {formatDate(usage.usedAt)}</span>
+              </div>
+            )} />
+          </Panel>
+        </section>
+      </>
+    );
+  }
+
+  function renderSuppliers() {
+    return (
+      <section className="workspace-grid">
+        <Panel title="Suppliers / procurement" description="Lightweight supplier records, quotes, risk labels and procurement drafts. No auto-contact, no purchase order and no payment action.">
+          <div className="filter-row">
+            <input placeholder="Search supplier" value={supplierFilters.keyword} onChange={(event) => setSupplierFilters({ ...supplierFilters, keyword: event.target.value })} />
+            <select value={supplierFilters.status} onChange={(event) => setSupplierFilters({ ...supplierFilters, status: event.target.value })}>
+              <option value="">All status</option>
+              {["active", "inactive", "blocked", "candidate"].map((item) => <option key={item} value={item}>{item}</option>)}
+            </select>
+            <select value={supplierFilters.riskLevel} onChange={(event) => setSupplierFilters({ ...supplierFilters, riskLevel: event.target.value })}>
+              <option value="">All risks</option>
+              {["low", "medium", "high"].map((item) => <option key={item} value={item}>{item}</option>)}
+            </select>
+            <input placeholder="Country" value={supplierFilters.country} onChange={(event) => setSupplierFilters({ ...supplierFilters, country: event.target.value })} />
+            <button className="secondary-button" onClick={() => loadSuppliers(supplierFilters)} disabled={loading}>Search</button>
+          </div>
+          <SimpleList items={suppliers} render={(item) => (
+            <button className={`customer-row ${item.id === selectedSupplierId ? "selected" : ""}`} onClick={() => selectSupplierRecord(item.id)}>
+              <strong>{item.name} / {item.status}</strong>
+              <span>{item.country || "-"} {item.city || ""} / risk: {item.riskLevel || "-"}</span>
+              <span>{(item.tags || []).join(", ") || "No tags"}</span>
+            </button>
+          )} />
+        </Panel>
+
+        <Panel title={selectedSupplier ? `Supplier detail: ${selectedSupplier.name}` : "Create supplier"} description="Contacts are permission controlled. Quotes are cost references only.">
+          <form className="stack-form" onSubmit={saveSupplierRecord}>
+            <input placeholder="Name" value={supplierForm.name} onChange={(event) => setSupplierForm({ ...supplierForm, name: event.target.value })} required />
+            <div className="form-grid two">
+              <input placeholder="Contact" value={supplierForm.contactName} onChange={(event) => setSupplierForm({ ...supplierForm, contactName: event.target.value })} />
+              <input placeholder="Phone" value={supplierForm.phone} onChange={(event) => setSupplierForm({ ...supplierForm, phone: event.target.value })} />
+              <input placeholder="Email" value={supplierForm.email} onChange={(event) => setSupplierForm({ ...supplierForm, email: event.target.value })} />
+              <input placeholder="WhatsApp" value={supplierForm.whatsapp} onChange={(event) => setSupplierForm({ ...supplierForm, whatsapp: event.target.value })} />
+              <input placeholder="Country" value={supplierForm.country} onChange={(event) => setSupplierForm({ ...supplierForm, country: event.target.value })} />
+              <input placeholder="City" value={supplierForm.city} onChange={(event) => setSupplierForm({ ...supplierForm, city: event.target.value })} />
+              <select value={supplierForm.status} onChange={(event) => setSupplierForm({ ...supplierForm, status: event.target.value })}>
+                {["active", "inactive", "blocked", "candidate"].map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+              <select value={supplierForm.riskLevel} onChange={(event) => setSupplierForm({ ...supplierForm, riskLevel: event.target.value })}>
+                <option value="">No risk level</option>
+                {["low", "medium", "high"].map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+            </div>
+            <input placeholder="Tags, comma or newline separated" value={supplierForm.tags} onChange={(event) => setSupplierForm({ ...supplierForm, tags: event.target.value })} />
+            <textarea placeholder="Notes" value={supplierForm.notes} onChange={(event) => setSupplierForm({ ...supplierForm, notes: event.target.value })} />
+            <div className="button-row">
+              <button disabled={loading}>{selectedSupplierId ? "Update supplier" : "Create supplier"}</button>
+              <button type="button" className="secondary-button" onClick={() => { setSelectedSupplierId(""); setSelectedSupplier(null); setSupplierForm({ ...emptySupplierForm, organizationId: selectedOrganizationId }); }}>New</button>
+              {selectedSupplierId && <button type="button" className="danger-button" onClick={deactivateSupplierRecord}>Deactivate</button>}
+            </div>
+          </form>
+        </Panel>
+
+        <Panel title="Contacts, quotes and procurement notes" description="Applying a supplier quote to order cost requires manual confirmation and does not confirm true cost.">
+          {selectedSupplier ? (
+            <>
+              <div className="form-grid two">
+                <input placeholder="Contact name" value={supplierContactForm.name} onChange={(event) => setSupplierContactForm({ ...supplierContactForm, name: event.target.value })} />
+                <input placeholder="Role" value={supplierContactForm.role} onChange={(event) => setSupplierContactForm({ ...supplierContactForm, role: event.target.value })} />
+                <input placeholder="WhatsApp" value={supplierContactForm.whatsapp} onChange={(event) => setSupplierContactForm({ ...supplierContactForm, whatsapp: event.target.value })} />
+                <button type="button" onClick={addSupplierContact} disabled={loading}>Add contact</button>
+              </div>
+              <SimpleList items={selectedSupplier.contacts || []} render={(item: any) => (
+                <div className="customer-row"><strong>{item.name}</strong><span>{item.role || "-"} / {item.whatsapp || item.phone || item.email || "hidden"}</span></div>
+              )} />
+
+              <div className="form-grid two">
+                <select value={supplierQuoteForm.productId} onChange={(event) => setSupplierQuoteForm({ ...supplierQuoteForm, productId: event.target.value })}>
+                  <option value="">Select product</option>
+                  {products.map((item) => <option key={item.id} value={item.id}>{item.name} / {item.sku}</option>)}
+                </select>
+                <input placeholder="SKU" value={supplierQuoteForm.sku} onChange={(event) => setSupplierQuoteForm({ ...supplierQuoteForm, sku: event.target.value })} />
+                <input placeholder="MOQ" value={supplierQuoteForm.moq} onChange={(event) => setSupplierQuoteForm({ ...supplierQuoteForm, moq: event.target.value })} />
+                <input placeholder="Unit cost" value={supplierQuoteForm.unitCost} onChange={(event) => setSupplierQuoteForm({ ...supplierQuoteForm, unitCost: event.target.value })} />
+                <input placeholder="Currency" value={supplierQuoteForm.currency} onChange={(event) => setSupplierQuoteForm({ ...supplierQuoteForm, currency: event.target.value })} />
+                <input placeholder="Lead time" value={supplierQuoteForm.leadTime} onChange={(event) => setSupplierQuoteForm({ ...supplierQuoteForm, leadTime: event.target.value })} />
+              </div>
+              <div className="button-row">
+                <button type="button" onClick={addSupplierQuote} disabled={loading}>Add quote</button>
+                <input placeholder="Order ID for cost application" value={supplierQuoteForm.orderId} onChange={(event) => setSupplierQuoteForm({ ...supplierQuoteForm, orderId: event.target.value })} />
+              </div>
+              <SimpleList items={selectedSupplier.quotes || []} render={(item: any) => (
+                <div className="customer-row">
+                  <strong>{item.sku || item.productName || "Quote"} / {item.currency || ""} {item.unitCost || "-"}</strong>
+                  <span>MOQ {item.moq || "-"} / lead time {item.leadTime || "-"}</span>
+                  <button className="secondary-button" onClick={() => applySelectedSupplierQuote(item.id)}>Apply to order cost</button>
+                </div>
+              )} />
+
+              <textarea placeholder="Purchase note" value={purchaseNoteForm.content} onChange={(event) => setPurchaseNoteForm({ ...purchaseNoteForm, content: event.target.value })} />
+              <button className="secondary-button" type="button" onClick={addPurchaseNote}>Add purchase note</button>
+              <SimpleList items={selectedSupplier.purchaseNotes || []} render={(item: any) => (
+                <div className="customer-row"><strong>{item.noteType}</strong><span>{item.content}</span></div>
+              )} />
+            </>
+          ) : <p className="empty-note">Select a supplier to manage contacts, quotes, notes and risks.</p>}
+        </Panel>
+
+        <Panel title="Supplier risk and draft generator" description="Drafts are for manual procurement communication only. They do not contact suppliers automatically.">
+          {selectedSupplier && (
+            <>
+              <div className="form-grid two">
+                <select value={supplierRiskForm.riskType} onChange={(event) => setSupplierRiskForm({ ...supplierRiskForm, riskType: event.target.value })}>
+                  {["unstable_delivery", "unstable_quality", "high_price", "poor_cooperation", "payment_risk", "needs_review", "other"].map((item) => <option key={item} value={item}>{item}</option>)}
+                </select>
+                <select value={supplierRiskForm.level} onChange={(event) => setSupplierRiskForm({ ...supplierRiskForm, level: event.target.value })}>
+                  {["low", "medium", "high"].map((item) => <option key={item} value={item}>{item}</option>)}
+                </select>
+                <input placeholder="Risk note" value={supplierRiskForm.description} onChange={(event) => setSupplierRiskForm({ ...supplierRiskForm, description: event.target.value })} />
+                <button type="button" onClick={addSupplierRisk}>Add risk</button>
+              </div>
+              <SimpleList items={selectedSupplier.risks || []} render={(item: any) => (
+                <div className="customer-row"><strong>{item.riskType} / {item.level}</strong><span>{item.description || "-"}</span></div>
+              )} />
+              <div className="form-grid two">
+                <select value={supplierScriptForm.scenario} onChange={(event) => setSupplierScriptForm({ ...supplierScriptForm, scenario: event.target.value })}>
+                  {["ask_price", "ask_moq", "ask_sample_fee", "ask_lead_time", "ask_bulk_order_cost", "ask_custom_feasibility", "ask_quality_issue", "ask_reship_cost", "negotiate_price", "confirm_purchase_details"].map((item) => <option key={item} value={item}>{item}</option>)}
+                </select>
+                <select value={supplierScriptForm.productId} onChange={(event) => setSupplierScriptForm({ ...supplierScriptForm, productId: event.target.value })}>
+                  <option value="">Optional product</option>
+                  {products.map((item) => <option key={item.id} value={item.id}>{item.name} / {item.sku}</option>)}
+                </select>
+                <input placeholder="Optional order ID" value={supplierScriptForm.orderId} onChange={(event) => setSupplierScriptForm({ ...supplierScriptForm, orderId: event.target.value })} />
+                <button type="button" onClick={generateSupplierDraft} disabled={loading}>Generate draft</button>
+              </div>
+              {supplierScript && <textarea readOnly value={supplierScript} />}
+              <RiskWarnings items={supplierRiskWarnings} />
+            </>
+          )}
+        </Panel>
+      </section>
+    );
+  }
+
+  function renderBrands() {
+    return (
+      <section className="workspace-grid">
+        <Panel title="Brands / stores" description="Brand context filters products, materials, knowledge and rules for drafts only. It does not switch WhatsApp accounts, sync stores or send messages.">
+          <div className="filter-row">
+            <select value={brandFilters.organizationId || selectedOrganizationId} onChange={(event) => setBrandFilters({ ...brandFilters, organizationId: event.target.value })}>
+              <option value="">Select organization</option>
+              {organizations.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select>
+            <select value={brandFilters.status} onChange={(event) => setBrandFilters({ ...brandFilters, status: event.target.value })}>
+              <option value="">All status</option>
+              {BRAND_STATUSES.map((item) => <option key={item} value={item}>{item}</option>)}
+            </select>
+            <input placeholder="Search brand" value={brandFilters.keyword} onChange={(event) => setBrandFilters({ ...brandFilters, keyword: event.target.value })} />
+            <button className="secondary-button" onClick={() => loadBrands(brandFilters)} disabled={loading}>Search</button>
+          </div>
+          <SimpleList items={brands} render={(item) => (
+            <button className={`customer-row ${item.id === selectedBrandId ? "selected" : ""}`} onClick={() => selectBrandRecord(item.id)}>
+              <strong>{item.displayName || item.name} / {item.status}</strong>
+              <span>{item.country || "-"} / {item.defaultLanguage || "-"} / {item.defaultCurrency || "-"}</span>
+              <span>Products {item.productsCount || 0}, materials {item.materialsCount || 0}, rules {item.rulesCount || 0}</span>
+            </button>
+          )} />
+        </Panel>
+
+        <Panel title={selectedBrand ? `Brand detail: ${selectedBrand.displayName || selectedBrand.name}` : "Create brand / store"} description="Active brands appear in AI and extension selectors. Archiving requires manual confirmation.">
+          <form className="stack-form" onSubmit={saveBrandRecord}>
+            <input placeholder="Brand name" value={brandForm.name} onChange={(event) => setBrandForm({ ...brandForm, name: event.target.value })} required />
+            <div className="form-grid two">
+              <input placeholder="Display name" value={brandForm.displayName} onChange={(event) => setBrandForm({ ...brandForm, displayName: event.target.value })} />
+              <input placeholder="Logo URL" value={brandForm.logoUrl} onChange={(event) => setBrandForm({ ...brandForm, logoUrl: event.target.value })} />
+              <input placeholder="Website" value={brandForm.website} onChange={(event) => setBrandForm({ ...brandForm, website: event.target.value })} />
+              <input placeholder="Country" value={brandForm.country} onChange={(event) => setBrandForm({ ...brandForm, country: event.target.value })} />
+              <input placeholder="Default language" value={brandForm.defaultLanguage} onChange={(event) => setBrandForm({ ...brandForm, defaultLanguage: event.target.value })} />
+              <input placeholder="Default currency" value={brandForm.defaultCurrency} onChange={(event) => setBrandForm({ ...brandForm, defaultCurrency: event.target.value })} />
+              <select value={brandForm.status} onChange={(event) => setBrandForm({ ...brandForm, status: event.target.value })}>
+                {BRAND_STATUSES.map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+            </div>
+            <textarea placeholder="Description" value={brandForm.description} onChange={(event) => setBrandForm({ ...brandForm, description: event.target.value })} />
+            <textarea placeholder="Notes" value={brandForm.notes} onChange={(event) => setBrandForm({ ...brandForm, notes: event.target.value })} />
+            <div className="button-row">
+              <button disabled={loading}>{selectedBrandId ? "Update brand" : "Create brand"}</button>
+              <button type="button" className="secondary-button" onClick={() => { setSelectedBrandId(""); setSelectedBrand(null); setBrandForm({ ...emptyBrandForm, organizationId: selectedOrganizationId }); }}>New</button>
+              {selectedBrandId && <button type="button" className="danger-button" onClick={archiveSelectedBrand}>Archive</button>}
+            </div>
+          </form>
+        </Panel>
+
+        <Panel title="Brand resources" description="Resources are linked manually and only affect what this brand prioritizes. They do not modify source product, material or knowledge records.">
+          {selectedBrand ? (
+            <>
+              <div className="form-grid two">
+                <select value={brandProductLinkId} onChange={(event) => setBrandProductLinkId(event.target.value)}>
+                  <option value="">Product to link</option>
+                  {products.map((item) => <option key={item.id} value={item.id}>{item.name} / {item.sku}</option>)}
+                </select>
+                <button type="button" onClick={addBrandProductLink}>Link product</button>
+                <select value={brandMaterialLinkId} onChange={(event) => setBrandMaterialLinkId(event.target.value)}>
+                  <option value="">Material to link</option>
+                  {materials.map((item) => <option key={item.id} value={item.id}>{item.title} / {item.type}</option>)}
+                </select>
+                <button type="button" onClick={addBrandMaterialLink}>Link material</button>
+                <select value={brandKnowledgeLinkId} onChange={(event) => setBrandKnowledgeLinkId(event.target.value)}>
+                  <option value="">Org knowledge to link</option>
+                  {orgKnowledgeBase.map((item) => <option key={item.id} value={item.id}>{item.title} / {item.category}</option>)}
+                </select>
+                <button type="button" onClick={addBrandKnowledgeLink}>Link knowledge</button>
+                <input placeholder="Script ID" value={brandScriptLinkForm.scriptId} onChange={(event) => setBrandScriptLinkForm({ ...brandScriptLinkForm, scriptId: event.target.value })} />
+                <select value={brandScriptLinkForm.scriptType} onChange={(event) => setBrandScriptLinkForm({ ...brandScriptLinkForm, scriptType: event.target.value })}>
+                  {["script_org", "script_variant", "knowledge_script", "other"].map((item) => <option key={item} value={item}>{item}</option>)}
+                </select>
+                <button type="button" onClick={addBrandScriptLink}>Link script</button>
+              </div>
+              <SimpleList items={selectedBrand.products || []} render={(item: any) => <BrandLinkedRow item={item} label={item.name || item.productId} onRemove={() => removeBrandLink("product", item.linkId)} />} />
+              <SimpleList items={selectedBrand.materials || []} render={(item: any) => <BrandLinkedRow item={item} label={item.title || item.materialId} onRemove={() => removeBrandLink("material", item.linkId)} />} />
+              <SimpleList items={selectedBrand.knowledgeBases || []} render={(item: any) => <BrandLinkedRow item={item} label={item.title || item.knowledgeBaseId} onRemove={() => removeBrandLink("knowledge", item.linkId)} />} />
+              <SimpleList items={selectedBrand.scripts || []} render={(item: any) => <BrandLinkedRow item={item} label={`${item.scriptType}: ${item.scriptId}`} onRemove={() => removeBrandLink("script", item.linkId)} />} />
+            </>
+          ) : <p className="empty-note">Select a brand to link resources.</p>}
+        </Panel>
+
+        <Panel title="Brand rules and assignment" description="Brand rules feed AI context. If a policy is missing, AI must ask the salesperson to confirm it.">
+          {selectedBrand ? (
+            <>
+              <div className="form-grid two">
+                <select value={brandRuleForm.ruleType} onChange={(event) => setBrandRuleForm({ ...brandRuleForm, ruleType: event.target.value })}>
+                  {BRAND_RULE_TYPES.map((item) => <option key={item} value={item}>{item}</option>)}
+                </select>
+                <input placeholder="Rule title" value={brandRuleForm.title} onChange={(event) => setBrandRuleForm({ ...brandRuleForm, title: event.target.value })} />
+                <input placeholder="Language" value={brandRuleForm.language} onChange={(event) => setBrandRuleForm({ ...brandRuleForm, language: event.target.value })} />
+                <label className="checkbox-inline"><input type="checkbox" checked={brandRuleForm.enabled} onChange={(event) => setBrandRuleForm({ ...brandRuleForm, enabled: event.target.checked })} /> Enabled</label>
+              </div>
+              <textarea placeholder="Rule content" value={brandRuleForm.content} onChange={(event) => setBrandRuleForm({ ...brandRuleForm, content: event.target.value })} />
+              <button type="button" onClick={saveBrandRule}>Save brand rule</button>
+              <SimpleList items={selectedBrand.rules || []} render={(item: any) => (
+                <div className="quote-history-item">
+                  <strong>{item.ruleType} / {item.title} / {item.enabled ? "enabled" : "disabled"}</strong>
+                  <span>{item.language || "all"} / {item.content}</span>
+                  <div className="detail-actions">
+                    <button className="secondary-button" onClick={() => toggleBrandRule(item)}>{item.enabled ? "Disable" : "Enable"}</button>
+                    <button className="danger-button" onClick={() => removeBrandRule(item.id)}>Delete</button>
+                  </div>
+                </div>
+              )} />
+              <div className="form-grid two">
+                <select value={brandAssignmentForm.entityType} onChange={(event) => setBrandAssignmentForm({ ...brandAssignmentForm, entityType: event.target.value })}>
+                  {BRAND_ASSIGNMENT_ENTITY_TYPES.map((item) => <option key={item} value={item}>{item}</option>)}
+                </select>
+                <input placeholder="Entity ID to assign" value={brandAssignmentForm.entityId} onChange={(event) => setBrandAssignmentForm({ ...brandAssignmentForm, entityId: event.target.value })} />
+                <button type="button" onClick={assignSelectedBrand}>Assign brand</button>
+              </div>
+              <RiskWarnings items={brandContext?.riskWarnings || []} />
+            </>
+          ) : <p className="empty-note">Select a brand to manage rules and assignment.</p>}
+        </Panel>
+      </section>
+    );
+  }
+
+  function renderPredictions() {
+    const highReorder = customerPredictions.filter((item) => item.predictionType === "reorder" && item.level === "high").length;
+    const dormant = customerPredictions.filter((item) => item.predictionType === "dormant").length;
+    const churnRisk = customerPredictions.filter((item) => item.predictionType === "churn_risk").length;
+    const highValue = customerPredictions.filter((item) => item.predictionType === "high_value").length;
+    const dueReminders = reorderReminders.filter((item) => new Date(item.remindAt).getTime() <= Date.now() + 24 * 60 * 60 * 1000).length;
+    return (
+      <>
+        <section className="metrics">
+          <Metric label="High reorder potential" value={highReorder} />
+          <Metric label="Dormant customers" value={dormant} />
+          <Metric label="High value alerts" value={highValue} />
+          <Metric label="Churn risk" value={churnRisk} />
+          <Metric label="Due reorder reminders" value={dueReminders} />
+        </section>
+        <section className="grid quote-layout">
+          <Panel title="Prediction filters" description="Rule-based prediction only. It does not auto-market or send WhatsApp messages.">
+            <div className="form-grid">
+              <SelectField label="Organization" value={predictionFilters.organizationId || selectedOrganizationId} onChange={(value) => setPredictionFilters({ ...predictionFilters, organizationId: value })} options={organizations.map((item) => [item.id, item.name])} emptyLabel="Personal scope" />
+              <SelectField label="Prediction type" value={predictionFilters.predictionType} onChange={(value) => setPredictionFilters({ ...predictionFilters, predictionType: value })} options={[
+                ["reorder", "reorder"],
+                ["dormant", "dormant"],
+                ["high_value", "high_value"],
+                ["churn_risk", "churn_risk"]
+              ]} emptyLabel="All types" />
+              <SelectField label="Level" value={predictionFilters.level} onChange={(value) => setPredictionFilters({ ...predictionFilters, level: value })} options={[["low", "low"], ["medium", "medium"], ["high", "high"]]} emptyLabel="All levels" />
+              <SelectField label="Status" value={predictionFilters.status} onChange={(value) => setPredictionFilters({ ...predictionFilters, status: value })} options={[["open", "open"], ["dismissed", "dismissed"], ["converted", "converted"], ["task_created", "task_created"]]} emptyLabel="All status" />
+            </div>
+            <div className="detail-actions">
+              <button onClick={() => loadPredictions(predictionFilters)} disabled={loading}>Search</button>
+              <button className="secondary-button" onClick={() => runPredictionRecalculate()} disabled={loading}>Recalculate visible scope</button>
+              <button className="secondary-button" onClick={() => selectedCustomerId && runPredictionRecalculate(selectedCustomerId)} disabled={loading || !selectedCustomerId}>Recalculate selected customer</button>
+            </div>
+            <RiskWarnings items={[
+              "Predictions are rule-based assistant signals, not a deal promise.",
+              "The system never sends WhatsApp messages or creates marketing campaigns automatically.",
+              "Confirm price, inventory, discount, lead time, shipping and payment details before sending any draft."
+            ]} />
+          </Panel>
+          <Panel title="Generated script draft" description="Copy manually after checking all business details.">
+            <textarea rows={8} value={predictionScript} onChange={(event) => setPredictionScript(event.target.value)} placeholder="Generate a reorder or reactivation script from a prediction." />
+            <RiskWarnings items={predictionRiskWarnings} />
+            <div className="detail-actions">
+              <button className="secondary-button" onClick={() => navigator.clipboard.writeText(predictionScript)} disabled={!predictionScript}>Copy draft</button>
+            </div>
+          </Panel>
+          <Panel title="Customer predictions" description="Open predictions can be converted into reminders only by manual click.">
+            <SimpleList items={customerPredictions} render={(item) => (
+              <div className="quote-history-item">
+                <strong>{item.customerName} / {item.predictionType} / {item.score} / {item.level}</strong>
+                <span>{item.recommendedAction || "-"}</span>
+                {(item.reasons || []).slice(0, 3).map((reason) => <span key={reason}>{reason}</span>)}
+                <div className="detail-actions">
+                  <button className="secondary-button" onClick={() => { setView("customers"); void selectCustomer(item.customerId); }}>Open customer</button>
+                  <button className="secondary-button" onClick={() => generatePredictionScript(item)} disabled={loading}>Generate script</button>
+                  <button className="secondary-button" onClick={() => createReminderFromPrediction(item)} disabled={loading || item.status !== "open"}>Create reminder</button>
+                  <button className="secondary-button" onClick={() => changePredictionStatus(item.id, "dismissed")} disabled={loading}>Dismiss</button>
+                  <button className="secondary-button" onClick={() => changePredictionStatus(item.id, "converted")} disabled={loading}>Mark converted</button>
+                </div>
+              </div>
+            )} />
+          </Panel>
+          <Panel title="Reorder reminders" description="Reminder status changes are manual and audited.">
+            <SimpleList items={reorderReminders} render={(item) => (
+              <div className="quote-history-item">
+                <strong>{item.customerName} / {item.reminderType} / {item.status}</strong>
+                <span>{formatDate(item.remindAt)} / {item.productName || "No product"}</span>
+                <span>{item.reason || "-"}</span>
+                {item.suggestedScript && <textarea rows={4} value={item.suggestedScript} readOnly />}
+                <div className="detail-actions">
+                  <button className="secondary-button" onClick={() => createFollowUpFromReminder(item.id)} disabled={loading || item.status !== "pending"}>Create FollowUpTask</button>
+                  <button className="secondary-button" onClick={() => changeReminderStatus(item.id, "completed")} disabled={loading}>Complete</button>
+                  <button className="secondary-button" onClick={() => changeReminderStatus(item.id, "dismissed")} disabled={loading}>Dismiss</button>
+                  <button className="secondary-button" onClick={() => changeReminderStatus(item.id, "converted")} disabled={loading}>Converted</button>
+                </div>
+              </div>
+            )} />
+          </Panel>
+          <Panel title="Product opportunities" description="Uses product, quote, sample and custom-request signals.">
+            <div className="customer-list">
+              {productOpportunities.length ? productOpportunities.map((item) => (
+                <div className="quote-history-item" key={item.productId}>
+                  <strong>{item.productName} / {item.score} / {item.level}</strong>
+                  <span>{item.recommendedAction}</span>
+                  {(item.reasons || []).slice(0, 3).map((reason) => <span key={reason}>{reason}</span>)}
+                </div>
+              )) : <p className="empty-note">No product opportunities.</p>}
+            </div>
+          </Panel>
+        </section>
+      </>
+    );
+  }
+
+  function renderReorderOperations() {
+    const high = reorderOpportunities.filter((item) => item.level === "high").length;
+    const dormant = reorderOpportunities.filter((item) => item.opportunityType === "dormant_reactivation").length;
+    const replenishment = reorderOpportunities.filter((item) => item.opportunityType === "replenishment").length;
+    const newProduct = reorderOpportunities.filter((item) => item.opportunityType === "new_product").length;
+    const converted = reorderOpportunities.filter((item) => item.status === "converted").length;
+    return (
+      <>
+        <section className="metrics">
+          <Metric label="High opportunities" value={high} />
+          <Metric label="Dormant reactivation" value={dormant} />
+          <Metric label="Replenishment" value={replenishment} />
+          <Metric label="Related product" value={newProduct} />
+          <Metric label="Converted" value={converted} />
+        </section>
+        <section className="grid quote-layout">
+          <Panel title="Reorder operations filters" description="Opportunity pools are rule-based. They never auto-market or auto-send WhatsApp messages.">
+            <div className="form-grid">
+              <SelectField label="Organization" value={reorderOpsFilters.organizationId || selectedOrganizationId} onChange={(value) => setReorderOpsFilters({ ...reorderOpsFilters, organizationId: value })} options={organizations.map((item) => [item.id, item.name])} emptyLabel="Personal scope" />
+              <SelectField label="Opportunity type" value={reorderOpsFilters.opportunityType} onChange={(value) => setReorderOpsFilters({ ...reorderOpsFilters, opportunityType: value })} options={REORDER_OPERATION_TYPES.map((item) => [item, item])} emptyLabel="All types" />
+              <SelectField label="Level" value={reorderOpsFilters.level} onChange={(value) => setReorderOpsFilters({ ...reorderOpsFilters, level: value })} options={[["low", "low"], ["medium", "medium"], ["high", "high"]]} emptyLabel="All levels" />
+              <SelectField label="Status" value={reorderOpsFilters.status} onChange={(value) => setReorderOpsFilters({ ...reorderOpsFilters, status: value })} options={REORDER_OPPORTUNITY_STATUSES.map((item) => [item, item])} emptyLabel="All status" />
+            </div>
+            <div className="detail-actions">
+              <button onClick={() => loadReorderOperations(reorderOpsFilters)} disabled={loading}>Search</button>
+              <button className="secondary-button" onClick={() => runReorderOpsRecalculate()} disabled={loading}>Recalculate scope</button>
+              <button className="secondary-button" onClick={() => selectedCustomerId && runReorderOpsRecalculate(selectedCustomerId)} disabled={loading || !selectedCustomerId}>Recalculate selected customer</button>
+            </div>
+            <RiskWarnings items={[
+              "No automatic marketing, bulk sending, or WhatsApp auto-send is implemented.",
+              "Scripts must be manually reviewed; confirm price, inventory, discount, lead time, and payment before sending.",
+              "Without completed order data, drafts use safe wording such as previous discussion, not previous purchase."
+            ]} />
+          </Panel>
+          <Panel title="Generated reorder draft" description="Draft only. Copy manually after checking business details.">
+            <textarea rows={8} value={reorderOperationScript} onChange={(event) => setReorderOperationScript(event.target.value)} placeholder="Generate a reorder, dormant, replenishment, or related-product draft." />
+            <RiskWarnings items={reorderOperationRiskWarnings} />
+            <div className="detail-actions">
+              <button className="secondary-button" onClick={() => navigator.clipboard.writeText(reorderOperationScript)} disabled={!reorderOperationScript}>Copy draft</button>
+            </div>
+          </Panel>
+          <Panel title="Reorder opportunity pool" description="Turn an opportunity into a FollowUpTask only by manual click.">
+            <SimpleList items={reorderOpportunities} render={(item) => (
+              <div className="quote-history-item">
+                <strong>{item.customerName} / {item.opportunityType} / {item.score} / {item.level}</strong>
+                <span>{item.productName || "No product"} / {item.status}</span>
+                <span>{item.recommendedAction || "-"}</span>
+                {(item.reasons || []).slice(0, 3).map((reason) => <span key={reason}>{reason}</span>)}
+                <div className="detail-actions">
+                  <button className="secondary-button" onClick={() => { setView("customers"); void selectCustomer(item.customerId); }}>Open customer</button>
+                  <button className="secondary-button" onClick={() => generateReorderOpsScript(item)} disabled={loading}>Generate script</button>
+                  <button className="secondary-button" onClick={() => createFollowUpFromOpportunity(item)} disabled={loading || item.status !== "open"}>Create FollowUpTask</button>
+                  <button className="secondary-button" onClick={() => changeReorderOpportunityStatus(item.id, "contacted")} disabled={loading}>Contacted</button>
+                  <button className="secondary-button" onClick={() => changeReorderOpportunityStatus(item.id, "converted")} disabled={loading}>Converted</button>
+                  <button className="secondary-button" onClick={() => changeReorderOpportunityStatus(item.id, "dismissed")} disabled={loading}>Dismiss</button>
+                </div>
+              </div>
+            )} />
+          </Panel>
+          <Panel title="Reorder campaigns" description="Campaigns are grouping tools only. They do not send or create bulk tasks automatically.">
+            <form className="form-grid" onSubmit={saveReorderCampaign}>
+              <SelectField label="Organization" value={reorderCampaignForm.organizationId || selectedOrganizationId} onChange={(value) => setReorderCampaignForm({ ...reorderCampaignForm, organizationId: value })} options={organizations.map((item) => [item.id, item.name])} emptyLabel="Personal campaign" />
+              <Field label="Name"><input value={reorderCampaignForm.name} onChange={(event) => setReorderCampaignForm({ ...reorderCampaignForm, name: event.target.value })} /></Field>
+              <SelectField label="Type" value={reorderCampaignForm.campaignType} onChange={(value) => setReorderCampaignForm({ ...reorderCampaignForm, campaignType: value })} options={REORDER_OPERATION_TYPES.map((item) => [item, item])} />
+              <SelectField label="Scope" value={reorderCampaignForm.targetScope} onChange={(value) => setReorderCampaignForm({ ...reorderCampaignForm, targetScope: value })} options={REORDER_CAMPAIGN_SCOPES.map((item) => [item, item])} />
+              <SelectField label="Status" value={reorderCampaignForm.status} onChange={(value) => setReorderCampaignForm({ ...reorderCampaignForm, status: value })} options={REORDER_CAMPAIGN_STATUSES.map((item) => [item, item])} />
+              <button disabled={loading}>Create campaign</button>
+            </form>
+            <SimpleList items={reorderCampaigns} render={(item) => (
+              <div className="quote-history-item">
+                <strong>{item.name} / {item.campaignType}</strong>
+                <span>{item.targetScope} / {item.status}</span>
+                <div className="detail-actions">
+                  <button className="secondary-button" onClick={() => deleteReorderCampaign(item.id).then(() => loadReorderOperations(reorderOpsFilters))} disabled={loading}>Delete</button>
+                </div>
+              </div>
+            )} />
+          </Panel>
+          <Panel title="Reorder playbooks" description="Reusable templates for safe reorder drafts.">
+            <form className="form-grid" onSubmit={saveReorderPlaybook}>
+              <SelectField label="Organization" value={reorderPlaybookForm.organizationId || selectedOrganizationId} onChange={(value) => setReorderPlaybookForm({ ...reorderPlaybookForm, organizationId: value })} options={organizations.map((item) => [item.id, item.name])} emptyLabel="Personal playbook" />
+              <Field label="Title"><input value={reorderPlaybookForm.title} onChange={(event) => setReorderPlaybookForm({ ...reorderPlaybookForm, title: event.target.value })} /></Field>
+              <SelectField label="Scenario" value={reorderPlaybookForm.scenario} onChange={(value) => setReorderPlaybookForm({ ...reorderPlaybookForm, scenario: value })} options={REORDER_OPERATION_SCRIPT_SCENARIOS.map((item) => [item, item])} />
+              <Field label="Language"><input value={reorderPlaybookForm.language} onChange={(event) => setReorderPlaybookForm({ ...reorderPlaybookForm, language: event.target.value })} /></Field>
+              <label className="field full-width"><span>Content</span><textarea rows={5} value={reorderPlaybookForm.content} onChange={(event) => setReorderPlaybookForm({ ...reorderPlaybookForm, content: event.target.value })} /></label>
+              <button disabled={loading}>Create playbook</button>
+            </form>
+            <SimpleList items={reorderPlaybooks} render={(item) => (
+              <div className="quote-history-item">
+                <strong>{item.title} / {item.scenario}</strong>
+                <span>{item.language} / {item.enabled ? "enabled" : "disabled"}</span>
+                <span>{item.content.slice(0, 120)}</span>
+                <div className="detail-actions">
+                  <button className="secondary-button" onClick={() => deleteReorderPlaybook(item.id).then(() => loadReorderOperations(reorderOpsFilters))} disabled={loading}>Delete</button>
+                </div>
+              </div>
+            )} />
+          </Panel>
+        </section>
+      </>
+    );
+  }
+
   function renderOrganizations() {
     return (
       <section className="customer-layout">
@@ -1689,7 +4273,7 @@ export function App() {
           <SimpleList items={organizations} render={(item) => (
             <button className={`customer-row ${item.id === selectedOrganizationId ? "selected" : ""}`} onClick={() => selectOrganization(item.id)}>
               <strong>{item.name}</strong>
-              <span>{item.currentUserRole || "member"} 路 {item.currentUserStatus || "-"} 路 {item.memberCount} members</span>
+              <span>{item.currentUserRole || "member"} 闂?{item.currentUserStatus || "-"} 闂?{item.memberCount} members</span>
               <span>Owner: {item.ownerId === currentUser?.id ? "you" : item.ownerId}</span>
             </button>
           )} />
@@ -1814,8 +4398,8 @@ export function App() {
             {customers.map((customer) => (
               <button key={customer.id} className={`customer-row ${customer.id === selectedCustomerId ? "selected" : ""}`} onClick={() => selectCustomer(customer.id)}>
                 <strong>{customer.name}</strong>
-                <span>{customer.whatsappNumber || "No WhatsApp"} · {customer.stage}</span>
-                <span>Owner {customer.ownerId ? customer.ownerId.slice(0, 8) : "-"} · Assigned {customer.assignedTo ? customer.assignedTo.slice(0, 8) : "-"} · Collaborators {customer.collaborators?.length || 0}</span>
+                <span>{customer.whatsappNumber || "No WhatsApp"} 闁?{customer.stage}</span>
+                <span>Owner {customer.ownerId ? customer.ownerId.slice(0, 8) : "-"} 闁?Assigned {customer.assignedTo ? customer.assignedTo.slice(0, 8) : "-"} 闁?Collaborators {customer.collaborators?.length || 0}</span>
                 <span>Intent: {customer.intentScore ?? "-"} / {customer.intentLevel || "-"}</span>
               </button>
             ))}
@@ -1857,7 +4441,7 @@ export function App() {
           <div className="risk-box">
             <strong>Duplicate customer detected</strong>
             {customerDuplicateMatches.map((match) => (
-              <span key={match.customerId}>{match.name} · owner {match.ownerId || "-"} · assigned {match.assignedTo || "-"} · fields {match.matchedFields.join(", ")}</span>
+              <span key={match.customerId}>{match.name} 闁?owner {match.ownerId || "-"} 闁?assigned {match.assignedTo || "-"} 闁?fields {match.matchedFields.join(", ")}</span>
             ))}
           </div>
         )}
@@ -1873,8 +4457,27 @@ export function App() {
   }
 
   function renderCustomerSideRecords() {
+    const predictions = customerPredictions.filter((item) => item.customerId === selectedCustomerId);
+    const reminders = reorderReminders.filter((item) => item.customerId === selectedCustomerId);
+    const cases = afterSalesCases.filter((item) => item.customerId === selectedCustomerId);
     return (
       <div className="quote-history">
+        <div>
+          <div className="section-subhead"><strong>Reorder predictions</strong><span>{predictions.length}</span></div>
+          <div className="quote-history-list">
+            {predictions.length ? predictions.map((item) => (
+              <div className="quote-history-item" key={item.id}>
+                <strong>{item.predictionType} / {item.score} / {item.level}</strong>
+                <span>{item.recommendedAction || "-"}</span>
+                <div className="detail-actions">
+                  <button className="secondary-button" onClick={() => generatePredictionScript(item)}>Generate script</button>
+                  <button className="secondary-button" onClick={() => createReminderFromPrediction(item)} disabled={item.status !== "open"}>Create reminder</button>
+                </div>
+              </div>
+            )) : <p className="empty-note">No reorder predictions yet.</p>}
+          </div>
+        </div>
+        <RecordList title="Reorder reminders" items={reminders.map((item) => `${item.reminderType} / ${item.status} / ${formatDate(item.remindAt)} / ${item.reason || "-"}`)} />
         <RecordList title="Assignment logs" items={customerAssignmentLogs.map((item) => `${item.fromUserId || "-"} -> ${item.toUserId || "-"} by ${item.operatedBy}`)} />
         {customerIntent && (
           <div className="risk-box">
@@ -1883,10 +4486,49 @@ export function App() {
             {customerIntent.intentReasons.slice(0, 4).map((item) => <span key={item}>{item}</span>)}
           </div>
         )}
-        <RecordList title="Quotes" items={customerQuotes.map((item) => `${item.currency} ${item.unitPrice} · ${item.quoteText.slice(0, 80)}`)} />
-        <RecordList title="Follow-ups" items={customerFollowUps.map((item) => `${item.taskType} · ${item.status} · ${formatDate(item.remindAt)}`)} />
-        <RecordList title="Samples" items={customerSampleOrders.map((item) => `${item.sampleName} · ${item.paymentStatus} · ${item.shippingStatus}`)} />
-        <RecordList title="Custom requests" items={customerCustomRequests.map((item) => `${item.requestType} · ${item.status} · ${item.productName || "No product"}`)} />
+        <RecordList title="Quotes" items={customerQuotes.map((item) => `${item.currency} ${item.unitPrice} 闁?${item.quoteText.slice(0, 80)}`)} />
+        <div>
+          <div className="section-subhead"><strong>Orders</strong><span>{customerOrders.length}</span></div>
+          <div className="quote-history-list">
+            {customerOrders.length ? customerOrders.map((item) => (
+              <div className="quote-history-item" key={item.id}>
+                <strong>{item.orderNo} / {item.orderStatus} / {item.paymentStatus}</strong>
+                <span>{item.productName || "No product"} / {item.currency || ""} {item.amount || "-"}</span>
+                <button className="secondary-button" onClick={() => { setView("orders"); void selectOrderRecord(item.id); }}>Open order</button>
+              </div>
+            )) : <p className="empty-note">No orders yet.</p>}
+          </div>
+        </div>
+        <div>
+          <div className="section-subhead"><strong>Quote conversion</strong><span>{customerQuotes.length}</span></div>
+          <div className="detail-actions">{customerQuotes.slice(0, 3).map((item) => item.id ? <button className="secondary-button" key={item.id} onClick={() => convertQuoteToOrder(item.id!)}>Quote to order</button> : null)}</div>
+        </div>
+        <div>
+          <div className="section-subhead"><strong>Sample conversion</strong><span>{customerSampleOrders.length}</span></div>
+          <div className="detail-actions">{customerSampleOrders.slice(0, 3).map((item) => <button className="secondary-button" key={item.id} onClick={() => convertSampleToOrder(item.id)}>Sample to bulk order</button>)}</div>
+        </div>
+        <div>
+          <div className="section-subhead"><strong>Custom conversion</strong><span>{customerCustomRequests.length}</span></div>
+          <div className="detail-actions">{customerCustomRequests.slice(0, 3).map((item) => <button className="secondary-button" key={item.id} onClick={() => convertCustomToOrder(item.id)}>Custom to order</button>)}</div>
+        </div>
+        <RecordList title="Follow-ups" items={customerFollowUps.map((item) => `${item.taskType} 闁?${item.status} 闁?${formatDate(item.remindAt)}`)} />
+        <div>
+          <div className="section-subhead"><strong>After-sales</strong><span>{cases.length}</span></div>
+          <div className="quote-history-list">
+            {cases.length ? cases.map((item) => (
+              <div className="quote-history-item" key={item.id}>
+                <strong>{item.caseNo} / {item.caseType} / {item.status}</strong>
+                <span>{item.priority} / responsibility {item.responsibility || "unknown"} / solution {item.finalSolution || item.requestedSolution || "unconfirmed"}</span>
+                <div className="detail-actions">
+                  <button className="secondary-button" onClick={() => { setView("afterSales"); void selectAfterSalesRecord(item.id); }}>Open after-sales</button>
+                  <button className="secondary-button" onClick={() => { setView("afterSales"); setSelectedAfterSalesId(""); setAfterSalesForm({ ...emptyAfterSalesForm, customerId: selectedCustomerId, orderId: customerOrders[0]?.id || "", productId: customerOrders[0]?.productId || "" }); }}>New after-sales</button>
+                </div>
+              </div>
+            )) : <p className="empty-note">No after-sales cases yet.</p>}
+          </div>
+        </div>
+        <RecordList title="Samples" items={customerSampleOrders.map((item) => `${item.sampleName} 闁?${item.paymentStatus} 闁?${item.shippingStatus}`)} />
+        <RecordList title="Custom requests" items={customerCustomRequests.map((item) => `${item.requestType} 闁?${item.status} 闁?${item.productName || "No product"}`)} />
       </div>
     );
   }
@@ -1904,8 +4546,8 @@ export function App() {
             {products.map((product) => (
               <button key={product.id} className={`customer-row ${product.id === selectedProductId ? "selected" : ""}`} onClick={() => selectProduct(product)}>
                 <strong>{product.name}</strong>
-                <span>{product.sku} · {product.category || "No category"}</span>
-                <span>MOQ {product.moq || "-"} · Price {product.suggestedPrice || "-"}</span>
+                <span>{product.sku} 闁?{product.category || "No category"}</span>
+                <span>MOQ {product.moq || "-"} 闁?Price {product.suggestedPrice || "-"}</span>
               </button>
             ))}
           </div>
@@ -1954,8 +4596,8 @@ export function App() {
               setProductForm(toProductForm(detail.product));
             }}>
               <strong>{item.product.name}</strong>
-              <span>{item.product.sku} 路 {item.product.category || "No category"}</span>
-              <span>Images {item.product.images.length} 路 MOQ {item.product.moq || "-"}</span>
+              <span>{item.product.sku} 闂?{item.product.category || "No category"}</span>
+              <span>Images {item.product.images.length} 闂?MOQ {item.product.moq || "-"}</span>
             </button>
           )} />
         </Panel>
@@ -2015,6 +4657,264 @@ export function App() {
     );
   }
 
+  function renderOrders() {
+    const selectedOrder = orders.find((item) => item.id === selectedOrderId);
+    return (
+      <section className="customer-layout">
+        <Panel title="Order center" description="Lightweight manual order records. No payment processing, no logistics lookup, no automatic WhatsApp sending.">
+          <FilterRow>
+            <select value={orderFilters.organizationId} onChange={(event) => setOrderFilters({ ...orderFilters, organizationId: event.target.value })}>
+              <option value="">Current scope</option>
+              {organizations.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select>
+            <input placeholder="Search order / customer / tracking" value={orderFilters.keyword} onChange={(event) => setOrderFilters({ ...orderFilters, keyword: event.target.value })} />
+            <select value={orderFilters.orderStatus} onChange={(event) => setOrderFilters({ ...orderFilters, orderStatus: event.target.value })}>
+              <option value="">All order statuses</option>
+              {ORDER_STATUSES.map((item) => <option key={item}>{item}</option>)}
+            </select>
+            <select value={orderFilters.paymentStatus} onChange={(event) => setOrderFilters({ ...orderFilters, paymentStatus: event.target.value })}>
+              <option value="">All payment statuses</option>
+              {ORDER_PAYMENT_STATUSES.map((item) => <option key={item}>{item}</option>)}
+            </select>
+            <select value={orderFilters.shippingStatus} onChange={(event) => setOrderFilters({ ...orderFilters, shippingStatus: event.target.value })}>
+              <option value="">All shipping statuses</option>
+              {ORDER_SHIPPING_STATUSES.map((item) => <option key={item}>{item}</option>)}
+            </select>
+            <button onClick={() => loadOrders(orderFilters)}>Search</button>
+          </FilterRow>
+          <SimpleList items={orders} render={(item) => (
+            <button className={`customer-row ${item.id === selectedOrderId ? "selected" : ""}`} onClick={() => selectOrderRecord(item.id)}>
+              <strong>{item.orderNo} 闁?{item.customerName || "Customer"}</strong>
+              <span>{item.orderType} 闁?{item.orderStatus} 闁?payment {item.paymentStatus}</span>
+              <span>{item.productName || "No product"} 闁?{item.currency || ""} {item.amount || "-"} 闁?ship {item.shippingStatus}</span>
+            </button>
+          )} />
+        </Panel>
+        <Panel title="Order editor" description="Statuses are manually maintained. Confirm payment, production, shipping and after-sales facts before messaging customers.">
+          {selectedOrder && <p className="empty-note">Selected: {selectedOrder.orderNo}</p>}
+          {renderOrderForm()}
+        </Panel>
+      </section>
+    );
+  }
+
+  function renderFulfillment() {
+    const groupLabels: Record<string, string> = {
+      pending_payment: "Pending payment",
+      deposit_paid: "Deposit paid / pending production",
+      in_production: "In production",
+      production_delayed: "Production delayed",
+      pending_shipment: "Pending shipment",
+      shipped_not_delivered: "Shipped, not delivered",
+      shipping_delayed: "Shipping delayed",
+      delivered_follow_up: "Delivered follow-up",
+      after_sales_pending: "After-sales pending",
+      completed: "Completed",
+      cancelled: "Cancelled"
+    };
+    const summary = fulfillmentBoard?.summary || {};
+    return (
+      <section className="stack">
+        <Panel title="Order fulfillment board" description="Manual fulfillment visibility only. No logistics lookup, no auto-shipping, no auto-payment, no WhatsApp auto-send.">
+          <div className="metrics-grid">
+            <Metric label="Pending payment" value={summary.pendingPaymentCount || 0} />
+            <Metric label="Deposit / pending production" value={summary.depositPaidCount || 0} />
+            <Metric label="In production" value={summary.inProductionCount || 0} />
+            <Metric label="Production delayed" value={summary.productionDelayedCount || 0} />
+            <Metric label="Pending shipment" value={summary.pendingShipmentCount || 0} />
+            <Metric label="Shipping delayed" value={summary.shippingDelayedCount || 0} />
+            <Metric label="After-sales" value={summary.afterSalesPendingCount || 0} />
+            <Metric label="Completed" value={summary.completedCount || 0} />
+          </div>
+          <div className="detail-actions">
+            <button onClick={loadFulfillmentBoard}>Refresh fulfillment</button>
+            <button className="secondary-button" onClick={() => selectedOrganizationId ? recalculateOrganizationFulfillmentAlerts(selectedOrganizationId).then(() => loadFulfillmentBoard()) : setStatus("Select an organization before batch recalculation.")}>Batch recalc alerts</button>
+          </div>
+        </Panel>
+        <section className="grid">
+          {Object.entries(fulfillmentBoard?.groups || {}).map(([group, items]) => (
+            <Panel key={group} title={groupLabels[group] || group} description="Orders may appear with live and persisted fulfillment alerts.">
+              <SimpleList items={items} render={(item) => (
+                <button className={`customer-row ${item.id === selectedOrderId ? "selected" : ""}`} onClick={async () => { setView("orders"); await selectOrderRecord(item.id); }}>
+                  <strong>{item.orderNo} / {item.customerName || "Customer"}</strong>
+                  <span>{item.productName || "No product"} / {item.currency || ""} {item.amount || "-"}</span>
+                  <span>{item.alerts.length ? item.alerts.map((alert) => `${alert.level}:${alert.alertType}`).join(", ") : "No alerts"}</span>
+                  <span>{item.recommendedAction}</span>
+                </button>
+              )} />
+            </Panel>
+          ))}
+        </section>
+      </section>
+    );
+  }
+
+  function renderProfit() {
+    return (
+      <section className="stack">
+        <Panel title="Profit and cost review" description="Lightweight sales operation reference only. Not accounting, tax, payment, or reconciliation.">
+          <FilterRow>
+            <select value={profitFilters.organizationId} onChange={(event) => setProfitFilters({ ...profitFilters, organizationId: event.target.value })}>
+              <option value="">Current scope</option>
+              {organizations.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select>
+            <input placeholder="Assigned user ID" value={profitFilters.assignedTo} onChange={(event) => setProfitFilters({ ...profitFilters, assignedTo: event.target.value })} />
+            <select value={profitFilters.marginLevel} onChange={(event) => setProfitFilters({ ...profitFilters, marginLevel: event.target.value })}>
+              <option value="">All margin levels</option>
+              <option value="loss">Loss</option>
+              <option value="low">Low</option>
+              <option value="normal">Normal</option>
+              <option value="high">High</option>
+            </select>
+            <select value={profitFilters.costConfirmed} onChange={(event) => setProfitFilters({ ...profitFilters, costConfirmed: event.target.value })}>
+              <option value="">Any confirmation</option>
+              <option value="true">Confirmed</option>
+              <option value="false">Unconfirmed</option>
+            </select>
+            <button onClick={() => loadProfit(profitFilters)}>Refresh profit</button>
+          </FilterRow>
+          <div className="metrics-grid">
+            <Metric label="Revenue" value={profitSummary?.totalRevenue || "0.00"} />
+            <Metric label="Cost" value={profitSummary?.totalCost || "0.00"} />
+            <Metric label="Gross profit" value={profitSummary?.totalGrossProfit || "0.00"} />
+            <Metric label="Avg margin" value={profitSummary?.avgGrossMargin ? `${profitSummary.avgGrossMargin}%` : "-"} />
+            <Metric label="Loss orders" value={profitSummary?.lossOrderCount || 0} />
+            <Metric label="Low margin" value={profitSummary?.lowMarginOrderCount || 0} />
+            <Metric label="Unconfirmed cost" value={profitSummary?.unconfirmedCostCount || 0} />
+          </div>
+          <RiskWarnings items={profitSummary?.riskWarnings || ["Profit data is reference only. Confirm all costs manually before decisions."]} />
+        </Panel>
+        <section className="customer-layout">
+          <Panel title="Order profit list" description="Open an order to edit costs, confirm costs, or generate AI review.">
+            <SimpleList items={profitOrders.map((row) => ({ ...row, id: row.orderId }))} render={(item) => (
+              <button className={`customer-row ${item.orderId === selectedOrderId ? "selected" : ""}`} onClick={() => openOrderCost(item.orderId)}>
+                <strong>{item.orderNo} / {item.customerName || "Customer"}</strong>
+                <span>{item.productName || "No product"} / revenue {item.currency || ""} {item.revenue || "-"} / cost {item.totalCost || "-"}</span>
+                <span>Gross {item.grossProfit || "-"} / margin {item.grossMargin || "-"}% / {item.marginLevel} / {item.costConfirmed ? "confirmed" : "unconfirmed"}</span>
+              </button>
+            )} />
+          </Panel>
+          <Panel title="Cost editor" description="Owner/manager can edit and confirm costs. Sales may only view permitted own records.">
+            {selectedOrderCost ? (
+              <>
+                <div className="metrics-grid">
+                  <Metric label="Revenue" value={`${selectedOrderCost.currency || ""} ${selectedOrderCost.revenue || "-"}`} />
+                  <Metric label="Total cost" value={`${selectedOrderCost.costCurrency || selectedOrderCost.currency || ""} ${selectedOrderCost.totalCost || "-"}`} />
+                  <Metric label="Gross profit" value={selectedOrderCost.grossProfit || "-"} />
+                  <Metric label="Gross margin" value={selectedOrderCost.grossMargin ? `${selectedOrderCost.grossMargin}%` : "-"} />
+                </div>
+                <div className="form-grid">
+                  <Field label="Product cost"><input value={orderCostForm.productCost} onChange={(event) => setOrderCostForm({ ...orderCostForm, productCost: event.target.value })} /></Field>
+                  <Field label="Packaging cost"><input value={orderCostForm.packagingCost} onChange={(event) => setOrderCostForm({ ...orderCostForm, packagingCost: event.target.value })} /></Field>
+                  <Field label="Domestic shipping"><input value={orderCostForm.domesticShipping} onChange={(event) => setOrderCostForm({ ...orderCostForm, domesticShipping: event.target.value })} /></Field>
+                  <Field label="International shipping"><input value={orderCostForm.internationalShipping} onChange={(event) => setOrderCostForm({ ...orderCostForm, internationalShipping: event.target.value })} /></Field>
+                  <Field label="Payment fee"><input value={orderCostForm.paymentFee} onChange={(event) => setOrderCostForm({ ...orderCostForm, paymentFee: event.target.value })} /></Field>
+                  <Field label="Platform fee"><input value={orderCostForm.platformFee} onChange={(event) => setOrderCostForm({ ...orderCostForm, platformFee: event.target.value })} /></Field>
+                  <Field label="Refund amount"><input value={orderCostForm.refundAmount} onChange={(event) => setOrderCostForm({ ...orderCostForm, refundAmount: event.target.value })} /></Field>
+                  <Field label="Reship cost"><input value={orderCostForm.reshipCost} onChange={(event) => setOrderCostForm({ ...orderCostForm, reshipCost: event.target.value })} /></Field>
+                  <Field label="Other cost"><input value={orderCostForm.otherCost} onChange={(event) => setOrderCostForm({ ...orderCostForm, otherCost: event.target.value })} /></Field>
+                  <Field label="Cost currency"><input value={orderCostForm.currency} onChange={(event) => setOrderCostForm({ ...orderCostForm, currency: event.target.value })} /></Field>
+                </div>
+                <Field label="Notes"><textarea rows={3} value={orderCostForm.notes} onChange={(event) => setOrderCostForm({ ...orderCostForm, notes: event.target.value })} /></Field>
+                <RiskWarnings items={selectedOrderCost.riskWarnings} />
+                <div className="detail-actions">
+                  <button onClick={saveOrderCost} disabled={loading}>Save cost</button>
+                  <button className="secondary-button" onClick={confirmSelectedOrderCost} disabled={loading || selectedOrderCost.costConfirmed}>Confirm cost</button>
+                  <button className="secondary-button" onClick={() => runProfitReview()} disabled={loading}>AI review</button>
+                  <button className="danger-button" onClick={removeSelectedOrderCost} disabled={loading}>Delete cost</button>
+                </div>
+              </>
+            ) : (
+              <p className="empty-note">Select an order to review profit. Cost details are hidden unless you have permission.</p>
+            )}
+            {profitReview && (
+              <div className="result-card">
+                <strong>{profitReview.reviewSummary}</strong>
+                <RecordList title="Findings" items={profitReview.findings} />
+                <RecordList title="Recommended actions" items={profitReview.recommendedActions} />
+                <RiskWarnings items={profitReview.riskWarnings} />
+              </div>
+            )}
+          </Panel>
+        </section>
+        <section className="grid">
+          <ProfitBreakdownPanel title="Product profit" rows={profitByProduct} />
+          <ProfitBreakdownPanel title="Customer profit" rows={profitByCustomer} />
+          <ProfitBreakdownPanel title="Salesperson profit" rows={profitBySalesperson} />
+        </section>
+      </section>
+    );
+  }
+
+  function renderOrderForm() {
+    return (
+      <>
+        <div className="form-grid">
+          <SelectField label="Customer" value={orderForm.customerId} onChange={(value) => setOrderForm({ ...orderForm, customerId: value })} options={customers.map((item) => [item.id, item.name])} />
+          <SelectField label="Product" value={orderForm.productId} onChange={(value) => setOrderForm({ ...orderForm, productId: value })} options={[...products.map((item) => [item.id, item.name] as [string, string]), ...orgProducts.map((item) => [item.product.id, `${item.product.name} (Org)`] as [string, string])]} emptyLabel="No product" />
+          <SelectField label="Order type" value={orderForm.orderType} onChange={(value) => setOrderForm({ ...orderForm, orderType: value })} options={ORDER_TYPES.map((item) => [item, item])} />
+          <SelectField label="Order status" value={orderForm.orderStatus} onChange={(value) => setOrderForm({ ...orderForm, orderStatus: value })} options={ORDER_STATUSES.map((item) => [item, item])} />
+          <Field label="Title"><input value={orderForm.title} onChange={(event) => setOrderForm({ ...orderForm, title: event.target.value })} /></Field>
+          <Field label="Amount"><input value={orderForm.amount} onChange={(event) => setOrderForm({ ...orderForm, amount: event.target.value })} /></Field>
+          <Field label="Currency"><input value={orderForm.currency} onChange={(event) => setOrderForm({ ...orderForm, currency: event.target.value })} /></Field>
+          <Field label="Quantity"><input value={orderForm.quantity} onChange={(event) => setOrderForm({ ...orderForm, quantity: event.target.value })} /></Field>
+          <SelectField label="Payment" value={orderForm.paymentStatus} onChange={(value) => setOrderForm({ ...orderForm, paymentStatus: value })} options={ORDER_PAYMENT_STATUSES.map((item) => [item, item])} />
+          <SelectField label="Production" value={orderForm.productionStatus} onChange={(value) => setOrderForm({ ...orderForm, productionStatus: value })} options={ORDER_PRODUCTION_STATUSES.map((item) => [item, item])} />
+          <SelectField label="Shipping" value={orderForm.shippingStatus} onChange={(value) => setOrderForm({ ...orderForm, shippingStatus: value })} options={ORDER_SHIPPING_STATUSES.map((item) => [item, item])} />
+          <SelectField label="After-sales" value={orderForm.afterSalesStatus} onChange={(value) => setOrderForm({ ...orderForm, afterSalesStatus: value })} options={ORDER_AFTER_SALES_STATUSES.map((item) => [item, item])} />
+          <Field label="Expected ship date"><input type="date" value={orderForm.expectedShipDate} onChange={(event) => setOrderForm({ ...orderForm, expectedShipDate: event.target.value })} /></Field>
+          <Field label="Expected delivery date"><input type="date" value={orderForm.expectedDeliveryDate} onChange={(event) => setOrderForm({ ...orderForm, expectedDeliveryDate: event.target.value })} /></Field>
+          <Field label="Tracking number"><input value={orderForm.trackingNumber} onChange={(event) => setOrderForm({ ...orderForm, trackingNumber: event.target.value })} /></Field>
+          <Field label="Assigned to"><input value={orderForm.assignedTo} onChange={(event) => setOrderForm({ ...orderForm, assignedTo: event.target.value })} placeholder="User ID, optional" /></Field>
+        </div>
+        <Field label="File URLs, one per line"><textarea rows={3} value={orderForm.files} onChange={(event) => setOrderForm({ ...orderForm, files: event.target.value })} /></Field>
+        <Field label="Notes"><textarea rows={4} value={orderForm.notes} onChange={(event) => setOrderForm({ ...orderForm, notes: event.target.value })} /></Field>
+        {orderScript && <Field label="Generated order script draft"><textarea rows={6} value={orderScript} onChange={(event) => setOrderScript(event.target.value)} /></Field>}
+        {fulfillmentAlerts.length > 0 && (
+          <Panel title="Fulfillment alerts" description="Alerts are rule-based suggestions. Resolve or dismiss them manually.">
+            <SimpleList items={fulfillmentAlerts.filter((item): item is OrderFulfillmentAlertSummary & { id: string } => Boolean(item.id))} render={(item) => (
+              <div className="customer-row">
+                <strong>{item.level} / {item.alertType}</strong>
+                <span>{item.reason}</span>
+                <span>{item.recommendedAction}</span>
+                <div className="detail-actions">
+                  <button className="secondary-button" onClick={() => item.id && updateFulfillmentAlertStatus(item.id, "resolved")}>Resolve</button>
+                  <button className="secondary-button" onClick={() => item.id && updateFulfillmentAlertStatus(item.id, "dismissed")}>Dismiss</button>
+                </div>
+              </div>
+            )} />
+          </Panel>
+        )}
+        <RiskWarnings items={orderRiskWarnings.length ? orderRiskWarnings : ["Order center is a manual sales record. It does not process payment, query logistics, or send WhatsApp messages.", "Confirm payment, production, shipping, after-sales, price, inventory and lead time before sending any draft."]} />
+        <div className="detail-actions">
+          <button onClick={saveOrderRecord}>Save order</button>
+          <button className="secondary-button" onClick={() => { setSelectedOrderId(""); setOrderForm({ ...emptyOrderForm, customerId: selectedCustomerId, productId: selectedProductId }); setOrderScript(""); setOrderRiskWarnings([]); }}>New</button>
+          <button className="danger-button" disabled={!selectedOrderId} onClick={() => selectedOrderId && removeOrder(selectedOrderId)}>Delete</button>
+        </div>
+        <div className="detail-actions">
+          <button className="secondary-button" disabled={!selectedOrderId} onClick={() => updateSelectedOrderStatus("payment", orderForm.paymentStatus)}>Update payment</button>
+          <button className="secondary-button" disabled={!selectedOrderId} onClick={() => updateSelectedOrderStatus("production", orderForm.productionStatus)}>Update production</button>
+          <button className="secondary-button" disabled={!selectedOrderId} onClick={() => updateSelectedOrderStatus("shipping", orderForm.shippingStatus)}>Update shipping</button>
+          <button className="secondary-button" disabled={!selectedOrderId} onClick={() => updateSelectedOrderStatus("afterSales", orderForm.afterSalesStatus)}>Update after-sales</button>
+          <button className="secondary-button" disabled={!selectedOrderId} onClick={createFollowUpFromSelectedOrder}>Create follow-up task</button>
+          <button className="secondary-button" disabled={!selectedOrderId} onClick={recalculateSelectedFulfillment}>Recalc fulfillment</button>
+          <button className="secondary-button" disabled={!selectedOrderId} onClick={createFulfillmentFollowUpFromSelectedOrder}>Create fulfillment follow-up</button>
+          <button className="secondary-button" disabled={!selectedOrderId} onClick={() => selectedOrderId && openOrderCost(selectedOrderId)}>Open cost review</button>
+        </div>
+        <div className="detail-actions">
+          {ORDER_SCRIPT_SCENARIOS.map((scenario) => (
+            <button className="secondary-button" key={scenario} disabled={!selectedOrderId} onClick={() => generateSelectedOrderScript(scenario as OrderScriptScenario)}>{scenario}</button>
+          ))}
+        </div>
+        <div className="detail-actions">
+          {ORDER_FULFILLMENT_SCRIPT_SCENARIOS.map((scenario) => (
+            <button className="secondary-button" key={scenario} disabled={!selectedOrderId} onClick={() => generateSelectedFulfillmentScript(scenario as OrderFulfillmentScriptScenario)}>{scenario}</button>
+          ))}
+        </div>
+      </>
+    );
+  }
+
   function renderKnowledge() {
     return (
       <section className="customer-layout">
@@ -2037,7 +4937,7 @@ export function App() {
               setKnowledgeForm(toKnowledgeForm(await getKnowledgeBaseItem(item.id)));
             }}>
               <strong>{item.title}</strong>
-              <span>{item.category} · {item.language} · {item.enabled ? "enabled" : "disabled"}</span>
+              <span>{item.category} 闁?{item.language} 闁?{item.enabled ? "enabled" : "disabled"}</span>
             </button>
           )} />
         </Panel>
@@ -2077,7 +4977,7 @@ export function App() {
               setOrgKnowledgeForm(toOrgKnowledgeForm(await getOrgKnowledgeBaseItem(item.id)));
             }}>
               <strong>{item.title}</strong>
-              <span>{item.category} 路 {item.language} 路 {item.enabled ? "enabled" : "disabled"}</span>
+              <span>{item.category} 闂?{item.language} 闂?{item.enabled ? "enabled" : "disabled"}</span>
               <span>Source: Org</span>
             </button>
           )} />
@@ -2118,7 +5018,7 @@ export function App() {
               setOrgScriptForm(toOrgScriptForm(await getOrgScript(item.id)));
             }}>
               <strong>{item.title}</strong>
-              <span>{item.category} 路 {item.language} 路 {item.enabled ? "enabled" : "disabled"}</span>
+              <span>{item.category} 闂?{item.language} 闂?{item.enabled ? "enabled" : "disabled"}</span>
               <span>Source: Org script</span>
             </button>
           )} />
@@ -2161,7 +5061,7 @@ export function App() {
           <SimpleList items={materials} render={(item) => (
             <button className="customer-row" onClick={() => { setSelectedMaterialId(item.id); setMaterialForm(toMaterialForm(item)); }}>
               <strong>{item.title}</strong>
-              <span>{item.type} · {item.language}</span>
+              <span>{item.type} 闁?{item.language}</span>
               <span>{item.url}</span>
             </button>
           )} />
@@ -2212,7 +5112,7 @@ export function App() {
               setMaterialForm(toMaterialForm(detail.material));
             }}>
               <strong>{item.material.title}</strong>
-              <span>{item.material.type} 路 {item.material.language}</span>
+              <span>{item.material.type} 闂?{item.material.language}</span>
               <span>{item.material.url}</span>
             </button>
           )} />
@@ -2250,7 +5150,7 @@ export function App() {
           <SimpleList items={sampleOrders} render={(item) => (
             <button className="customer-row" onClick={async () => { setSelectedSampleOrderId(item.id); setSampleForm(toSampleForm(await getSampleOrder(item.id))); }}>
               <strong>{item.sampleName}</strong>
-              <span>{item.customerName || item.customerId} · {item.paymentStatus} · {item.shippingStatus}</span>
+              <span>{item.customerName || item.customerId} 闁?{item.paymentStatus} 闁?{item.shippingStatus}</span>
             </button>
           )} />
         </Panel>
@@ -2296,9 +5196,9 @@ export function App() {
           <CustomFilterBar />
           <SimpleList items={customRequests} render={(item) => (
             <button className="customer-row" onClick={async () => { setSelectedCustomRequestId(item.id); setCustomForm(toCustomForm(await getCustomRequest(item.id))); }}>
-              <strong>{item.customerName || item.customerId} · {item.requestType}</strong>
-              <span>{item.productName || "No product"} · {item.status}</span>
-              <span>MOQ {item.moq || "-"} · Qty {item.quantity || "-"}</span>
+              <strong>{item.customerName || item.customerId} 闁?{item.requestType}</strong>
+              <span>{item.productName || "No product"} 闁?{item.status}</span>
+              <span>MOQ {item.moq || "-"} 闁?Qty {item.quantity || "-"}</span>
             </button>
           )} />
         </Panel>
@@ -2320,20 +5220,28 @@ export function App() {
               {organizations.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
             </select>
             <input placeholder="Entity type" value={auditLogFilters.entityType} onChange={(event) => setAuditLogFilters({ ...auditLogFilters, entityType: event.target.value })} />
+            <input placeholder="Entity ID" value={auditLogFilters.entityId} onChange={(event) => setAuditLogFilters({ ...auditLogFilters, entityId: event.target.value })} />
             <select value={auditLogFilters.action} onChange={(event) => setAuditLogFilters({ ...auditLogFilters, action: event.target.value as "" | AuditLogAction })}>
               <option value="">All actions</option>
               <option value="create">create</option>
               <option value="update">update</option>
               <option value="delete">delete</option>
             </select>
+            <select value={auditLogFilters.riskLevel} onChange={(event) => setAuditLogFilters({ ...auditLogFilters, riskLevel: event.target.value as AuditLogFilters["riskLevel"] })}>
+              <option value="">All risks</option>
+              <option value="low">low</option>
+              <option value="medium">medium</option>
+              <option value="high">high</option>
+            </select>
             <input placeholder="User ID" value={auditLogFilters.userId} onChange={(event) => setAuditLogFilters({ ...auditLogFilters, userId: event.target.value })} />
+            <input placeholder="Keyword" value={auditLogFilters.keyword} onChange={(event) => setAuditLogFilters({ ...auditLogFilters, keyword: event.target.value })} />
             <button onClick={() => loadAuditLogs({ ...auditLogFilters, organizationId })}>Search</button>
             {organizationId && <a className="secondary-button" href={auditLogsCsvUrl({ ...auditLogFilters, organizationId })}>Export CSV</a>}
           </div>
           <SimpleList items={auditLogs} render={(item) => (
             <button className={`customer-row ${selectedAuditLog?.id === item.id ? "selected" : ""}`} onClick={() => selectAuditLog(item.id)}>
               <strong>{item.action} {item.entityType}</strong>
-              <span>{item.createdAt} 路 actor {item.userId || item.actorId || "-"}</span>
+              <span>{item.createdAt} 闂?actor {item.userId || item.actorId || "-"}</span>
               <span>{item.entityId || "-"}</span>
             </button>
           )} />
@@ -2345,10 +5253,12 @@ export function App() {
                 <span>Action</span><strong>{selectedAuditLog.action}</strong>
                 <span>Entity</span><strong>{selectedAuditLog.entityType} / {selectedAuditLog.entityId || "-"}</strong>
                 <span>User</span><strong>{selectedAuditLog.userId || selectedAuditLog.actorId || "-"}</strong>
+                <span>Risk</span><strong>{selectedAuditLog.riskLevel || "low"}</strong>
                 <span>Time</span><strong>{selectedAuditLog.createdAt}</strong>
               </div>
               <Field label="Before"><textarea rows={8} readOnly value={JSON.stringify(selectedAuditLog.before || null, null, 2)} /></Field>
               <Field label="After"><textarea rows={8} readOnly value={JSON.stringify(selectedAuditLog.after || null, null, 2)} /></Field>
+              <Field label="Metadata"><textarea rows={6} readOnly value={JSON.stringify(selectedAuditLog.metadata || null, null, 2)} /></Field>
             </>
           ) : (
             <p>Select an audit log.</p>
@@ -2358,67 +5268,99 @@ export function App() {
     );
   }
 
-  function renderImportExport() {
+  function renderPermissions() {
+    const rolePermissions: Record<OrganizationRole, string[]> = {
+      owner: [...PERMISSION_KEYS],
+      manager: PERMISSION_KEYS.filter((key) => !["organization.delete", "member.updateRole", "member.remove", "export.sensitiveFields"].includes(key)),
+      sales: PERMISSION_KEYS.filter((key) => /Own|create$|ai\.|viewOrg|viewOwn|audit\.viewOwn|dashboard\.viewOwn/.test(key) && !/delete|export|report|member|organization\.delete/.test(key)),
+      support: PERMISSION_KEYS.filter((key) => ["customer.viewOwn", "followup.viewOwn", "followup.create", "followup.updateOwn", "material.viewOrg", "knowledge.viewOrg", "script.viewOrg", "audit.viewOwn", "ai.reply", "ai.riskCheck", "ai.salesSummary", "ai.useOrgKnowledge", "ai.useOrgMaterial"].includes(key))
+    };
     return (
       <section className="grid quote-layout">
-        <Panel title="CSV import" description="Upload UTF-8 CSV only. Dry run validates without writing data.">
-          <Field label="Data type">
-            <select value={importType} onChange={(event) => { setImportType(event.target.value as ImportExportType); setImportResult(null); }}>
-              {IMPORT_EXPORT_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
-            </select>
-          </Field>
-          <Field label="CSV file">
-            <input type="file" accept=".csv,text/csv" onChange={(event) => setImportFile(event.target.files?.[0] || null)} />
-          </Field>
-          {importType === "customers" && (
-            <>
-              <SelectField label="Customer organization scope" value={importOrganizationId} onChange={setImportOrganizationId} options={organizations.map((item) => [item.id, item.name])} emptyLabel="Personal scope" />
-              <label className="checkbox-line">
-                <input type="checkbox" checked={importSkipDuplicates} onChange={(event) => setImportSkipDuplicates(event.target.checked)} />
-                <span>Skip duplicate customers during formal import</span>
-              </label>
-            </>
-          )}
-          <div className="detail-actions">
-            <a className="secondary-button" href={templateCsvUrl(importType)}>Download template</a>
-            <button className="secondary-button" onClick={() => runCsvImport(true)}>Dry run</button>
-            <button onClick={() => runCsvImport(false)}>Confirm import</button>
-          </div>
-          <RiskWarnings items={[
-            "CSV only, max 5MB. Excel files are not supported in V2-F.",
-            "ownerId, createdBy, tokens, secrets and API keys are ignored and never imported.",
-            "Import/export is scoped to the current logged-in user only."
-          ]} />
-        </Panel>
-        <Panel title="CSV export and result" description="Export only current user data. Formula-like cells are escaped.">
-          <div className="list">
-            {IMPORT_EXPORT_TYPES.map((type) => (
-              <div className="list-item" key={type}>
-                <div>
-                  <strong>{type}</strong>
-                  <span>UTF-8 CSV, arrays use | separator</span>
-                </div>
-                <a className="secondary-button" href={exportCsvUrl(type)}>Export</a>
+        <Panel title="Permission matrix" description="V4-D only displays the default matrix. Custom IAM, SSO and external directories are not included.">
+          <div className="table-like">
+            <div className="table-row table-head"><span>Role</span><span>Allowed permissions</span></div>
+            {ORGANIZATION_ROLES.map((role) => (
+              <div className="table-row" key={role}>
+                <strong>{role}</strong>
+                <span>{rolePermissions[role].join(", ")}</span>
               </div>
             ))}
           </div>
-          {importResult && (
-            <div className="quote-history">
-              <div className="risk-box">
-                <span>Total rows: {importResult.totalRows}</span>
-                <span>Success: {importResult.successCount}</span>
-                <span>Skipped: {importResult.skippedCount}</span>
-                <span>Failed rows: {importResult.failureCount}</span>
-                <span>Mode: {importResult.dryRun ? "dry run" : "write"}</span>
-              </div>
-              <RecordList title="Import errors" items={importResult.errors.map((error) => `row ${error.row} · ${error.field}: ${error.message}`)} />
-            </div>
-          )}
+        </Panel>
+        <Panel title="Sensitive operation confirmation" description="Deletion, role changes and sensitive exports require explicit confirmation.">
+          <ul>
+            <li>owner: full access, including sensitive export and audit export.</li>
+            <li>manager: team data and normal export, no organization delete or sensitive export.</li>
+            <li>sales: own assigned customers and sales workflow only.</li>
+            <li>support: read/after-sales follow-up only, no quote creation or export.</li>
+          </ul>
         </Panel>
       </section>
     );
   }
-
+  function renderRiskEvents() {
+    const organizationId = selectedOrganizationId;
+    return (
+      <section className="customer-layout">
+        <Panel title="Risk events" description="High and medium risk audit events for the selected organization.">
+          <div className="detail-actions">
+            <button onClick={() => loadRiskEvents(organizationId)} disabled={!organizationId || !canManageSelectedOrganization}>Refresh risk events</button>
+          </div>
+          <SimpleList items={riskEvents} render={(item) => (
+            <button className={`customer-row ${selectedAuditLog?.id === item.id ? "selected" : ""}`} onClick={() => selectAuditLog(item.id)}>
+              <strong>{item.riskLevel || "low"} / {item.action}</strong>
+              <span>{item.entityType} {item.entityId || ""}</span>
+              <span>{item.createdAt}</span>
+            </button>
+          )} />
+        </Panel>
+        <Panel title="Risk event detail" description="Risk events are audit hints, not automated WhatsApp actions.">
+          <p>Review high-risk deletes, role changes, cross-organization denials and sensitive exports. Confirm whether the action was expected.</p>
+          {selectedAuditLog && <Field label="Metadata"><textarea rows={10} readOnly value={JSON.stringify(selectedAuditLog.metadata || null, null, 2)} /></Field>}
+        </Panel>
+      </section>
+    );
+  }
+  function renderImportExport() {
+    const orgScope = importOrganizationId || selectedOrganizationId;
+    return (
+      <section className="grid quote-layout">
+        <Panel title="Organization import/export" description="V4-A: owner/manager can batch handle organization customers, shared products, materials, knowledge and scripts.">
+          <div className="form-grid">
+            <SelectField label="Organization" value={orgScope} onChange={setImportOrganizationId} options={organizations.map((item) => [item.id, item.name])} emptyLabel="Select organization" />
+            <Field label="Data type">
+              <select value={organizationImportType} onChange={(event) => { setOrganizationImportType(event.target.value as OrganizationImportExportType); setOrganizationImportJob(null); setOrganizationExportJob(null); }}>
+                {ORGANIZATION_IMPORT_EXPORT_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+              </select>
+            </Field>
+          </div>
+          <Field label="CSV file"><input type="file" accept=".csv,text/csv" onChange={(event) => setOrganizationImportFile(event.target.files?.[0] || null)} /></Field>
+          <label className="checkbox-line"><input type="checkbox" checked={importSkipDuplicates} onChange={(event) => setImportSkipDuplicates(event.target.checked)} /><span>Skip duplicate customers/products during formal import</span></label>
+          <div className="detail-actions">
+            <button className="secondary-button" onClick={() => runOrganizationCsvImport(true)} disabled={!canManageSelectedOrganization}>Dry run</button>
+            <button onClick={() => runOrganizationCsvImport(false)} disabled={!canManageSelectedOrganization}>Confirm import</button>
+            <button className="secondary-button" onClick={() => runOrganizationCsvExport("normal")} disabled={!canManageSelectedOrganization}>Generate normal export</button>
+            <button className="secondary-button" onClick={() => runOrganizationCsvExport("sensitive")} disabled={!canManageSelectedOrganization}>Sensitive export</button>
+          </div>
+          <RiskWarnings items={["Organization import/export is owner/manager only; sales/support are read-only.", "dryRun validates format, uniqueness and permission without writing to the database.", "ownerId, createdBy, organizationId, secrets and token fields are ignored."]} />
+          {organizationImportJob && <div className="risk-box"><span>Import job: {organizationImportJob.id}</span><span>Status: {organizationImportJob.status}</span><span>Rows: {organizationImportJob.result?.totalRows ?? "-"}</span><span>Success: {organizationImportJob.result?.successCount ?? "-"}</span><span>Failed: {organizationImportJob.result?.failureCount ?? "-"}</span></div>}
+          {organizationExportJob && <div className="risk-box"><span>Export job: {organizationExportJob.id}</span><span>Status: {organizationExportJob.status}</span><span>File: {organizationExportJob.filePath || "generated"}</span></div>}
+        </Panel>
+        <Panel title="CSV import" description="Upload UTF-8 CSV only. Dry run validates without writing data.">
+          <Field label="Data type"><select value={importType} onChange={(event) => { setImportType(event.target.value as ImportExportType); setImportResult(null); }}>{IMPORT_EXPORT_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}</select></Field>
+          <Field label="CSV file"><input type="file" accept=".csv,text/csv" onChange={(event) => setImportFile(event.target.files?.[0] || null)} /></Field>
+          {importType === "customers" && <><SelectField label="Customer organization scope" value={importOrganizationId} onChange={setImportOrganizationId} options={organizations.map((item) => [item.id, item.name])} emptyLabel="Personal scope" /><label className="checkbox-line"><input type="checkbox" checked={importSkipDuplicates} onChange={(event) => setImportSkipDuplicates(event.target.checked)} /><span>Skip duplicate customers during formal import</span></label></>}
+          <div className="detail-actions"><a className="secondary-button" href={templateCsvUrl(importType)}>Download template</a><button className="secondary-button" onClick={() => runCsvImport(true)}>Dry run</button><button onClick={() => runCsvImport(false)}>Confirm import</button></div>
+          <RiskWarnings items={["CSV only, max 5MB. Excel files are not supported in V2-F.", "ownerId, createdBy, tokens, secrets and API keys are ignored and never imported.", "Import/export is scoped to the current logged-in user only."]} />
+        </Panel>
+        <Panel title="CSV export and result" description="Export only current user data. Formula-like cells are escaped.">
+          <div className="list">{IMPORT_EXPORT_TYPES.map((type) => <div className="list-item" key={type}><div><strong>{type}</strong><span>UTF-8 CSV, arrays use | separator</span></div><a className="secondary-button" href={exportCsvUrl(type)}>Export</a></div>)}</div>
+          {importResult && <div className="quote-history"><div className="risk-box"><span>Total rows: {importResult.totalRows}</span><span>Success: {importResult.successCount}</span><span>Skipped: {importResult.skippedCount}</span><span>Failed rows: {importResult.failureCount}</span><span>Mode: {importResult.dryRun ? "dry run" : "write"}</span></div><RecordList title="Import errors" items={importResult.errors.map((error) => `row ${error.row} / ${error.field}: ${error.message}`)} /></div>}
+        </Panel>
+      </section>
+    );
+  }
   async function runCsvImport(dryRun: boolean) {
     if (!importFile) return setStatus("Please choose a CSV file first.");
     setLoading(true);
@@ -2433,6 +5375,62 @@ export function App() {
       if (!dryRun) await refreshAll();
     } catch {
       setStatus("CSV import failed. Check file type, size and row errors.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function runOrganizationCsvImport(dryRun: boolean) {
+    const organizationId = importOrganizationId || selectedOrganizationId;
+    if (!organizationId) return setStatus("Please choose an organization first.");
+    if (!organizationImportFile) return setStatus("Please choose a CSV file first.");
+    setLoading(true);
+    try {
+      const result = await importOrganizationCsv(organizationImportType, organizationImportFile, {
+        organizationId,
+        dryRun,
+        skipDuplicates: importSkipDuplicates
+      });
+      setOrganizationImportJob({ ...result.job, result: result.result });
+      setStatus(dryRun ? "Organization dry run completed. No data was written." : "Organization import completed and audit log was recorded.");
+      if (!dryRun) await refreshAll();
+    } catch {
+      setStatus("Organization import failed. Owner or manager role is required.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function runOrganizationCsvExport(fieldsScope: "normal" | "sensitive" = "normal") {
+    const organizationId = importOrganizationId || selectedOrganizationId;
+    if (!organizationId) return setStatus("Please choose an organization first.");
+    if (fieldsScope === "sensitive" && !window.confirm("Sensitive export may include contact information. Confirm this high-risk action?")) return;
+    setLoading(true);
+    try {
+      const result = await createOrganizationExportJob(organizationImportType, organizationId, {}, fieldsScope);
+      setOrganizationExportJob(result.job);
+      setStatus(`Organization ${fieldsScope} export job completed and audit log was recorded.`);
+    } catch {
+      setStatus("Organization export failed. Owner or manager role is required.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function runReportJob() {
+    const organizationId = reportFilters.organizationId || selectedOrganizationId;
+    if (!organizationId) return setStatus("Please choose an organization first.");
+    setLoading(true);
+    try {
+      const result = await generateReportJob(organizationId, reportFilters.reportType, {
+        assignedTo: reportFilters.assignedTo,
+        stage: reportFilters.stage,
+        intentLevel: reportFilters.intentLevel
+      });
+      setReportJob(result.job);
+      setStatus("Report job completed and audit log was recorded.");
+    } catch {
+      setStatus("Report generation failed. Owner or manager role is required.");
     } finally {
       setLoading(false);
     }
@@ -2520,7 +5518,7 @@ export function App() {
           {tasks.length ? tasks.map((task) => (
             <div className="task-card" key={task.id}>
               <strong>{task.customerName}</strong>
-              <span>{task.taskType} · {formatDate(task.remindAt)}</span>
+              <span>{task.taskType} 闁?{formatDate(task.remindAt)}</span>
               <textarea value={task.recommendedScript} readOnly />
               <button onClick={() => markTaskDone(task.id)}>Complete</button>
             </div>
@@ -2538,7 +5536,7 @@ export function App() {
             <div className="list-item" key={customer.id}>
               <div>
                 <strong>{customer.name}</strong>
-                <span>{customer.stage} · intent {customer.intentScore ?? "-"}</span>
+                <span>{customer.stage} 闁?intent {customer.intentScore ?? "-"}</span>
               </div>
               <button onClick={() => { setView("customers"); void selectCustomer(customer.id); }}>Open</button>
             </div>
@@ -2619,8 +5617,32 @@ function SimpleList<T extends { id: string }>({ items, render }: { items: T[]; r
   return <div className="customer-list">{items.length ? items.map((item) => <div key={item.id}>{render(item)}</div>) : <p className="empty-note">No records.</p>}</div>;
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
+function BrandLinkedRow({ item, label, onRemove }: { item: any; label: string; onRemove: () => void }) {
+  return (
+    <div className="customer-row">
+      <strong>{label}</strong>
+      <span>{item.sku || item.type || item.category || item.scriptType || item.id}</span>
+      <button className="secondary-button" onClick={onRemove}>Unlink</button>
+    </div>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: number | string }) {
   return <div className="metric"><span>{label}</span><strong>{value}</strong></div>;
+}
+
+function ProfitBreakdownPanel({ title, rows }: { title: string; rows: ProfitBreakdownRow[] }) {
+  return (
+    <Panel title={title} description="Aggregated from accessible orders only. Currency conversion is not performed.">
+      <SimpleList items={rows.map((row) => ({ ...row, id: row.id || row.name }))} render={(row) => (
+        <div className="customer-row">
+          <strong>{row.name}</strong>
+          <span>{row.sku || row.country || "No extra label"} / orders {row.orderCount}</span>
+          <span>Revenue {row.revenue} / cost {row.totalCost} / gross {row.grossProfit} / margin {row.grossMargin || "-"}%</span>
+        </div>
+      )} />
+    </Panel>
+  );
 }
 
 function RecordList({ title, items }: { title: string; items: string[] }) {
@@ -2639,29 +5661,63 @@ function RiskWarnings({ items }: { items: string[] }) {
   return <div className="risk-box">{items.map((item) => <span key={item}>{item}</span>)}</div>;
 }
 
+function predictionToReminderType(type: string) {
+  if (type === "dormant") return "dormant_reactivation";
+  if (type === "high_value") return "product_recommendation";
+  return "reorder";
+}
+
+function predictionToScriptType(type: string) {
+  if (type === "dormant") return "dormant_reactivation";
+  if (type === "high_value") return "high_value_follow_up";
+  if (type === "churn_risk") return "churn_risk_follow_up";
+  return "reorder";
+}
+
+function opportunityToScriptScenario(type: string): ReorderOperationScriptScenario {
+  if (type === "dormant_reactivation") return "dormant_reactivation";
+  if (type === "new_product") return "new_product_recommendation";
+  if (type === "replenishment") return "replenishment_check";
+  if (type === "holiday") return "holiday_greeting";
+  if (type === "high_value") return "high_value_customer_follow_up";
+  if (type === "churn_risk") return "churn_risk_recovery";
+  return "reorder_follow_up";
+}
+
 function titleForView(view: View) {
   const titles: Record<View, string> = {
-    dashboard: "首页工作台",
-    teamDashboard: "团队看板",
-    organizations: "组织与成员",
-    roles: "角色权限",
-    customers: "客户 CRM",
-    products: "产品资料库",
-    orgProducts: "公共产品库",
-    quotes: "报价助手",
-    knowledge: "个人知识库",
-    orgKnowledge: "公共知识库",
-    orgScripts: "公共话术库",
-    materials: "素材中心",
-    orgMaterials: "公共素材库",
-    samples: "样品单管理",
-    custom: "定制需求管理",
-    importExport: "CSV 导入/导出",
-    auditLogs: "审计日志"
+    dashboard: "Home",
+    teamDashboard: "Team board",
+    reports: "Reports",
+    predictions: "Predictions / reorder reminders",
+    reorderOps: "Reorder operations",
+    afterSales: "After-sales and exceptions",
+    scriptTests: "A/B script testing",
+    suppliers: "Suppliers / procurement",
+    brands: "Brands / stores",
+    organizations: "Organizations",
+    roles: "Roles",
+    permissions: "Permission matrix",
+    customers: "Customer CRM",
+    products: "Products",
+    orgProducts: "Org products",
+    quotes: "Quotes",
+    orders: "Order center",
+    fulfillment: "Order fulfillment",
+    profit: "Profit review",
+    knowledge: "Knowledge",
+    orgKnowledge: "Org knowledge",
+    orgScripts: "Org scripts",
+    materials: "Materials",
+    orgMaterials: "Org materials",
+    samples: "Sample orders",
+    custom: "Custom requests",
+    importExport: "CSV import/export",
+    auditLogs: "Audit logs",
+    riskEvents: "Risk events"
   };
   return titles[view];
 }
-
 function toOrganizationForm(organization: OrganizationSummary | OrganizationDetail): OrganizationForm {
   return {
     name: organization.name || ""
@@ -2688,7 +5744,7 @@ function toCustomerForm(customer: CustomerSummary): CustomerForm {
     country: customer.country || "",
     language: customer.language || "English",
     tags: (customer.tags || []).join(", "),
-    stage: customer.stage || "新线索",
+    stage: customer.stage || "New lead",
     interestedProduct: customer.interestedProduct || "",
     latestSummary: customer.latestSummary || "",
     nextFollowUpAt: toDatetimeLocal(customer.nextFollowUpAt),
@@ -2708,8 +5764,7 @@ function toCustomerPayload(form: CustomerForm): CustomerUpsertRequest {
     country: form.country || null,
     language: form.language || null,
     tags: splitLinesOrComma(form.tags),
-    stage: form.stage || "新线索",
-    interestedProduct: form.interestedProduct || null,
+    stage: form.stage || "New lead",
     latestSummary: form.latestSummary || null,
     nextFollowUpAt: form.nextFollowUpAt ? new Date(form.nextFollowUpAt).toISOString() : null,
     notes: form.notes || null
@@ -2850,6 +5905,114 @@ function toCustomForm(item: CustomRequestSummary): CustomForm {
   };
 }
 
+function toOrderForm(item: OrderSummary): OrderForm {
+  return {
+    customerId: item.customerId,
+    productId: item.productId || "",
+    orderType: item.orderType || "normal",
+    title: item.title || "",
+    amount: item.amount || "",
+    currency: item.currency || "USD",
+    quantity: item.quantity ? String(item.quantity) : "",
+    paymentStatus: item.paymentStatus || "unpaid",
+    productionStatus: item.productionStatus || "not_started",
+    shippingStatus: item.shippingStatus || "pending",
+    afterSalesStatus: item.afterSalesStatus || "none",
+    orderStatus: item.orderStatus || "draft",
+    expectedShipDate: item.expectedShipDate?.slice(0, 10) || "",
+    expectedDeliveryDate: item.expectedDeliveryDate?.slice(0, 10) || "",
+    trackingNumber: item.trackingNumber || "",
+    notes: item.notes || "",
+    files: (item.files || []).join("\n"),
+    assignedTo: item.assignedTo || ""
+  };
+}
+
+function toAfterSalesForm(item: AfterSalesCaseSummary | AfterSalesCaseDetail | any) {
+  return {
+    customerId: item.customerId,
+    orderId: item.orderId || "",
+    productId: item.productId || "",
+    caseType: item.caseType || "quality_issue",
+    priority: item.priority || "medium",
+    status: item.status || "open",
+    responsibility: item.responsibility || "unknown",
+    requestedSolution: item.requestedSolution || "",
+    finalSolution: item.finalSolution || "",
+    refundAmount: item.refundAmount || "",
+    reshipCost: item.reshipCost || "",
+    compensationAmount: item.compensationAmount || "",
+    currency: item.currency || "USD",
+    description: item.description || "",
+    customerClaim: item.customerClaim || "",
+    internalNotes: item.internalNotes || "",
+    evidenceUrls: (item.evidenceUrls || []).join("\n"),
+    resolutionNotes: item.resolutionNotes || "",
+    assignedTo: item.assignedTo || "",
+    scriptScenario: "apologize_and_acknowledge"
+  };
+}
+
+function toSupplierForm(item: any) {
+  return {
+    organizationId: item.organizationId || "",
+    name: item.name || "",
+    contactName: item.contactName || "",
+    phone: item.phone || "",
+    email: item.email || "",
+    whatsapp: item.whatsapp || "",
+    wechat: item.wechat || "",
+    country: item.country || "",
+    city: item.city || "",
+    website: item.website || "",
+    tags: (item.tags || []).join(", "),
+    rating: item.rating ? String(item.rating) : "",
+    status: item.status || "candidate",
+    riskLevel: item.riskLevel || "",
+    notes: item.notes || ""
+  };
+}
+
+function toBrandForm(item: any) {
+  return {
+    organizationId: item.organizationId || "",
+    name: item.name || "",
+    displayName: item.displayName || "",
+    description: item.description || "",
+    logoUrl: item.logoUrl || "",
+    website: item.website || "",
+    defaultLanguage: item.defaultLanguage || "en",
+    defaultCurrency: item.defaultCurrency || "USD",
+    country: item.country || "",
+    status: item.status || "active",
+    notes: item.notes || ""
+  };
+}
+
+function afterSalesPayload(form: typeof emptyAfterSalesForm) {
+  return {
+    customerId: form.customerId,
+    orderId: form.orderId || null,
+    productId: form.productId || null,
+    caseType: form.caseType,
+    priority: form.priority,
+    status: form.status,
+    responsibility: form.responsibility,
+    requestedSolution: form.requestedSolution || null,
+    finalSolution: form.finalSolution || null,
+    refundAmount: form.refundAmount || null,
+    reshipCost: form.reshipCost || null,
+    compensationAmount: form.compensationAmount || null,
+    currency: form.currency || null,
+    description: form.description || null,
+    customerClaim: form.customerClaim || null,
+    internalNotes: form.internalNotes || null,
+    evidenceUrls: splitLinesOrComma(form.evidenceUrls),
+    resolutionNotes: form.resolutionNotes || null,
+    assignedTo: form.assignedTo || null
+  };
+}
+
 function toCustomPayload(form: CustomForm): CustomRequestUpsertRequest {
   return {
     customerId: form.customerId,
@@ -2906,4 +6069,13 @@ function formatDate(value?: string | null) {
   if (!value) return "-";
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
+function formatRate(value?: number | null) {
+  if (value === null || value === undefined) return "n/a";
+  return `${Math.round(value * 1000) / 10}%`;
+}
+
+function nextVariantLabel(index: number) {
+  return ["A", "B", "C", "D", "E"][Math.max(0, Math.min(index, 4))] || "A";
 }

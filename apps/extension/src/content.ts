@@ -1,10 +1,12 @@
 import type {
+  AfterSalesScriptResponse,
   AiReplyRequest,
   AiReplyResponse,
   AiReplyScenario,
   AuthUser,
   CustomerDetail,
   CustomerIntentResponse,
+  CustomerPredictionSummary,
   CustomRequestDetail,
   CustomScriptResponse,
   CustomScriptScenario,
@@ -12,9 +14,12 @@ import type {
   FollowUpTaskType,
   MaterialIntroResponse,
   MaterialSummary,
+  OrderScriptResponse,
+  OrderSummary,
   ProductIntroResponse,
   ProductSummary,
   QuoteResponse,
+  ReorderScriptResponse,
   SampleOrderDetail,
   SampleScriptResponse,
   SampleScriptScenario
@@ -26,12 +31,24 @@ const WEB_LOGIN_URL = import.meta.env.VITE_WEB_LOGIN_URL || "http://localhost:51
 const SIDEBAR_ID = "wa-ai-sidebar";
 const HIDDEN_CLASS = "wa-ai-hidden";
 
-type QuickAction = "translate" | "reply" | "quote" | "urge" | "product" | "material" | "sample" | "custom" | "followUp";
+type QuickAction = "translate" | "reply" | "quote" | "urge" | "product" | "material" | "sample" | "custom" | "afterSales" | "followUp";
 type ReplyVariant = "short" | "professional" | "closing";
 type RecognitionStatus = "normal" | "abnormal" | "notChat" | "whatsappNotOpen";
 type SidebarAuthState = { status: "checking" | "authenticated" | "anonymous"; user?: AuthUser };
+type SupplierScriptResponse = {
+  scriptText: string;
+  alternativeScripts?: string[];
+  riskWarnings: string[];
+  missingInfo?: string[];
+  createdLogId?: string;
+};
 
 let authState: SidebarAuthState = { status: "checking" };
+let scriptExperiments: Array<any> = [];
+let scriptVariants: Array<any> = [];
+let lastScriptUsageId = "";
+let sidebarOrganizationId = "";
+let sidebarBrands: Array<any> = [];
 
 type StoredCustomerProfile = {
   customerId?: string;
@@ -96,6 +113,11 @@ function createSidebar() {
           <button id="wa-ai-save-customer" type="button" class="wa-ai-link-button">保存到后台</button>
         </div>
         <input id="wa-ai-customer-id" type="hidden" />
+        <div class="wa-ai-two-cols">
+          <label class="wa-ai-field"><span>Brand / store</span><select id="wa-ai-brand-select"><option value="">No brand context</option></select></label>
+          <button id="wa-ai-refresh-brands" type="button" class="wa-ai-link-button">Refresh brands</button>
+        </div>
+        <div class="wa-ai-safety-note">Brand context only filters products/materials and draft policies. It does not switch WhatsApp accounts, sync stores, auto-send, or promise brand policy.</div>
         <label class="wa-ai-field"><span>客户名称</span><input id="wa-ai-customer" type="text" placeholder="例如 Amina Trading" /></label>
         <div class="wa-ai-two-cols">
           <label class="wa-ai-field"><span>WhatsApp 号码</span><input id="wa-ai-whatsapp-number" type="text" placeholder="+971..." /></label>
@@ -136,6 +158,48 @@ function createSidebar() {
           <div class="wa-ai-analysis-card"><span>推荐动作</span><div id="wa-ai-intent-action">推荐动作仅作为销售建议。</div></div>
         </div>
         <button id="wa-ai-refresh-intent" type="button" class="wa-ai-wide-button wa-ai-secondary-wide">计算意向分</button>
+        <div class="wa-ai-analysis-grid">
+          <div class="wa-ai-analysis-card"><span>复购预测</span><strong id="wa-ai-reorder-score">保存客户后可查看</strong></div>
+          <div class="wa-ai-analysis-card"><span>复购建议</span><div id="wa-ai-reorder-action">建议仅作参考，不会自动发送。</div></div>
+        </div>
+        <label class="wa-ai-field"><span>复购/唤醒话术草稿</span><textarea id="wa-ai-reorder-script" rows="4"></textarea></label>
+        <div class="wa-ai-two-actions">
+          <button id="wa-ai-load-reorder" type="button" class="wa-ai-wide-button wa-ai-secondary-wide">查看复购建议</button>
+          <button id="wa-ai-generate-reorder" type="button" class="wa-ai-wide-button">生成复购话术</button>
+        </div>
+        <div class="wa-ai-two-actions">
+          <button id="wa-ai-copy-reorder-script" type="button" class="wa-ai-wide-button">复制复购话术</button>
+          <button id="wa-ai-insert-reorder-script" type="button" class="wa-ai-wide-button wa-ai-secondary-wide">插入输入框</button>
+        </div>
+        <div class="wa-ai-divider"></div>
+        <div class="wa-ai-section-title">
+          <h3>Order center</h3>
+          <button id="wa-ai-refresh-orders" type="button" class="wa-ai-link-button">Refresh</button>
+        </div>
+        <div class="wa-ai-safety-note">Orders are manual records only. Confirm payment, production, logistics and after-sales details before sending any draft.</div>
+        <label class="wa-ai-field"><span>Current customer orders</span><select id="wa-ai-order-select"><option value="">Save customer first</option></select></label>
+        <div class="wa-ai-analysis-card"><span>Fulfillment alerts</span><div id="wa-ai-fulfillment-alerts">Select an order to check fulfillment alerts.</div></div>
+        <div class="wa-ai-two-cols">
+          <label class="wa-ai-field"><span>Amount</span><input id="wa-ai-order-amount" type="text" placeholder="1000" /></label>
+          <label class="wa-ai-field"><span>Currency</span><input id="wa-ai-order-currency" type="text" value="USD" /></label>
+        </div>
+        <div class="wa-ai-two-cols">
+          <label class="wa-ai-field"><span>Quantity</span><input id="wa-ai-order-quantity" type="text" placeholder="100" /></label>
+          <label class="wa-ai-field"><span>Status</span><select id="wa-ai-order-status"><option value="draft">draft</option><option value="pending_payment">pending_payment</option><option value="processing">processing</option><option value="shipped">shipped</option><option value="completed">completed</option></select></label>
+        </div>
+        <label class="wa-ai-field"><span>Order script draft</span><textarea id="wa-ai-order-script" rows="4"></textarea></label>
+        <div class="wa-ai-two-actions">
+          <button id="wa-ai-create-order" type="button" class="wa-ai-wide-button wa-ai-secondary-wide">Create order</button>
+          <button id="wa-ai-generate-order-script" type="button" class="wa-ai-wide-button">Generate order script</button>
+        </div>
+        <div class="wa-ai-two-actions">
+          <button id="wa-ai-copy-order-script" type="button" class="wa-ai-wide-button">Copy order script</button>
+          <button id="wa-ai-insert-order-script" type="button" class="wa-ai-wide-button wa-ai-secondary-wide">Insert draft</button>
+        </div>
+        <div class="wa-ai-two-actions">
+          <button id="wa-ai-load-fulfillment" type="button" class="wa-ai-wide-button wa-ai-secondary-wide">Check fulfillment</button>
+          <button id="wa-ai-generate-fulfillment-script" type="button" class="wa-ai-wide-button">Fulfillment draft</button>
+        </div>
       </section>
 
       <section class="wa-ai-section">
@@ -330,6 +394,82 @@ function createSidebar() {
       </section>
 
       <section class="wa-ai-section">
+        <div class="wa-ai-section-title"><h3>After-sales</h3></div>
+        <div class="wa-ai-safety-note">After-sales records and scripts are drafts only. They do not refund, reship, confirm responsibility, query logistics, or send WhatsApp messages.</div>
+        <input id="wa-ai-after-sales-id" type="hidden" />
+        <div class="wa-ai-two-cols">
+          <label class="wa-ai-field"><span>Case type</span><select id="wa-ai-after-sales-type">
+            <option value="quality_issue">quality_issue</option>
+            <option value="shipping_delay">shipping_delay</option>
+            <option value="missing_item">missing_item</option>
+            <option value="wrong_item">wrong_item</option>
+            <option value="refund_request">refund_request</option>
+            <option value="return_request">return_request</option>
+            <option value="reship_request">reship_request</option>
+            <option value="complaint">complaint</option>
+            <option value="other">other</option>
+          </select></label>
+          <label class="wa-ai-field"><span>Priority</span><select id="wa-ai-after-sales-priority">
+            <option value="medium">medium</option>
+            <option value="low">low</option>
+            <option value="high">high</option>
+            <option value="urgent">urgent</option>
+          </select></label>
+        </div>
+        <label class="wa-ai-field"><span>Customer claim</span><textarea id="wa-ai-after-sales-claim" rows="3" placeholder="Paste the complaint or problem details"></textarea></label>
+        <label class="wa-ai-field"><span>Evidence URLs</span><textarea id="wa-ai-after-sales-evidence" rows="2" placeholder="one image/video/logistics URL per line"></textarea></label>
+        <label class="wa-ai-field"><span>Script scenario</span><select id="wa-ai-after-sales-scenario">
+          <option value="ask_for_evidence">ask_for_evidence</option>
+          <option value="apologize_and_acknowledge">apologize_and_acknowledge</option>
+          <option value="explain_shipping_delay">explain_shipping_delay</option>
+          <option value="explain_quality_check">explain_quality_check</option>
+          <option value="refund_policy_explain">refund_policy_explain</option>
+          <option value="reship_arrangement">reship_arrangement</option>
+          <option value="solution_confirm">solution_confirm</option>
+          <option value="follow_up_after_resolved">follow_up_after_resolved</option>
+          <option value="calm_down_complaint">calm_down_complaint</option>
+          <option value="request_internal_confirmation">request_internal_confirmation</option>
+        </select></label>
+        <label class="wa-ai-field"><span>After-sales script draft</span><textarea id="wa-ai-after-sales-script" rows="5"></textarea></label>
+        <div class="wa-ai-two-actions">
+          <button id="wa-ai-save-after-sales" type="button" class="wa-ai-wide-button">Create after-sales case</button>
+          <button id="wa-ai-generate-after-sales-script" type="button" class="wa-ai-wide-button wa-ai-secondary-wide">Generate after-sales script</button>
+        </div>
+        <div class="wa-ai-two-actions">
+          <button id="wa-ai-copy-after-sales-script" type="button" class="wa-ai-wide-button">Copy after-sales script</button>
+          <button id="wa-ai-insert-after-sales-script" type="button" class="wa-ai-wide-button wa-ai-secondary-wide">Insert draft</button>
+        </div>
+      </section>
+
+      <section class="wa-ai-section">
+        <div class="wa-ai-section-title"><h3>Supplier / procurement</h3></div>
+        <div class="wa-ai-safety-note">Supplier scripts are drafts only. The extension does not contact suppliers, create purchase orders, confirm costs, or apply supplier costs automatically.</div>
+        <div class="wa-ai-two-cols">
+          <label class="wa-ai-field"><span>Supplier ID</span><input id="wa-ai-supplier-id" type="text" placeholder="optional supplier id" /></label>
+          <label class="wa-ai-field"><span>Order ID</span><input id="wa-ai-supplier-order-id" type="text" placeholder="optional order id" /></label>
+        </div>
+        <label class="wa-ai-field"><span>Product ID</span><input id="wa-ai-supplier-product-id" type="text" placeholder="optional product id; selected product is used if empty" /></label>
+        <label class="wa-ai-field"><span>Supplier script scenario</span><select id="wa-ai-supplier-scenario">
+          <option value="ask_price">ask_price</option>
+          <option value="ask_moq">ask_moq</option>
+          <option value="ask_sample_fee">ask_sample_fee</option>
+          <option value="ask_lead_time">ask_lead_time</option>
+          <option value="ask_bulk_order_cost">ask_bulk_order_cost</option>
+          <option value="ask_custom_feasibility">ask_custom_feasibility</option>
+          <option value="ask_quality_issue">ask_quality_issue</option>
+          <option value="ask_reship_cost">ask_reship_cost</option>
+          <option value="negotiate_price">negotiate_price</option>
+          <option value="confirm_purchase_details">confirm_purchase_details</option>
+        </select></label>
+        <label class="wa-ai-field"><span>Supplier draft</span><textarea id="wa-ai-supplier-script" rows="5"></textarea></label>
+        <div class="wa-ai-two-actions">
+          <button id="wa-ai-generate-supplier-script" type="button" class="wa-ai-wide-button">Generate supplier draft</button>
+          <button id="wa-ai-copy-supplier-script" type="button" class="wa-ai-wide-button wa-ai-secondary-wide">Copy supplier draft</button>
+        </div>
+        <button id="wa-ai-insert-supplier-script" type="button" class="wa-ai-wide-button wa-ai-secondary-wide">Insert draft</button>
+      </section>
+
+      <section class="wa-ai-section">
         <div class="wa-ai-section-title">
           <h3>客户消息理解</h3>
           <button id="wa-ai-read-selection" type="button" class="wa-ai-link-button">读取选中</button>
@@ -355,6 +495,7 @@ function createSidebar() {
           <button data-action="material" type="button">发素材</button>
           <button data-action="sample" type="button">样品</button>
           <button data-action="custom" type="button">Custom</button>
+          <button data-action="afterSales" type="button">After-sales</button>
           <button data-action="followUp" type="button">设置跟进</button>
         </div>
       </section>
@@ -370,6 +511,28 @@ function createSidebar() {
       </section>
     </section>
 
+      <section class="wa-ai-section">
+        <div class="wa-ai-section-title">
+          <h3>A/B Script Test</h3>
+          <button id="wa-ai-refresh-script-tests" type="button" class="wa-ai-link-button">Refresh</button>
+        </div>
+        <div class="wa-ai-safety-note">A/B scripts are drafts only. Copying or inserting records usage, but the final WhatsApp send action is always manual.</div>
+        <label class="wa-ai-field"><span>Active experiment</span><select id="wa-ai-script-experiment-select"><option value="">No active experiment loaded</option></select></label>
+        <label class="wa-ai-field"><span>Variant</span><select id="wa-ai-script-variant-select"><option value="">Select experiment first</option></select></label>
+        <label class="wa-ai-field"><span>Variant draft</span><textarea id="wa-ai-script-test-draft" rows="5"></textarea></label>
+        <div class="wa-ai-two-actions">
+          <button id="wa-ai-copy-script-test" type="button" class="wa-ai-wide-button">Copy + record</button>
+          <button id="wa-ai-insert-script-test" type="button" class="wa-ai-wide-button wa-ai-secondary-wide">Insert + record</button>
+        </div>
+        <div class="wa-ai-two-actions">
+          <button id="wa-ai-mark-script-replied" type="button" class="wa-ai-wide-button wa-ai-secondary-wide">Mark replied</button>
+          <button id="wa-ai-mark-script-quote" type="button" class="wa-ai-wide-button wa-ai-secondary-wide">Mark quote</button>
+        </div>
+        <div class="wa-ai-two-actions">
+          <button id="wa-ai-mark-script-order" type="button" class="wa-ai-wide-button wa-ai-secondary-wide">Mark order</button>
+          <button id="wa-ai-mark-script-no-response" type="button" class="wa-ai-wide-button wa-ai-secondary-wide">Mark no response</button>
+        </div>
+      </section>
     <footer class="wa-ai-footer">
       <div id="wa-ai-recognition-status" class="wa-ai-recognition-status">识别异常，已切换复制粘贴模式</div>
       <div id="wa-ai-status">当前为复制粘贴模式。报价和回复只生成草稿，不会自动发送 WhatsApp 消息。</div>
@@ -405,8 +568,25 @@ function bindEvents(toggleButton: HTMLButtonElement) {
 
   getElement<HTMLButtonElement>("wa-ai-save-customer").addEventListener("click", saveCustomerToApi);
   getElement<HTMLButtonElement>("wa-ai-refresh-intent").addEventListener("click", () => void loadCustomerIntentScore());
+  getElement<HTMLButtonElement>("wa-ai-load-reorder").addEventListener("click", () => void loadReorderPrediction());
+  getElement<HTMLButtonElement>("wa-ai-generate-reorder").addEventListener("click", () => void generateReorderScriptFromSidebar());
+  getElement<HTMLButtonElement>("wa-ai-copy-reorder-script").addEventListener("click", () => copyTextArea("wa-ai-reorder-script", "复购话术已复制，请人工确认后手动发送。"));
+  getElement<HTMLButtonElement>("wa-ai-insert-reorder-script").addEventListener("click", () => insertTextAreaIntoWhatsApp("wa-ai-reorder-script"));
+  getElement<HTMLButtonElement>("wa-ai-refresh-orders").addEventListener("click", () => void loadOrdersForCurrentCustomer());
+  getElement<HTMLButtonElement>("wa-ai-create-order").addEventListener("click", () => void createOrderFromSidebar());
+  getElement<HTMLButtonElement>("wa-ai-generate-order-script").addEventListener("click", () => void generateOrderScriptFromSidebar());
+  getElement<HTMLButtonElement>("wa-ai-load-fulfillment").addEventListener("click", () => void loadOrderFulfillmentFromSidebar());
+  getElement<HTMLButtonElement>("wa-ai-generate-fulfillment-script").addEventListener("click", () => void generateFulfillmentScriptFromSidebar());
+  getElement<HTMLButtonElement>("wa-ai-copy-order-script").addEventListener("click", () => copyTextArea("wa-ai-order-script", "Order script copied. Please confirm manually before sending."));
+  getElement<HTMLButtonElement>("wa-ai-insert-order-script").addEventListener("click", () => insertTextAreaIntoWhatsApp("wa-ai-order-script"));
   getElement<HTMLButtonElement>("wa-ai-open-login").addEventListener("click", () => {
     window.open(WEB_LOGIN_URL, "_blank", "noopener,noreferrer");
+  });
+  getElement<HTMLButtonElement>("wa-ai-refresh-brands").addEventListener("click", () => void loadBrandsForSidebar());
+  getElement<HTMLSelectElement>("wa-ai-brand-select").addEventListener("change", () => {
+    void loadProducts(getInput("wa-ai-product-search").value);
+    void loadMaterials(getInput("wa-ai-material-search").value);
+    setStatus("Brand context changed. Drafts will use this brand after manual confirmation; no WhatsApp account was switched.");
   });
   getElement<HTMLButtonElement>("wa-ai-refresh-products").addEventListener("click", () => void loadProducts());
   getElement<HTMLButtonElement>("wa-ai-search-products").addEventListener("click", () => void loadProducts(getInput("wa-ai-product-search").value));
@@ -440,6 +620,22 @@ function bindEvents(toggleButton: HTMLButtonElement) {
   getElement<HTMLButtonElement>("wa-ai-copy-custom-script").addEventListener("click", () => copyTextArea("wa-ai-custom-script", "Custom script copied. Please confirm manually before sending."));
   getElement<HTMLButtonElement>("wa-ai-insert-custom-script").addEventListener("click", () => insertTextAreaIntoWhatsApp("wa-ai-custom-script"));
   getElement<HTMLButtonElement>("wa-ai-custom-follow-up").addEventListener("click", seedCustomFollowUp);
+  getElement<HTMLButtonElement>("wa-ai-save-after-sales").addEventListener("click", () => void createAfterSalesFromSidebar());
+  getElement<HTMLButtonElement>("wa-ai-generate-after-sales-script").addEventListener("click", () => void generateAfterSalesScriptFromSidebar());
+  getElement<HTMLButtonElement>("wa-ai-copy-after-sales-script").addEventListener("click", () => copyTextArea("wa-ai-after-sales-script", "After-sales script copied. Confirm policy and facts before sending."));
+  getElement<HTMLButtonElement>("wa-ai-insert-after-sales-script").addEventListener("click", () => insertTextAreaIntoWhatsApp("wa-ai-after-sales-script"));
+  getElement<HTMLButtonElement>("wa-ai-generate-supplier-script").addEventListener("click", () => void generateSupplierScriptFromSidebar());
+  getElement<HTMLButtonElement>("wa-ai-copy-supplier-script").addEventListener("click", () => copyTextArea("wa-ai-supplier-script", "Supplier draft copied. Confirm price, MOQ, lead time, quality and cost before contacting the supplier manually."));
+  getElement<HTMLButtonElement>("wa-ai-insert-supplier-script").addEventListener("click", () => insertTextAreaIntoWhatsApp("wa-ai-supplier-script"));
+  getElement<HTMLButtonElement>("wa-ai-refresh-script-tests").addEventListener("click", () => void loadScriptExperimentsForSidebar());
+  getElement<HTMLSelectElement>("wa-ai-script-experiment-select").addEventListener("change", () => void loadSelectedScriptExperiment());
+  getElement<HTMLSelectElement>("wa-ai-script-variant-select").addEventListener("change", updateSelectedScriptVariantDraft);
+  getElement<HTMLButtonElement>("wa-ai-copy-script-test").addEventListener("click", () => void recordScriptUsageFromSidebar("copy"));
+  getElement<HTMLButtonElement>("wa-ai-insert-script-test").addEventListener("click", () => void recordScriptUsageFromSidebar("insert"));
+  getElement<HTMLButtonElement>("wa-ai-mark-script-replied").addEventListener("click", () => void markScriptUsageOutcomeFromSidebar("customer_replied"));
+  getElement<HTMLButtonElement>("wa-ai-mark-script-quote").addEventListener("click", () => void markScriptUsageOutcomeFromSidebar("quote_created"));
+  getElement<HTMLButtonElement>("wa-ai-mark-script-order").addEventListener("click", () => void markScriptUsageOutcomeFromSidebar("order_created"));
+  getElement<HTMLButtonElement>("wa-ai-mark-script-no-response").addEventListener("click", () => void markScriptUsageOutcomeFromSidebar("no_response"));
   document.querySelectorAll<HTMLButtonElement>("[data-follow-up-days]").forEach((button) => {
     button.addEventListener("click", () => {
       setFollowUpDate(Number(button.dataset.followUpDays || "1"));
@@ -470,6 +666,7 @@ function bindEvents(toggleButton: HTMLButtonElement) {
       if (action === "quote") return generateQuoteDraft();
       if (action === "sample") return generateSampleScriptFromSidebar("sample_quote");
       if (action === "custom") return generateCustomScriptFromSidebar("custom_confirm");
+      if (action === "afterSales") return generateAfterSalesScriptFromSidebar("apologize_and_acknowledge");
       if (action === "followUp") {
         updateFollowUpScript();
         setFollowUpDate(1);
@@ -494,8 +691,10 @@ async function checkAuthStatus() {
     const result = (await response.json()) as { user: AuthUser };
     authState = { status: "authenticated", user: result.user };
     renderAuthState();
+    await loadBrandsForSidebar();
     await loadProducts();
     await loadMaterials();
+    await loadScriptExperimentsForSidebar();
   } catch {
     authState = { status: "anonymous" };
     renderAuthState();
@@ -534,7 +733,27 @@ function renderAuthState() {
 function setProtectedControlsDisabled(disabled: boolean) {
   [
     "wa-ai-save-customer",
+    "wa-ai-refresh-brands",
+    "wa-ai-brand-select",
     "wa-ai-refresh-intent",
+    "wa-ai-load-reorder",
+    "wa-ai-generate-reorder",
+    "wa-ai-copy-reorder-script",
+    "wa-ai-insert-reorder-script",
+    "wa-ai-reorder-script",
+    "wa-ai-refresh-orders",
+    "wa-ai-order-select",
+    "wa-ai-order-amount",
+    "wa-ai-order-currency",
+    "wa-ai-order-quantity",
+    "wa-ai-order-status",
+    "wa-ai-order-script",
+    "wa-ai-create-order",
+    "wa-ai-generate-order-script",
+    "wa-ai-load-fulfillment",
+    "wa-ai-generate-fulfillment-script",
+    "wa-ai-copy-order-script",
+    "wa-ai-insert-order-script",
     "wa-ai-refresh-products",
     "wa-ai-search-products",
     "wa-ai-product-search",
@@ -588,7 +807,35 @@ function setProtectedControlsDisabled(disabled: boolean) {
     "wa-ai-generate-custom-script",
     "wa-ai-copy-custom-script",
     "wa-ai-insert-custom-script",
-    "wa-ai-custom-follow-up"
+    "wa-ai-custom-follow-up",
+    "wa-ai-after-sales-type",
+    "wa-ai-after-sales-priority",
+    "wa-ai-after-sales-claim",
+    "wa-ai-after-sales-evidence",
+    "wa-ai-after-sales-scenario",
+    "wa-ai-after-sales-script",
+    "wa-ai-save-after-sales",
+    "wa-ai-generate-after-sales-script",
+    "wa-ai-copy-after-sales-script",
+    "wa-ai-insert-after-sales-script",
+    "wa-ai-supplier-id",
+    "wa-ai-supplier-order-id",
+    "wa-ai-supplier-product-id",
+    "wa-ai-supplier-scenario",
+    "wa-ai-supplier-script",
+    "wa-ai-generate-supplier-script",
+    "wa-ai-copy-supplier-script",
+    "wa-ai-insert-supplier-script",
+    "wa-ai-refresh-script-tests",
+    "wa-ai-script-experiment-select",
+    "wa-ai-script-variant-select",
+    "wa-ai-script-test-draft",
+    "wa-ai-copy-script-test",
+    "wa-ai-insert-script-test",
+    "wa-ai-mark-script-replied",
+    "wa-ai-mark-script-quote",
+    "wa-ai-mark-script-order",
+    "wa-ai-mark-script-no-response"
   ].forEach((id) => {
     const element = document.getElementById(id) as HTMLButtonElement | HTMLSelectElement | null;
     if (element) element.disabled = disabled;
@@ -628,6 +875,9 @@ async function apiFetch(path: string, init: RequestInit = {}): Promise<Extension
     authState = { status: "anonymous" };
     renderAuthState();
   }
+  if (response.status === 403) {
+    setStatus("权限不足，请在 Web 后台确认组织角色或客户归属。");
+  }
   return {
     ...response,
     json: async () => JSON.parse(response.body),
@@ -642,12 +892,41 @@ function plainHeaders(headers: HeadersInit | undefined): Record<string, string> 
   return headers;
 }
 
+async function loadBrandsForSidebar() {
+  if (!ensureAuthenticated()) return;
+  const select = getElement<HTMLSelectElement>("wa-ai-brand-select");
+  try {
+    if (!sidebarOrganizationId) {
+      const orgResponse = await apiFetch("/api/organizations");
+      if (orgResponse.ok) {
+        const organizations = (await orgResponse.json()) as Array<{ id: string; name: string }>;
+        sidebarOrganizationId = organizations[0]?.id || "";
+      }
+    }
+    if (!sidebarOrganizationId) {
+      sidebarBrands = [];
+      select.replaceChildren(option("", "No organization brand"));
+      return;
+    }
+    const response = await apiFetch(`/api/brands?organizationId=${encodeURIComponent(sidebarOrganizationId)}&status=active&pageSize=50`);
+    if (!response.ok) throw new Error("brands failed");
+    sidebarBrands = (await response.json()) as Array<any>;
+    select.replaceChildren(option("", "No brand context"), ...sidebarBrands.map((brand) => option(brand.id, brand.displayName || brand.name)));
+  } catch {
+    sidebarBrands = [];
+    select.replaceChildren(option("", "Brand load failed"));
+    setStatus("Brand/store list failed to load. AI drafts can still run without brand context.");
+  }
+}
+
 async function loadProducts(query = "") {
   if (!ensureAuthenticated()) return;
   const select = getElement<HTMLSelectElement>("wa-ai-product-select");
   try {
     const params = new URLSearchParams();
     if (query.trim()) params.set("q", query.trim());
+    const brandId = selectedBrandId();
+    if (brandId) params.set("brandId", brandId);
     const response = await apiFetch(`/api/products${params.toString() ? `?${params.toString()}` : ""}`);
     if (!response.ok) throw new Error("products failed");
     const products = (await response.json()) as ProductSummary[];
@@ -672,6 +951,8 @@ async function loadMaterials(query = "") {
     if (type) params.set("type", type);
     if (language) params.set("language", language);
     if (product) params.set("productId", product.id);
+    const brandId = selectedBrandId();
+    if (brandId) params.set("brandId", brandId);
     const response = await apiFetch(`/api/materials${params.toString() ? `?${params.toString()}` : ""}`);
     if (!response.ok) throw new Error("materials failed");
     const materials = (await response.json()) as MaterialSummary[];
@@ -1028,8 +1309,17 @@ async function saveCustomerToApi() {
     if (!response.ok) throw new Error("save failed");
     const saved = (await response.json()) as CustomerDetail;
     getInput("wa-ai-customer-id").value = saved.id;
+    const brandId = selectedBrandId();
+    if (brandId) {
+      await apiFetch(`/api/brands/${encodeURIComponent(brandId)}/assign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entityType: "customer", entityId: saved.id, confirm: true })
+      });
+    }
     await storeCustomerProfile(saved);
     await loadCustomerIntentScore();
+    await loadReorderPrediction();
     setStatus(`客户已保存：${saved.name}`);
   } catch {
     setStatus("客户保存失败。请确认本地 API 和 PostgreSQL 已启动。");
@@ -1052,6 +1342,432 @@ async function loadCustomerIntentScore() {
     renderCustomerIntent(null);
     setStatus("意向分加载失败，请确认客户属于当前账号。");
   }
+}
+
+async function loadReorderPrediction() {
+  if (!ensureAuthenticated()) return;
+  const customerId = getInput("wa-ai-customer-id").value.trim();
+  if (!customerId) {
+    renderReorderPrediction(null);
+    setStatus("请先保存客户后使用复购预测。复购建议只作销售辅助判断。");
+    return;
+  }
+  setButtonsBusy(true);
+  try {
+    await apiFetch("/api/predictions/customers/recalculate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ customerId })
+    });
+    const response = await apiFetch(`/api/predictions/customers?status=open&pageSize=20`);
+    if (!response.ok) throw new Error("prediction failed");
+    const rows = (await response.json()) as CustomerPredictionSummary[];
+    const prediction = rows
+      .filter((item) => item.customerId === customerId)
+      .sort((a, b) => b.score - a.score)[0] || null;
+    renderReorderPrediction(prediction);
+    setStatus("复购预测已加载。不会自动创建任务或发送 WhatsApp 消息。");
+  } catch {
+    renderReorderPrediction(null);
+    setStatus("复购预测加载失败，请确认客户归属和角色权限。");
+  } finally {
+    setButtonsBusy(false);
+  }
+}
+
+async function generateReorderScriptFromSidebar() {
+  if (!ensureAuthenticated()) return;
+  const customerId = getInput("wa-ai-customer-id").value.trim();
+  if (!customerId) return setStatus("请先保存客户后生成复购话术。");
+  setButtonsBusy(true);
+  try {
+    const response = await apiFetch("/api/ai/reorder-script", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customerId,
+        productId: selectedProduct()?.id || null,
+        brandId: selectedBrandId() || null,
+        reminderType: "reorder",
+        targetLanguage: getSelect("wa-ai-language").value,
+        tone: "professional"
+      })
+    });
+    if (!response.ok) throw new Error("reorder script failed");
+    const result = (await response.json()) as ReorderScriptResponse;
+    getTextArea("wa-ai-reorder-script").value = result.scriptText;
+    getTextArea("wa-ai-follow-up-script").value = result.scriptText;
+    renderRisks(result.riskWarnings);
+    setStatus("复购话术草稿已生成，请确认价格、库存、优惠、交期和客户历史后手动发送。");
+  } catch {
+    setStatus("复购话术生成失败，请确认客户权限和 API 服务。");
+  } finally {
+    setButtonsBusy(false);
+  }
+}
+
+async function loadOrdersForCurrentCustomer() {
+  if (!ensureAuthenticated()) return;
+  const customerId = getInput("wa-ai-customer-id").value.trim();
+  const select = getElement<HTMLSelectElement>("wa-ai-order-select");
+  if (!customerId) {
+    select.innerHTML = `<option value="">Save customer first</option>`;
+    return setStatus("Save the customer before using order center.");
+  }
+  try {
+    const response = await apiFetch(`/api/orders?customerId=${encodeURIComponent(customerId)}&pageSize=20`);
+    if (!response.ok) throw new Error("orders failed");
+    const orders = (await response.json()) as OrderSummary[];
+    select.innerHTML = orders.length
+      ? orders.map((order) => `<option value="${escapeHtml(order.id)}">${escapeHtml(`${order.orderNo} / ${order.orderStatus} / ${order.paymentStatus}`)}</option>`).join("")
+      : `<option value="">No orders yet</option>`;
+    setStatus("Orders loaded. They are manual records only.");
+  } catch {
+    setStatus("Order list failed to load. Check customer permission and login state.");
+  }
+}
+
+async function createOrderFromSidebar() {
+  if (!ensureAuthenticated()) return;
+  const customerId = getInput("wa-ai-customer-id").value.trim();
+  if (!customerId) return setStatus("Save the customer before creating an order.");
+  setButtonsBusy(true);
+  try {
+    const response = await apiFetch("/api/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customerId,
+        productId: selectedProduct()?.id || null,
+        orderType: "normal",
+        amount: getInput("wa-ai-order-amount").value.trim() || null,
+        currency: getInput("wa-ai-order-currency").value.trim() || "USD",
+        quantity: getInput("wa-ai-order-quantity").value.trim() || null,
+        orderStatus: getSelect("wa-ai-order-status").value,
+        paymentStatus: "unpaid",
+        productionStatus: "not_started",
+        shippingStatus: "pending",
+        afterSalesStatus: "none",
+        title: "WhatsApp customer order"
+      })
+    });
+    if (!response.ok) throw new Error("create order failed");
+    const order = (await response.json()) as OrderSummary & { riskWarnings?: string[] };
+    const brandId = selectedBrandId();
+    if (brandId) {
+      await apiFetch(`/api/brands/${encodeURIComponent(brandId)}/assign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entityType: "order", entityId: order.id, confirm: true })
+      });
+    }
+    getElement<HTMLSelectElement>("wa-ai-order-select").innerHTML = `<option value="${escapeHtml(order.id)}">${escapeHtml(`${order.orderNo} / ${order.orderStatus}`)}</option>`;
+    renderRisks(order.riskWarnings || ["Order created manually. Confirm payment, production, shipping and after-sales details."]);
+    setStatus("Order created as a manual record. No WhatsApp message was sent.");
+  } catch {
+    setStatus("Order creation failed. Check customer/product permission.");
+  } finally {
+    setButtonsBusy(false);
+  }
+}
+
+async function generateOrderScriptFromSidebar() {
+  if (!ensureAuthenticated()) return;
+  const orderId = getElement<HTMLSelectElement>("wa-ai-order-select").value;
+  if (!orderId) return setStatus("Select or create an order first.");
+  setButtonsBusy(true);
+  try {
+    const response = await apiFetch("/api/ai/order-script", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        orderId,
+        brandId: selectedBrandId() || null,
+        scenario: getSelect("wa-ai-order-status").value === "pending_payment" ? "payment_reminder" : "order_confirm",
+        targetLanguage: getSelect("wa-ai-language").value,
+        tone: "professional"
+      })
+    });
+    if (!response.ok) throw new Error("order script failed");
+    const result = (await response.json()) as OrderScriptResponse;
+    getTextArea("wa-ai-order-script").value = result.scriptText;
+    renderRisks(result.riskWarnings);
+    setStatus("Order script generated as draft only. Confirm facts before manually sending.");
+  } catch {
+    setStatus("Order script generation failed. Check order permission.");
+  } finally {
+    setButtonsBusy(false);
+  }
+}
+
+async function loadOrderFulfillmentFromSidebar() {
+  if (!ensureAuthenticated()) return;
+  const orderId = getElement<HTMLSelectElement>("wa-ai-order-select").value;
+  if (!orderId) return setStatus("Select or create an order first.");
+  try {
+    const response = await apiFetch(`/api/orders/${encodeURIComponent(orderId)}/fulfillment`);
+    if (!response.ok) throw new Error("fulfillment failed");
+    const result = await response.json() as { alerts: Array<{ level: string; alertType: string; recommendedAction?: string | null }>; recommendedActions?: string[] };
+    getElement<HTMLDivElement>("wa-ai-fulfillment-alerts").textContent = result.alerts.length
+      ? result.alerts.map((alert) => `${alert.level}: ${alert.alertType} - ${alert.recommendedAction || ""}`).join(" | ")
+      : "No open fulfillment alerts. Still confirm payment, production, shipping and after-sales details manually.";
+    setStatus("Fulfillment alerts loaded. The extension does not update order status automatically.");
+  } catch {
+    setStatus("Fulfillment check failed. Check order permission.");
+  }
+}
+
+async function generateFulfillmentScriptFromSidebar() {
+  if (!ensureAuthenticated()) return;
+  const orderId = getElement<HTMLSelectElement>("wa-ai-order-select").value;
+  if (!orderId) return setStatus("Select or create an order first.");
+  setButtonsBusy(true);
+  try {
+    const scenario = getSelect("wa-ai-order-status").value === "pending_payment" ? "payment_follow_up" : "delivery_follow_up";
+    const response = await apiFetch("/api/ai/order-fulfillment-script", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderId, brandId: selectedBrandId() || null, scenario, targetLanguage: getSelect("wa-ai-language").value, tone: "professional" })
+    });
+    if (!response.ok) throw new Error("fulfillment script failed");
+    const result = (await response.json()) as OrderScriptResponse;
+    getTextArea("wa-ai-order-script").value = result.scriptText;
+    renderRisks(result.riskWarnings);
+    setStatus("Fulfillment script generated as draft only. No WhatsApp message was sent.");
+  } catch {
+    setStatus("Fulfillment script generation failed. Check order permission.");
+  } finally {
+    setButtonsBusy(false);
+  }
+}
+
+async function createAfterSalesFromSidebar() {
+  if (!ensureAuthenticated()) return;
+  const customerId = getInput("wa-ai-customer-id").value.trim();
+  if (!customerId) return setStatus("Save the customer before creating an after-sales case.");
+  setButtonsBusy(true);
+  try {
+    const response = await apiFetch("/api/after-sales", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customerId,
+        orderId: getElement<HTMLSelectElement>("wa-ai-order-select").value || null,
+        productId: selectedProduct()?.id || null,
+        caseType: getSelect("wa-ai-after-sales-type").value,
+        priority: getSelect("wa-ai-after-sales-priority").value,
+        description: getTextArea("wa-ai-after-sales-claim").value || null,
+        customerClaim: getTextArea("wa-ai-after-sales-claim").value || null,
+        evidenceUrls: parseLines(getTextArea("wa-ai-after-sales-evidence").value)
+      })
+    });
+    if (!response.ok) throw new Error("after-sales create failed");
+    const result = (await response.json()) as { id: string; caseNo: string; riskWarnings?: string[] };
+    const brandId = selectedBrandId();
+    if (brandId) {
+      await apiFetch(`/api/brands/${encodeURIComponent(brandId)}/assign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entityType: "after_sales", entityId: result.id, confirm: true })
+      });
+    }
+    getInput("wa-ai-after-sales-id").value = result.id;
+    renderRisks(result.riskWarnings || ["After-sales case created manually. Confirm policy, responsibility, refund, reship and evidence before messaging."]);
+    setStatus(`After-sales case ${result.caseNo} created. No refund, reshipment, responsibility attribution, or WhatsApp message was triggered.`);
+  } catch {
+    setStatus("After-sales case creation failed. Check customer/order/product permission.");
+  } finally {
+    setButtonsBusy(false);
+  }
+}
+
+async function generateAfterSalesScriptFromSidebar(scenario?: string) {
+  if (!ensureAuthenticated()) return;
+  let afterSalesCaseId = getInput("wa-ai-after-sales-id").value.trim();
+  if (!afterSalesCaseId) {
+    const created = await createAfterSalesForScript();
+    if (!created) return;
+    afterSalesCaseId = created;
+  }
+  setButtonsBusy(true);
+  try {
+    const response = await apiFetch("/api/ai/after-sales-script", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        afterSalesCaseId,
+        brandId: selectedBrandId() || null,
+        scenario: scenario || getSelect("wa-ai-after-sales-scenario").value,
+        targetLanguage: getSelect("wa-ai-language").value,
+        tone: "professional"
+      })
+    });
+    if (!response.ok) throw new Error("after-sales script failed");
+    const result = (await response.json()) as AfterSalesScriptResponse;
+    getTextArea("wa-ai-after-sales-script").value = result.scriptText;
+    getTextArea("wa-ai-follow-up-script").value = result.scriptText;
+    renderRisks(result.riskWarnings);
+    setStatus("After-sales script generated as a draft only. Confirm responsibility, policy, refund, reship, logistics and evidence before manually sending.");
+  } catch {
+    setStatus("After-sales script generation failed. Check after-sales permission.");
+  } finally {
+    setButtonsBusy(false);
+  }
+}
+
+async function createAfterSalesForScript() {
+  const customerId = getInput("wa-ai-customer-id").value.trim();
+  if (!customerId) {
+    setStatus("Save the customer before using after-sales scripts.");
+    return null;
+  }
+  try {
+    const response = await apiFetch("/api/after-sales", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customerId,
+        orderId: getElement<HTMLSelectElement>("wa-ai-order-select").value || null,
+        productId: selectedProduct()?.id || null,
+        caseType: getSelect("wa-ai-after-sales-type").value,
+        priority: getSelect("wa-ai-after-sales-priority").value,
+        description: getTextArea("wa-ai-after-sales-claim").value || "After-sales case created from WhatsApp sidebar draft flow.",
+        customerClaim: getTextArea("wa-ai-after-sales-claim").value || null,
+        evidenceUrls: parseLines(getTextArea("wa-ai-after-sales-evidence").value)
+      })
+    });
+    if (!response.ok) throw new Error("after-sales create failed");
+    const result = (await response.json()) as { id: string };
+    getInput("wa-ai-after-sales-id").value = result.id;
+    return result.id;
+  } catch {
+    setStatus("Create an after-sales case first, or check customer/order permission.");
+    return null;
+  }
+}
+
+async function generateSupplierScriptFromSidebar() {
+  if (!ensureAuthenticated()) return;
+  setButtonsBusy(true);
+  try {
+    const response = await apiFetch("/api/ai/supplier-script", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        supplierId: getInput("wa-ai-supplier-id").value.trim() || null,
+        productId: getInput("wa-ai-supplier-product-id").value.trim() || selectedProduct()?.id || null,
+        orderId: getInput("wa-ai-supplier-order-id").value.trim() || getElement<HTMLSelectElement>("wa-ai-order-select").value || null,
+        brandId: selectedBrandId() || null,
+        scenario: getSelect("wa-ai-supplier-scenario").value,
+        targetLanguage: getSelect("wa-ai-language").value,
+        tone: "professional"
+      })
+    });
+    if (!response.ok) throw new Error("supplier script failed");
+    const result = (await response.json()) as SupplierScriptResponse;
+    getTextArea("wa-ai-supplier-script").value = result.scriptText;
+    renderRisks(result.riskWarnings);
+    setStatus("Supplier draft generated. No supplier was contacted, no purchase order was created, and no cost was applied.");
+  } catch {
+    setStatus("Supplier draft generation failed. Check supplier/product/order permission.");
+  } finally {
+    setButtonsBusy(false);
+  }
+}
+
+async function loadScriptExperimentsForSidebar() {
+  if (!ensureAuthenticated()) return;
+  try {
+    const response = await apiFetch("/api/script-experiments?status=active&pageSize=20");
+    if (!response.ok) throw new Error("script experiments failed");
+    scriptExperiments = (await response.json()) as Array<any>;
+    const select = getElement<HTMLSelectElement>("wa-ai-script-experiment-select");
+    select.innerHTML = `<option value="">Select active experiment</option>${scriptExperiments.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)} / ${escapeHtml(item.scenario)}</option>`).join("")}`;
+    scriptVariants = [];
+    getElement<HTMLSelectElement>("wa-ai-script-variant-select").innerHTML = `<option value="">Select experiment first</option>`;
+    getTextArea("wa-ai-script-test-draft").value = "";
+    setStatus("A/B script experiments loaded. Drafts still require manual copy or insert.");
+  } catch {
+    setStatus("A/B script experiments failed to load or permission is insufficient.");
+  }
+}
+
+async function loadSelectedScriptExperiment() {
+  const experimentId = getElement<HTMLSelectElement>("wa-ai-script-experiment-select").value;
+  if (!experimentId) return;
+  try {
+    const response = await apiFetch(`/api/script-experiments/${encodeURIComponent(experimentId)}`);
+    if (!response.ok) throw new Error("script experiment detail failed");
+    const detail = (await response.json()) as any;
+    scriptVariants = (detail.variants || []).filter((variant: any) => variant.enabled);
+    const select = getElement<HTMLSelectElement>("wa-ai-script-variant-select");
+    select.innerHTML = `<option value="">Select variant</option>${scriptVariants.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.versionLabel)} / ${escapeHtml(item.title)}</option>`).join("")}`;
+    getTextArea("wa-ai-script-test-draft").value = "";
+    lastScriptUsageId = "";
+    setStatus("A/B script variants loaded. Copy or insert records usage only; it does not send WhatsApp messages.");
+  } catch {
+    setStatus("A/B script experiment detail failed to load.");
+  }
+}
+
+function updateSelectedScriptVariantDraft() {
+  const variant = selectedScriptVariant();
+  getTextArea("wa-ai-script-test-draft").value = variant?.content || "";
+}
+
+async function recordScriptUsageFromSidebar(mode: "copy" | "insert") {
+  if (!ensureAuthenticated()) return;
+  const variant = selectedScriptVariant();
+  const experimentId = getElement<HTMLSelectElement>("wa-ai-script-experiment-select").value;
+  if (!variant || !experimentId) return setStatus("Select an active experiment and variant first.");
+  try {
+    const usedText = getTextArea("wa-ai-script-test-draft").value || variant.content;
+    const response = await apiFetch("/api/script-usages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        experimentId,
+        variantId: variant.id,
+        customerId: getInput("wa-ai-customer-id").value.trim() || null,
+        scenario: scriptExperiments.find((item) => item.id === experimentId)?.scenario || "first_reply",
+        channel: "extension",
+        usedText
+      })
+    });
+    if (!response.ok) throw new Error("script usage failed");
+    const result = (await response.json()) as { id: string };
+    lastScriptUsageId = result.id;
+    if (mode === "copy") {
+      await navigator.clipboard.writeText(usedText);
+      setStatus("A/B draft copied and usage recorded. Please manually confirm and send in WhatsApp.");
+    } else {
+      getTextArea("wa-ai-script-test-draft").value = usedText;
+      insertTextAreaIntoWhatsApp("wa-ai-script-test-draft");
+      setStatus("A/B draft inserted and usage recorded. It was not automatically sent.");
+    }
+  } catch {
+    setStatus("A/B script usage record failed. Check customer or experiment permission.");
+  }
+}
+
+async function markScriptUsageOutcomeFromSidebar(outcome: string) {
+  if (!lastScriptUsageId) return setStatus("Copy or insert a script variant first, then mark outcome manually.");
+  try {
+    const response = await apiFetch(`/api/script-usages/${encodeURIComponent(lastScriptUsageId)}/outcome`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ outcome })
+    });
+    if (!response.ok) throw new Error("outcome failed");
+    setStatus(`A/B script outcome marked as ${outcome}.`);
+  } catch {
+    setStatus("A/B script outcome update failed.");
+  }
+}
+
+function selectedScriptVariant() {
+  const variantId = getElement<HTMLSelectElement>("wa-ai-script-variant-select").value;
+  return scriptVariants.find((variant) => variant.id === variantId);
 }
 
 async function handleQuickAction(action: Exclude<QuickAction, "product" | "quote">) {
@@ -1079,10 +1795,11 @@ async function handleQuickAction(action: Exclude<QuickAction, "product" | "quote
 }
 
 async function requestAiReply(payload: AiReplyRequest) {
+  const brandId = selectedBrandId();
   const response = await apiFetch("/api/ai/reply", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
+    body: JSON.stringify({ ...payload, brandId: brandId || undefined })
   });
   if (!response.ok) throw new Error("AI reply request failed");
   return response.json() as Promise<AiReplyResponse>;
@@ -1152,6 +1869,10 @@ function selectedProduct() {
   return products.find((product) => product.id === select.value);
 }
 
+function selectedBrandId() {
+  return getElement<HTMLSelectElement>("wa-ai-brand-select").value || "";
+}
+
 function selectedProductLabel() {
   const product = selectedProduct();
   return product ? `${product.name} (${product.sku})` : "";
@@ -1206,6 +1927,12 @@ function renderRisks(values: string[]) {
 function renderCustomerIntent(result: CustomerIntentResponse | null) {
   getElement("wa-ai-intent-score").textContent = result ? `${result.intentScore} · ${result.intentLevel}` : "保存客户后可计算";
   getElement("wa-ai-intent-action").textContent = result ? result.recommendedAction : "推荐动作仅作为销售建议。";
+}
+
+function renderReorderPrediction(result: CustomerPredictionSummary | null) {
+  getElement("wa-ai-reorder-score").textContent = result ? `${result.score} / ${result.level} / ${result.predictionType}` : "保存客户后可查看";
+  getElement("wa-ai-reorder-action").textContent = result?.recommendedAction || "建议仅作参考，不会自动发送。";
+  if (result?.suggestedScript) getTextArea("wa-ai-reorder-script").value = result.suggestedScript;
 }
 
 function updateFollowUpScript() {
@@ -1309,7 +2036,13 @@ function buildProductContext(action: QuickAction) {
       manualContext
     ].filter(Boolean).join("\n");
   }
-  const labels: Record<Exclude<QuickAction, "material" | "sample" | "custom">, string> = {
+  if (action === "afterSales") {
+    return [
+      "User clicked after-sales. Generate a draft only. Do not promise refunds, reshipments, compensation, responsibility, logistics status, or after-sales policy.",
+      manualContext
+    ].filter(Boolean).join("\n");
+  }
+  const labels: Record<Exclude<QuickAction, "material" | "sample" | "custom" | "afterSales">, string> = {
     translate: "用户点击了翻译。",
     reply: "用户点击了生成回复。",
     quote: "用户点击了报价，需要避免编造价格、库存、交期和运费。",
@@ -1329,6 +2062,7 @@ function statusForAction(action: QuickAction, risks: string[]) {
     product: "产品介绍草稿已生成。",
     sample: "样品话术草稿已生成。",
     custom: "Custom script draft generated.",
+    afterSales: "After-sales script draft generated.",
     followUp: "跟进草稿已生成。"
   };
   return `${prefixMap[action] || "素材说明草稿已生成。"}${risks[0] ? ` ${risks[0]}` : ""}`;
@@ -1339,6 +2073,10 @@ function parseTiers(value: string) {
     const [quantity, unitPrice] = line.split(/,|\//).map((item) => item.trim());
     return { quantity: Number(quantity), unitPrice };
   }).filter((tier) => tier.quantity > 0 && Number(tier.unitPrice) > 0);
+}
+
+function parseLines(value: string) {
+  return value.split(/\n/).map((item) => item.trim()).filter(Boolean);
 }
 
 function bindToggleButton(id: string, onText: string, offText: string) {
@@ -1462,6 +2200,16 @@ function option(value: string, label: string) {
   element.value = value;
   element.textContent = label;
   return element;
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&#39;"
+  })[char] || char);
 }
 
 function applyWhatsAppOffset() {

@@ -16,6 +16,7 @@ import {
   getActiveOrganizationRole,
   organizationIdFromRequest
 } from "./organization-permissions.js";
+import { recordSecurityAudit, requireConfirm } from "./permissions.js";
 
 type CustomerDb = Pick<typeof prisma, "customer"> & Partial<Pick<typeof prisma, "quote" | "followUpTask" | "sampleOrder" | "customRequest" | "organizationMember" | "customerAssignmentLog" | "customerDuplicateEventLog" | "auditLog">>;
 
@@ -295,8 +296,13 @@ customersRouter.delete("/:id", async (req, res, next) => {
       res.status(403).json({ message: "customer write permission required" });
       return;
     }
+    const confirmError = requireConfirm(req, existing.organizationId && canWriteOrganizationResource(orgRole) ? "customer.deleteTeam" : "customer.deleteOwn");
+    if (confirmError) {
+      await recordSecurityAudit(db as any, req, { organizationId: existing.organizationId, action: "confirm_required", entityType: "Customer", entityId: existing.id, riskLevel: "high", metadata: { confirmRequired: true } });
+      return res.status(409).json(confirmError);
+    }
     await db.customer.delete({ where: { id: req.params.id } });
-    await writeAuditLog(db, { organizationId: existing.organizationId, userId: req.user!.id, action: "delete", entityType: "Customer", entityId: existing.id, before: existing, after: null });
+    await writeAuditLog(db, { organizationId: existing.organizationId, userId: req.user!.id, action: "delete", entityType: "Customer", entityId: existing.id, before: existing, after: null, riskLevel: "high", metadata: { confirmed: true } });
     res.status(204).send();
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {

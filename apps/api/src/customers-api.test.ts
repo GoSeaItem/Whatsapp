@@ -61,7 +61,7 @@ function createTestApp(seed: TestCustomer[] = []) {
           country: args.data.country ?? null,
           language: args.data.language ?? "English",
           tags: args.data.tags ?? [],
-          stage: args.data.stage ?? "新线索",
+          stage: args.data.stage ?? "new lead",
           interestedProduct: args.data.interestedProduct ?? null,
           latestSummary: args.data.latestSummary ?? null,
           nextFollowUpAt: args.data.nextFollowUpAt ?? null,
@@ -146,7 +146,7 @@ describe("Customer CRUD API", () => {
         whatsappNumber: "+52 55 0000 0000",
         country: "Mexico",
         language: "English",
-        tags: ["新客户", "需要跟进"],
+        tags: ["new customer", "needs follow up"],
         notes: "Needs quote",
         ownerId: "attacker-owner"
       })
@@ -156,19 +156,19 @@ describe("Customer CRUD API", () => {
       name: "Mexico Buyer",
       ownerId: "sales-1",
       whatsappNumber: "+52 55 0000 0000",
-      tags: ["新客户", "需要跟进"]
+      tags: ["new customer", "needs follow up"]
     });
   });
 
   it("lists only the current user's customers and supports tag/stage filters", async () => {
     const { app } = createTestApp([
-      makeCustomer({ id: "c1", ownerId: "sales-1", name: "A", tags: ["高意向"], stage: "已报价" }),
-      makeCustomer({ id: "c2", ownerId: "sales-1", name: "B", tags: ["新客户"], stage: "新线索" }),
-      makeCustomer({ id: "c3", ownerId: "sales-2", name: "C", tags: ["高意向"], stage: "已报价" })
+      makeCustomer({ id: "c1", ownerId: "sales-1", name: "A", tags: ["hot"], stage: "quoted" }),
+      makeCustomer({ id: "c2", ownerId: "sales-1", name: "B", tags: ["new"], stage: "new lead" }),
+      makeCustomer({ id: "c3", ownerId: "sales-2", name: "C", tags: ["hot"], stage: "quoted" })
     ]);
 
     const response = await request(app)
-      .get("/api/customers?tag=高意向&stage=已报价")
+      .get("/api/customers?tag=hot&stage=quoted")
       .set("x-user-id", "sales-1")
       .expect(200);
 
@@ -188,7 +188,7 @@ describe("Customer CRUD API", () => {
 
     expect(updateResponse.body).toMatchObject({ id: "c1", name: "After", latestSummary: "Updated from CRM" });
 
-    await request(app).delete("/api/customers/c1").set("x-user-id", "sales-1").expect(204);
+    await request(app).delete("/api/customers/c1?confirm=true").set("x-user-id", "sales-1").expect(204);
     await request(app).get("/api/customers/c1").set("x-user-id", "sales-1").expect(404);
   });
 
@@ -212,7 +212,7 @@ describe("Customer CRUD API", () => {
 
     const response = await request(app).post("/api/customers").set("x-user-id", "sales-1").send({ name: "" }).expect(400);
 
-    expect(response.body.errors).toContainEqual({ field: "name", message: "客户名称不能为空" });
+    expect(response.body.errors).toContainEqual({ field: "name", message: "�ͻ����Ʋ���Ϊ��" });
   });
 
   it("creates organization customers with owner, organization, assignment and duplicate protection", async () => {
@@ -324,7 +324,7 @@ function makeCustomer(overrides: Partial<TestCustomer>): TestCustomer {
     country: null,
     language: "English",
     tags: [],
-    stage: "新线索",
+    stage: "new lead",
     interestedProduct: null,
     latestSummary: null,
     nextFollowUpAt: null,
