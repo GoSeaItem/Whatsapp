@@ -1571,7 +1571,7 @@ export function App() {
       await loadProfit(profitFilters);
       setStatus("Order cost confirmed manually.");
     } catch {
-      setStatus("Confirm order cost failed. Manager/owner permission may be required.");
+      setStatus("Confirm order cost failed. Manager/ owner permission may be required.");
     } finally {
       setLoading(false);
     }
@@ -3353,7 +3353,7 @@ export function App() {
             <button className="secondary-button" onClick={handleLogout}>Logout</button>
           </div>
         </header>
-        <div className="safety-note">{AI_SAFETY_NOTE} All generated text is draft only. 濠电姰鍨煎▔娑氱矓閹绢喖鏄ユ俊銈呮噹鐟欙箓骞栨潏鍓хɑ闁哄棛濮撮埥澶愬箻绾惧顥濇繝娈垮枤閸犳牕鐣烽妸銉庣喓鎷犲顔芥緬闂備礁鎲￠弻锝夊礉瀹€鍐︿汗闁稿瞼鍋為悞璇裁归敐鍥舵毌闁稿鎸荤粚閬嶅船閸?system never sends WhatsApp messages automatically.</div>
+        <div className="safety-note">{AI_SAFETY_NOTE} All generated text is draft only. 系统不会自动发送 WhatsApp 消息，所有内容都需要业务员手动确认。</div>
         {view === "dashboard" && renderDashboard()}
         {view === "teamDashboard" && renderTeamDashboard()}
         {view === "reports" && renderReports()}
@@ -3456,8 +3456,8 @@ export function App() {
               {(teamSummary?.memberStats || []).map((member) => (
                 <div className="quote-history-item" key={member.userId}>
                   <strong>{member.userName || member.userEmail || member.userId}</strong>
-                  <span>{member.role} 闂?customers {member.customerCount}</span>
-                  <span>completed follow-ups {member.completedFollowUps} 闂?quotes {member.quoteCount}</span>
+                  <span>{member.role} / customers {member.customerCount}</span>
+                  <span>completed follow-ups {member.completedFollowUps} / quotes {member.quoteCount}</span>
                 </div>
               ))}
             </div>
@@ -3465,8 +3465,8 @@ export function App() {
           <Panel title="High intent customers" description="Contact information is hidden in this team view. Open customer detail only when you have permission.">
             <SimpleList items={teamSummary?.highIntentCustomers || []} render={(item) => (
               <button className="customer-row" onClick={() => { setView("customers"); void selectCustomer(item.id); }}>
-                <strong>{item.name} 闂?{item.intentScore}</strong>
-                <span>{item.stage} 闂?owner {item.ownerId || "-"} 闂?assigned {item.assignedTo || "-"}</span>
+                <strong>{item.name} / {item.intentScore}</strong>
+                <span>{item.stage} / owner {item.ownerId || "-"} / assigned {item.assignedTo || "-"}</span>
                 <span>{item.recommendedAction}</span>
               </button>
             )} />
@@ -4273,7 +4273,7 @@ export function App() {
           <SimpleList items={organizations} render={(item) => (
             <button className={`customer-row ${item.id === selectedOrganizationId ? "selected" : ""}`} onClick={() => selectOrganization(item.id)}>
               <strong>{item.name}</strong>
-              <span>{item.currentUserRole || "member"} 闂?{item.currentUserStatus || "-"} 闂?{item.memberCount} members</span>
+              <span>{item.currentUserRole || "member"} / {item.currentUserStatus || "-"} / {item.memberCount} members</span>
               <span>Owner: {item.ownerId === currentUser?.id ? "you" : item.ownerId}</span>
             </button>
           )} />
@@ -4398,8 +4398,8 @@ export function App() {
             {customers.map((customer) => (
               <button key={customer.id} className={`customer-row ${customer.id === selectedCustomerId ? "selected" : ""}`} onClick={() => selectCustomer(customer.id)}>
                 <strong>{customer.name}</strong>
-                <span>{customer.whatsappNumber || "No WhatsApp"} 闁?{customer.stage}</span>
-                <span>Owner {customer.ownerId ? customer.ownerId.slice(0, 8) : "-"} 闁?Assigned {customer.assignedTo ? customer.assignedTo.slice(0, 8) : "-"} 闁?Collaborators {customer.collaborators?.length || 0}</span>
+                <span>{customer.whatsappNumber || "No WhatsApp"} / {customer.stage}</span>
+                <span>Owner {customer.ownerId ? customer.ownerId.slice(0, 8) : "-"} / Assigned {customer.assignedTo ? customer.assignedTo.slice(0, 8) : "-"} / Collaborators {customer.collaborators?.length || 0}</span>
                 <span>Intent: {customer.intentScore ?? "-"} / {customer.intentLevel || "-"}</span>
               </button>
             ))}
@@ -4441,7 +4441,7 @@ export function App() {
           <div className="risk-box">
             <strong>Duplicate customer detected</strong>
             {customerDuplicateMatches.map((match) => (
-              <span key={match.customerId}>{match.name} 闁?owner {match.ownerId || "-"} 闁?assigned {match.assignedTo || "-"} 闁?fields {match.matchedFields.join(", ")}</span>
+              <span key={match.customerId}>{match.name} / owner {match.ownerId || "-"} / assigned {match.assignedTo || "-"} / fields {match.matchedFields.join(", ")}</span>
             ))}
           </div>
         )}
@@ -4486,7 +4486,7 @@ export function App() {
             {customerIntent.intentReasons.slice(0, 4).map((item) => <span key={item}>{item}</span>)}
           </div>
         )}
-        <RecordList title="Quotes" items={customerQuotes.map((item) => `${item.currency} ${item.unitPrice} 闁?${item.quoteText.slice(0, 80)}`)} />
+        <RecordList title="Quotes" items={customerQuotes.map((item) => `${item.currency} ${item.unitPrice} / ${item.quoteText.slice(0, 80)}`)} />
         <div>
           <div className="section-subhead"><strong>Orders</strong><span>{customerOrders.length}</span></div>
           <div className="quote-history-list">
@@ -4511,7 +4511,7 @@ export function App() {
           <div className="section-subhead"><strong>Custom conversion</strong><span>{customerCustomRequests.length}</span></div>
           <div className="detail-actions">{customerCustomRequests.slice(0, 3).map((item) => <button className="secondary-button" key={item.id} onClick={() => convertCustomToOrder(item.id)}>Custom to order</button>)}</div>
         </div>
-        <RecordList title="Follow-ups" items={customerFollowUps.map((item) => `${item.taskType} 闁?${item.status} 闁?${formatDate(item.remindAt)}`)} />
+        <RecordList title="Follow-ups" items={customerFollowUps.map((item) => `${item.taskType} / ${item.status} / ${formatDate(item.remindAt)}`)} />
         <div>
           <div className="section-subhead"><strong>After-sales</strong><span>{cases.length}</span></div>
           <div className="quote-history-list">
@@ -4527,8 +4527,8 @@ export function App() {
             )) : <p className="empty-note">No after-sales cases yet.</p>}
           </div>
         </div>
-        <RecordList title="Samples" items={customerSampleOrders.map((item) => `${item.sampleName} 闁?${item.paymentStatus} 闁?${item.shippingStatus}`)} />
-        <RecordList title="Custom requests" items={customerCustomRequests.map((item) => `${item.requestType} 闁?${item.status} 闁?${item.productName || "No product"}`)} />
+        <RecordList title="Samples" items={customerSampleOrders.map((item) => `${item.sampleName} / ${item.paymentStatus} / ${item.shippingStatus}`)} />
+        <RecordList title="Custom requests" items={customerCustomRequests.map((item) => `${item.requestType} / ${item.status} / ${item.productName || "No product"}`)} />
       </div>
     );
   }
@@ -4546,8 +4546,8 @@ export function App() {
             {products.map((product) => (
               <button key={product.id} className={`customer-row ${product.id === selectedProductId ? "selected" : ""}`} onClick={() => selectProduct(product)}>
                 <strong>{product.name}</strong>
-                <span>{product.sku} 闁?{product.category || "No category"}</span>
-                <span>MOQ {product.moq || "-"} 闁?Price {product.suggestedPrice || "-"}</span>
+                <span>{product.sku} / {product.category || "No category"}</span>
+                <span>MOQ {product.moq || "-"} / Price {product.suggestedPrice || "-"}</span>
               </button>
             ))}
           </div>
@@ -4596,8 +4596,8 @@ export function App() {
               setProductForm(toProductForm(detail.product));
             }}>
               <strong>{item.product.name}</strong>
-              <span>{item.product.sku} 闂?{item.product.category || "No category"}</span>
-              <span>Images {item.product.images.length} 闂?MOQ {item.product.moq || "-"}</span>
+              <span>{item.product.sku} / {item.product.category || "No category"}</span>
+              <span>Images {item.product.images.length} / MOQ {item.product.moq || "-"}</span>
             </button>
           )} />
         </Panel>
@@ -4684,9 +4684,9 @@ export function App() {
           </FilterRow>
           <SimpleList items={orders} render={(item) => (
             <button className={`customer-row ${item.id === selectedOrderId ? "selected" : ""}`} onClick={() => selectOrderRecord(item.id)}>
-              <strong>{item.orderNo} 闁?{item.customerName || "Customer"}</strong>
-              <span>{item.orderType} 闁?{item.orderStatus} 闁?payment {item.paymentStatus}</span>
-              <span>{item.productName || "No product"} 闁?{item.currency || ""} {item.amount || "-"} 闁?ship {item.shippingStatus}</span>
+              <strong>{item.orderNo} / {item.customerName || "Customer"}</strong>
+              <span>{item.orderType} / {item.orderStatus} / payment {item.paymentStatus}</span>
+              <span>{item.productName || "No product"} / {item.currency || ""} {item.amount || "-"} / ship {item.shippingStatus}</span>
             </button>
           )} />
         </Panel>
@@ -4937,7 +4937,7 @@ export function App() {
               setKnowledgeForm(toKnowledgeForm(await getKnowledgeBaseItem(item.id)));
             }}>
               <strong>{item.title}</strong>
-              <span>{item.category} 闁?{item.language} 闁?{item.enabled ? "enabled" : "disabled"}</span>
+              <span>{item.category} / {item.language} / {item.enabled ? "enabled" : "disabled"}</span>
             </button>
           )} />
         </Panel>
@@ -4977,7 +4977,7 @@ export function App() {
               setOrgKnowledgeForm(toOrgKnowledgeForm(await getOrgKnowledgeBaseItem(item.id)));
             }}>
               <strong>{item.title}</strong>
-              <span>{item.category} 闂?{item.language} 闂?{item.enabled ? "enabled" : "disabled"}</span>
+              <span>{item.category} / {item.language} / {item.enabled ? "enabled" : "disabled"}</span>
               <span>Source: Org</span>
             </button>
           )} />
@@ -5018,7 +5018,7 @@ export function App() {
               setOrgScriptForm(toOrgScriptForm(await getOrgScript(item.id)));
             }}>
               <strong>{item.title}</strong>
-              <span>{item.category} 闂?{item.language} 闂?{item.enabled ? "enabled" : "disabled"}</span>
+              <span>{item.category} / {item.language} / {item.enabled ? "enabled" : "disabled"}</span>
               <span>Source: Org script</span>
             </button>
           )} />
@@ -5061,7 +5061,7 @@ export function App() {
           <SimpleList items={materials} render={(item) => (
             <button className="customer-row" onClick={() => { setSelectedMaterialId(item.id); setMaterialForm(toMaterialForm(item)); }}>
               <strong>{item.title}</strong>
-              <span>{item.type} 闁?{item.language}</span>
+              <span>{item.type} / {item.language}</span>
               <span>{item.url}</span>
             </button>
           )} />
@@ -5112,7 +5112,7 @@ export function App() {
               setMaterialForm(toMaterialForm(detail.material));
             }}>
               <strong>{item.material.title}</strong>
-              <span>{item.material.type} 闂?{item.material.language}</span>
+              <span>{item.material.type} / {item.material.language}</span>
               <span>{item.material.url}</span>
             </button>
           )} />
@@ -5150,7 +5150,7 @@ export function App() {
           <SimpleList items={sampleOrders} render={(item) => (
             <button className="customer-row" onClick={async () => { setSelectedSampleOrderId(item.id); setSampleForm(toSampleForm(await getSampleOrder(item.id))); }}>
               <strong>{item.sampleName}</strong>
-              <span>{item.customerName || item.customerId} 闁?{item.paymentStatus} 闁?{item.shippingStatus}</span>
+              <span>{item.customerName || item.customerId} / {item.paymentStatus} / {item.shippingStatus}</span>
             </button>
           )} />
         </Panel>
@@ -5196,9 +5196,9 @@ export function App() {
           <CustomFilterBar />
           <SimpleList items={customRequests} render={(item) => (
             <button className="customer-row" onClick={async () => { setSelectedCustomRequestId(item.id); setCustomForm(toCustomForm(await getCustomRequest(item.id))); }}>
-              <strong>{item.customerName || item.customerId} 闁?{item.requestType}</strong>
-              <span>{item.productName || "No product"} 闁?{item.status}</span>
-              <span>MOQ {item.moq || "-"} 闁?Qty {item.quantity || "-"}</span>
+              <strong>{item.customerName || item.customerId} / {item.requestType}</strong>
+              <span>{item.productName || "No product"} / {item.status}</span>
+              <span>MOQ {item.moq || "-"} /Qty {item.quantity || "-"}</span>
             </button>
           )} />
         </Panel>
@@ -5241,7 +5241,7 @@ export function App() {
           <SimpleList items={auditLogs} render={(item) => (
             <button className={`customer-row ${selectedAuditLog?.id === item.id ? "selected" : ""}`} onClick={() => selectAuditLog(item.id)}>
               <strong>{item.action} {item.entityType}</strong>
-              <span>{item.createdAt} 闂?actor {item.userId || item.actorId || "-"}</span>
+              <span>{item.createdAt} / actor {item.userId || item.actorId || "-"}</span>
               <span>{item.entityId || "-"}</span>
             </button>
           )} />
@@ -5518,7 +5518,7 @@ export function App() {
           {tasks.length ? tasks.map((task) => (
             <div className="task-card" key={task.id}>
               <strong>{task.customerName}</strong>
-              <span>{task.taskType} 闁?{formatDate(task.remindAt)}</span>
+              <span>{task.taskType} / {formatDate(task.remindAt)}</span>
               <textarea value={task.recommendedScript} readOnly />
               <button onClick={() => markTaskDone(task.id)}>Complete</button>
             </div>
@@ -5536,7 +5536,7 @@ export function App() {
             <div className="list-item" key={customer.id}>
               <div>
                 <strong>{customer.name}</strong>
-                <span>{customer.stage} 闁?intent {customer.intentScore ?? "-"}</span>
+                <span>{customer.stage} / intent {customer.intentScore ?? "-"}</span>
               </div>
               <button onClick={() => { setView("customers"); void selectCustomer(customer.id); }}>Open</button>
             </div>
