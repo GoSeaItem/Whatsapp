@@ -8,6 +8,7 @@ Current release target: `v1.0-enterprise`.
 - `EnterpriseResourceLink` is a safe foundation for cross-organization resource sharing; broader cross-organization data sharing remains conservative and should be expanded in a dedicated hardening pass.
 - Enterprise import/export coverage for all V5 entities should be extended later under the existing sensitive-export and audit rules.
 - Legacy mojibake strings still exist in older seed/demo data and some historical V1/V2 text. User-facing critical V5 pages avoid those strings, but a full localization cleanup is still recommended.
+- Chrome extension UI now uses a quick toolbar and tabbed workbench, but older low-frequency form labels still include some legacy text from earlier versions. Core navigation and new high-frequency actions use the refreshed labels.
 - Safety boundaries remain unchanged: no automatic WhatsApp sending, no bulk sending, no send-button simulation, no automatic customer/supplier contact, no real payment/logistics/procurement, and no automatic commercial promises.
 
 ## V4-N Full-chain Release Review

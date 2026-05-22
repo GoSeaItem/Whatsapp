@@ -20,6 +20,19 @@ Safety boundary remains unchanged: no WhatsApp official API, no automatic sendin
 
 Docs: [enterprise platform](docs/enterprise-platform.md), [enterprise permissions and audit](docs/enterprise-permissions-audit.md), [enterprise reports](docs/enterprise-reports.md), [enterprise audit](docs/enterprise-audit.md).
 
+## Chrome 插件 UI：快捷工具条 + AI 工作台
+
+Chrome 插件已升级为 WhatsApp 页面快捷工具条 + 右侧 AI 工作台：
+
+- WhatsApp 聊天输入框附近显示轻量工具条：`AI 回复`、`翻译`、`报价`、`素材`、`更多`。
+- 找不到输入框容器时降级为右下角浮动 `AI` 按钮。
+- 右侧 AI 工作台使用 `客户`、`AI`、`业务`、`A/B`、`更多` Tab，不再默认展开所有模块。
+- A/B 话术结果标记合并为一个下拉菜单。
+- 插入草稿只写入 WhatsApp 输入框，不点击发送按钮。
+- 插件仍然不接入 WhatsApp 官方 API、不自动发送、不自动群发、不模拟点击发送按钮。
+
+生产说明见：[docs/extension-production.md](docs/extension-production.md)。
+
 ## v0.6-v4-growth-ops
 
 `v0.6-v4-growth-ops` 汇总 V4-A 到 V4-M：组织级导入导出、跨组织报表、AI 高级增强、高级权限与审计、经营预测与复购提醒、订单中心、履约看板、利润与成本复盘、复购运营、售后异常、A/B 话术测试、供应商/采购协同、多品牌/多店铺管理。
@@ -1198,6 +1211,5 @@ rg -n "\.click\(|dispatchEvent|KeyboardEvent|send button|compose-btn-send|bulk s
 ```
 
 允许命中测试文件里的“不自动发送”断言；源代码中不应出现自动点击 WhatsApp 发送按钮、自动群发、批量发送或定时发送逻辑。
-
 
 

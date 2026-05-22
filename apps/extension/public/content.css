@@ -1,6 +1,6 @@
 #wa-ai-sidebar {
   background: #f7faf8;
-  border-left: 1px solid #d9e4dd;
+  border-left: 1px solid #e3eae6;
   bottom: 0;
   box-shadow: -8px 0 22px rgba(10, 28, 20, 0.14);
   color: #17211c;
@@ -10,7 +10,7 @@
   position: fixed;
   right: 0;
   top: 0;
-  width: 360px;
+  width: min(400px, 100vw);
   z-index: 2147483647;
 }
 
@@ -32,12 +32,13 @@
 
 .wa-ai-header {
   align-items: flex-start;
-  background: #10241d;
+  background: #0b3d2e;
   color: #ffffff;
   display: flex;
   gap: 12px;
   justify-content: space-between;
-  padding: 14px;
+  min-height: 70px;
+  padding: 12px;
 }
 
 .wa-ai-header h2,
@@ -59,7 +60,7 @@
 }
 
 .wa-ai-pill {
-  background: #244238;
+  background: #1c5a45;
   border-radius: 999px;
   color: #dff7e8;
   flex: 0 0 auto;
@@ -67,11 +68,42 @@
   padding: 5px 8px;
 }
 
+.wa-ai-header-actions {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+}
+
+.wa-ai-header-actions button {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #ffffff;
+  cursor: pointer;
+  display: inline-flex;
+  height: 30px;
+  justify-content: center;
+  width: 30px;
+}
+
 .wa-ai-scroll {
-  display: grid;
-  gap: 10px;
+  flex: 1 1 auto;
   overflow: auto;
-  padding: 10px;
+  padding: 10px 12px 82px;
+}
+
+.wa-ai-tab-panels {
+  display: block;
+}
+
+.wa-ai-tab-panel {
+  display: none;
+  gap: 10px;
+}
+
+.wa-ai-tab-panel[data-active="true"] {
+  display: grid;
 }
 
 .wa-ai-auth-panel {
@@ -118,8 +150,8 @@
 
 .wa-ai-section {
   background: #ffffff;
-  border: 1px solid #dfe7e1;
-  border-radius: 8px;
+  border: 1px solid #e3eae6;
+  border-radius: 12px;
   display: grid;
   gap: 10px;
   padding: 12px;
@@ -291,6 +323,145 @@
   padding: 8px;
 }
 
+.wa-ai-info-note {
+  background: #eef7f1;
+  border: 1px solid #d6e9dc;
+  border-radius: 10px;
+  color: #305a43;
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 8px;
+}
+
+.wa-ai-tabs {
+  background: #ffffff;
+  border-bottom: 1px solid #e3eae6;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  padding: 8px 10px;
+}
+
+.wa-ai-tabs button {
+  background: #f3f7f4;
+  border-radius: 10px;
+  color: #365347;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  min-height: 36px;
+  padding: 0 6px;
+}
+
+.wa-ai-tabs button[data-active="true"] {
+  background: #0b3d2e;
+  color: #ffffff;
+}
+
+.wa-ai-context-card {
+  background: #ffffff;
+  border-bottom: 1px solid #e3eae6;
+  display: grid;
+  gap: 7px;
+  padding: 10px 12px;
+}
+
+.wa-ai-context-row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.wa-ai-context-row div {
+  background: #f7faf8;
+  border: 1px solid #e3eae6;
+  border-radius: 10px;
+  min-width: 0;
+  padding: 8px;
+}
+
+.wa-ai-context-row span {
+  color: #6c7a72;
+  display: block;
+  font-size: 11px;
+  margin-bottom: 3px;
+}
+
+.wa-ai-context-row strong {
+  color: #12241b;
+  display: block;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wa-ai-context-card p {
+  color: #597066;
+  font-size: 12px;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.wa-ai-business-grid,
+.wa-ai-more-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.wa-ai-business-grid button,
+.wa-ai-more-grid button {
+  background: #f7faf8;
+  border: 1px solid #e3eae6;
+  border-radius: 10px;
+  color: #16382b;
+  cursor: pointer;
+  font-size: 13px;
+  min-height: 40px;
+  padding: 0 9px;
+  text-align: left;
+}
+
+.wa-ai-business-grid button[data-active="true"] {
+  background: #0b3d2e;
+  border-color: #0b3d2e;
+  color: #ffffff;
+}
+
+.wa-ai-business-module {
+  display: none;
+}
+
+.wa-ai-business-module[data-active="true"] {
+  display: grid;
+}
+
+.wa-ai-hidden-control {
+  display: none !important;
+}
+
+.wa-ai-bottom-bar {
+  background: #ffffff;
+  border-top: 1px solid #e3eae6;
+  bottom: 0;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 8px 10px;
+  position: absolute;
+  width: 100%;
+}
+
+.wa-ai-bottom-bar button {
+  background: #0b3d2e;
+  border-radius: 10px;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 13px;
+  min-height: 38px;
+}
+
 .wa-ai-wide-button {
   background: #10241d;
   border-radius: 6px;
@@ -448,7 +619,7 @@
 }
 
 .wa-ai-toggle {
-  background: #10241d;
+  background: #0b3d2e;
   border: 0;
   border-radius: 6px 0 0 6px;
   color: #ffffff;
@@ -456,9 +627,52 @@
   font: 700 12px Inter, ui-sans-serif, system-ui, sans-serif;
   padding: 10px 8px;
   position: fixed;
-  right: 360px;
+  right: min(400px, 100vw);
   top: 88px;
   z-index: 2147483647;
+}
+
+.wa-ai-quick-toolbar {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid #e3eae6;
+  border-radius: 14px;
+  box-shadow: 0 8px 22px rgba(18, 36, 27, 0.12);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 auto 6px;
+  max-width: min(680px, calc(100% - 24px));
+  padding: 6px;
+  position: relative;
+  z-index: 2147483646;
+}
+
+.wa-ai-quick-toolbar button {
+  background: #eef7f1;
+  border: 1px solid #d6e9dc;
+  border-radius: 10px;
+  color: #0b3d2e;
+  cursor: pointer;
+  font: 700 13px Inter, ui-sans-serif, system-ui, sans-serif;
+  min-height: 38px;
+  padding: 0 10px;
+}
+
+#wa-ai-floating-button {
+  background: #0b3d2e;
+  border: 0;
+  border-radius: 999px;
+  bottom: 92px;
+  box-shadow: 0 10px 24px rgba(11, 61, 46, 0.28);
+  color: #ffffff;
+  cursor: pointer;
+  font: 800 14px Inter, ui-sans-serif, system-ui, sans-serif;
+  height: 48px;
+  position: fixed;
+  right: 20px;
+  width: 48px;
+  z-index: 2147483646;
 }
 
 .wa-ai-hidden #wa-ai-sidebar {
@@ -471,11 +685,11 @@
 
 @media (max-width: 1180px) {
   #wa-ai-sidebar {
-    width: 340px;
+    width: min(380px, 100vw);
   }
 
   .wa-ai-toggle {
-    right: 340px;
+    right: min(380px, 100vw);
   }
 }
 
@@ -489,7 +703,18 @@
   }
 
   .wa-ai-two-cols,
-  .wa-ai-analysis-grid {
+  .wa-ai-analysis-grid,
+  .wa-ai-context-row,
+  .wa-ai-business-grid,
+  .wa-ai-more-grid {
     grid-template-columns: 1fr;
+  }
+
+  .wa-ai-quick-toolbar {
+    justify-content: center;
+  }
+
+  .wa-ai-quick-toolbar button {
+    flex: 1 1 76px;
   }
 }

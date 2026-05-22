@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "WhatsApp AI Sales Assistant V1",
-  "description": "A WhatsApp Web sidebar assistant for draft translation, sales replies, quotes, product notes, and follow-up reminders. It never sends messages automatically.",
-  "version": "0.1.0",
+  "name": "WhatsApp AI Sales Assistant",
+  "description": "A WhatsApp Web quick toolbar and AI workbench for draft replies, translation, quotes, materials, and sales workflows. It never sends messages automatically.",
+  "version": "1.0.0",
   "action": {
     "default_title": "WhatsApp AI Sales Assistant",
     "default_popup": "popup.html"

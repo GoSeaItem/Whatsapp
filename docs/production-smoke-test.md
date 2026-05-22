@@ -501,3 +501,18 @@ Troubleshooting:
 - Open enterprise brand context for an active brand and confirm `brandUsed`, `brandRulesUsed`, and risk warnings are visible.
 - Confirm sales/support cannot manage enterprise units or generate enterprise reports.
 - Confirm no WhatsApp message is sent automatically from any V5 workflow.
+
+## V5 Extension UI Refresh Smoke Test
+
+1. Open `https://web.whatsapp.com` and select a real chat.
+2. Confirm the quick toolbar appears near the WhatsApp input area with `AI 回复`, `翻译`, `报价`, `素材`, and `更多`.
+3. Switch away from a chat and confirm the toolbar hides or falls back to the floating `AI` button.
+4. Switch chats repeatedly and confirm only one toolbar is injected.
+5. Click `AI 回复` and confirm the right workbench opens on the `AI` tab.
+6. Click `翻译` and confirm it stays in the `AI` tab and does not send a message.
+7. Click `报价` and confirm the workbench opens the `业务` tab with the quote panel.
+8. Click `素材` and confirm the workbench opens the material panel.
+9. Click `更多` and confirm Web backend shortcuts are shown.
+10. Open the `A/B` tab and confirm result marking uses one dropdown.
+11. Insert any draft and confirm it only fills the input box; it does not click the WhatsApp send button.
+12. Confirm no auto-send, bulk-send, simulated send-button click, or WhatsApp official API call occurs.

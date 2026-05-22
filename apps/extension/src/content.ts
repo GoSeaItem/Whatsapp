@@ -29,9 +29,13 @@ import { AI_SAFETY_NOTE } from "@wa-ai/shared";
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 const WEB_LOGIN_URL = import.meta.env.VITE_WEB_LOGIN_URL || "http://localhost:5173";
 const SIDEBAR_ID = "wa-ai-sidebar";
+const QUICK_TOOLBAR_ID = "wa-ai-quick-toolbar";
+const FLOATING_BUTTON_ID = "wa-ai-floating-button";
 const HIDDEN_CLASS = "wa-ai-hidden";
 
 type QuickAction = "translate" | "reply" | "quote" | "urge" | "product" | "material" | "sample" | "custom" | "afterSales" | "followUp";
+type SidebarTab = "customer" | "ai" | "business" | "ab" | "more";
+type BusinessModule = "quote" | "material" | "sample" | "custom" | "order" | "afterSales" | "reorder" | "followUp" | "product";
 type ReplyVariant = "short" | "professional" | "closing";
 type RecognitionStatus = "normal" | "abnormal" | "notChat" | "whatsappNotOpen";
 type SidebarAuthState = { status: "checking" | "authenticated" | "anonymous"; user?: AuthUser };
@@ -49,6 +53,9 @@ let scriptVariants: Array<any> = [];
 let lastScriptUsageId = "";
 let sidebarOrganizationId = "";
 let sidebarBrands: Array<any> = [];
+let quickToolbarObserver: MutationObserver | null = null;
+let activeSidebarTab: SidebarTab = "ai";
+let activeBusinessModule: BusinessModule = "quote";
 
 type StoredCustomerProfile = {
   customerId?: string;
@@ -540,6 +547,9 @@ function createSidebar() {
   `;
   document.body.appendChild(sidebar);
 
+  upgradeSidebarWorkbench(sidebar);
+  mountQuickToolbar();
+  setupQuickToolbarObserver();
   bindEvents(toggleButton);
   applyWhatsAppOffset();
   updateRecognitionStatus();
@@ -560,10 +570,229 @@ function replyCard(id: ReplyVariant, title: string, rows: number) {
   `;
 }
 
+function upgradeSidebarWorkbench(sidebar: HTMLElement) {
+  const header = sidebar.querySelector<HTMLElement>(".wa-ai-header");
+  if (header) {
+    header.innerHTML = `
+      <div>
+        <p class="wa-ai-kicker">复制粘贴模式 / 已连接后台</p>
+        <h2>WhatsApp AI 销售助手</h2>
+      </div>
+      <div class="wa-ai-header-actions">
+        <span class="wa-ai-pill">草稿模式</span>
+        <button id="wa-ai-refresh-sidebar" type="button" title="刷新">↻</button>
+        <button id="wa-ai-collapse-sidebar" type="button" title="收起">×</button>
+      </div>
+    `;
+  }
+
+  const authPanel = getElement("wa-ai-auth-panel");
+  authPanel.classList.add("wa-ai-login-card");
+  const contextCard = document.createElement("section");
+  contextCard.className = "wa-ai-context-card";
+  contextCard.innerHTML = `
+    <div class="wa-ai-context-row">
+      <div><span>客户</span><strong id="wa-ai-context-customer">未保存</strong></div>
+      <div><span>阶段</span><strong id="wa-ai-context-stage">新线索</strong></div>
+    </div>
+    <div class="wa-ai-context-row">
+      <div><span>品牌</span><strong id="wa-ai-context-brand">未选择</strong></div>
+      <div><span>意向</span><strong id="wa-ai-context-intent">保存后计算</strong></div>
+    </div>
+    <p>品牌仅影响产品、素材、知识库和草稿策略，不会切换 WhatsApp 账号。</p>
+  `;
+  authPanel.insertAdjacentElement("afterend", contextCard);
+
+  const tabs = document.createElement("nav");
+  tabs.className = "wa-ai-tabs";
+  tabs.innerHTML = `
+    <button type="button" data-tab="customer">客户</button>
+    <button type="button" data-tab="ai">AI</button>
+    <button type="button" data-tab="business">业务</button>
+    <button type="button" data-tab="ab">A/B</button>
+    <button type="button" data-tab="more">更多</button>
+  `;
+  contextCard.insertAdjacentElement("afterend", tabs);
+
+  const scroll = sidebar.querySelector<HTMLElement>(".wa-ai-scroll");
+  if (!scroll) return;
+
+  const panels = document.createElement("section");
+  panels.className = "wa-ai-tab-panels";
+  panels.innerHTML = `
+    <div class="wa-ai-tab-panel" data-panel="customer"></div>
+    <div class="wa-ai-tab-panel" data-panel="ai"></div>
+    <div class="wa-ai-tab-panel" data-panel="business"></div>
+    <div class="wa-ai-tab-panel" data-panel="ab"></div>
+    <div class="wa-ai-tab-panel" data-panel="more"></div>
+  `;
+
+  const customerPanel = panels.querySelector<HTMLElement>('[data-panel="customer"]')!;
+  const aiPanel = panels.querySelector<HTMLElement>('[data-panel="ai"]')!;
+  const businessPanel = panels.querySelector<HTMLElement>('[data-panel="business"]')!;
+  const abPanel = panels.querySelector<HTMLElement>('[data-panel="ab"]')!;
+  const morePanel = panels.querySelector<HTMLElement>('[data-panel="more"]')!;
+  businessPanel.appendChild(createBusinessLauncher());
+  morePanel.appendChild(createMorePanel());
+
+  Array.from(sidebar.querySelectorAll<HTMLElement>(".wa-ai-section")).forEach((section) => {
+    const module = classifyBusinessModule(section);
+    if (section.classList.contains("wa-ai-business-launcher")) return;
+    if (section.querySelector("#wa-ai-script-experiment-select")) {
+      enhanceAbSection(section);
+      abPanel.appendChild(section);
+      return;
+    }
+    if (section.querySelector("#wa-ai-message") || section.querySelector(".wa-ai-replies") || section.querySelector("[data-action]")) {
+      aiPanel.appendChild(section);
+      return;
+    }
+    if (section.querySelector("#wa-ai-save-customer")) {
+      section.classList.add("wa-ai-customer-lite");
+      customerPanel.appendChild(section);
+      return;
+    }
+    if (section.querySelector("#wa-ai-supplier-script")) {
+      morePanel.appendChild(section);
+      return;
+    }
+    if (module) {
+      section.dataset.businessModule = module;
+      section.classList.add("wa-ai-business-module");
+      businessPanel.appendChild(section);
+      return;
+    }
+    morePanel.appendChild(section);
+  });
+
+  scroll.replaceChildren(panels);
+
+  const bottomBar = document.createElement("section");
+  bottomBar.className = "wa-ai-bottom-bar";
+  bottomBar.innerHTML = `
+    <button type="button" data-toolbar-action="reply">AI 回复</button>
+    <button type="button" data-toolbar-action="quote">报价</button>
+    <button type="button" id="wa-ai-bottom-save">保存</button>
+    <button type="button" data-toolbar-action="more">更多</button>
+  `;
+  sidebar.insertBefore(bottomBar, sidebar.querySelector(".wa-ai-footer"));
+  openSidebarTab("ai");
+  showBusinessModule("quote");
+  updateContextCard();
+}
+
+function createBusinessLauncher() {
+  const section = document.createElement("section");
+  section.className = "wa-ai-section wa-ai-business-launcher";
+  section.innerHTML = `
+    <div class="wa-ai-section-title"><h3>业务动作</h3><span>当前客户快捷操作</span></div>
+    <div class="wa-ai-business-grid">
+      <button type="button" data-business-panel="quote">💬 报价</button>
+      <button type="button" data-business-panel="material">🖼 素材</button>
+      <button type="button" data-business-panel="sample">🧪 样品</button>
+      <button type="button" data-business-panel="custom">🎨 定制</button>
+      <button type="button" data-business-panel="order">📦 订单</button>
+      <button type="button" data-business-panel="afterSales">🛟 售后</button>
+      <button type="button" data-business-panel="reorder">🔁 复购</button>
+      <button type="button" data-business-panel="followUp">⏰ 跟进</button>
+    </div>
+  `;
+  return section;
+}
+
+function createMorePanel() {
+  const section = document.createElement("section");
+  section.className = "wa-ai-section";
+  section.innerHTML = `
+    <div class="wa-ai-section-title"><h3>更多入口</h3><span>复杂管理到 Web 后台完成</span></div>
+    <div class="wa-ai-more-grid">
+      <button type="button" data-open-web="">打开 Web 后台</button>
+      <button type="button" data-open-web="#brands">品牌管理</button>
+      <button type="button" data-open-web="#suppliers">供应商</button>
+      <button type="button" data-open-web="#profit">利润复盘</button>
+      <button type="button" data-open-web="#fulfillment">履约看板</button>
+      <button type="button" data-open-web="#script-tests">A/B 实验管理</button>
+      <button type="button" id="wa-ai-refresh-cache">刷新缓存</button>
+      <button type="button" disabled>退出登录请到 Web 后台</button>
+    </div>
+    <div class="wa-ai-info-note">仅生成草稿，不会自动发送 WhatsApp 消息。</div>
+  `;
+  return section;
+}
+
+function enhanceAbSection(section: HTMLElement) {
+  const safety = section.querySelector<HTMLElement>(".wa-ai-safety-note");
+  if (safety) {
+    safety.className = "wa-ai-info-note";
+    safety.textContent = "A/B 话术仅记录草稿使用，最终发送需手动完成。";
+  }
+  const copy = document.getElementById("wa-ai-copy-script-test");
+  const insert = document.getElementById("wa-ai-insert-script-test");
+  if (copy) copy.textContent = "复制并记录";
+  if (insert) insert.textContent = "插入并记录";
+  ["wa-ai-mark-script-replied", "wa-ai-mark-script-quote", "wa-ai-mark-script-order", "wa-ai-mark-script-no-response"].forEach((id) => {
+    document.getElementById(id)?.classList.add("wa-ai-hidden-control");
+  });
+  const controls = document.createElement("div");
+  controls.className = "wa-ai-two-actions";
+  controls.innerHTML = `
+    <label class="wa-ai-field"><span>标记结果</span><select id="wa-ai-script-outcome-select">
+      <option value="customer_replied">已回复</option>
+      <option value="quote_created">已报价</option>
+      <option value="order_created">已下单</option>
+      <option value="no_response">无回复</option>
+    </select></label>
+    <button id="wa-ai-mark-script-outcome" type="button" class="wa-ai-wide-button wa-ai-secondary-wide">标记结果</button>
+  `;
+  const draft = document.getElementById("wa-ai-script-test-draft");
+  draft?.closest(".wa-ai-field")?.insertAdjacentElement("afterend", controls);
+}
+
+function classifyBusinessModule(section: HTMLElement): BusinessModule | null {
+  if (section.querySelector("#wa-ai-quote-text")) return "quote";
+  if (section.querySelector("#wa-ai-material-select")) return "material";
+  if (section.querySelector("#wa-ai-sample-name")) return "sample";
+  if (section.querySelector("#wa-ai-custom-type")) return "custom";
+  if (section.querySelector("#wa-ai-order-select")) return "order";
+  if (section.querySelector("#wa-ai-after-sales-type")) return "afterSales";
+  if (section.querySelector("#wa-ai-reorder-script")) return "reorder";
+  if (section.querySelector("#wa-ai-follow-up-type")) return "followUp";
+  if (section.querySelector("#wa-ai-product-select")) return "product";
+  return null;
+}
+
 function bindEvents(toggleButton: HTMLButtonElement) {
   toggleButton.addEventListener("click", () => {
     document.documentElement.classList.toggle(HIDDEN_CLASS);
     applyWhatsAppOffset();
+    mountQuickToolbar();
+  });
+
+  document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((button) => {
+    button.addEventListener("click", () => openSidebarTab(button.dataset.tab as SidebarTab));
+  });
+  document.querySelectorAll<HTMLButtonElement>("[data-toolbar-action]").forEach((button) => {
+    button.addEventListener("click", () => void handleToolbarAction(button.dataset.toolbarAction || "reply"));
+  });
+  document.querySelectorAll<HTMLButtonElement>("[data-business-panel]").forEach((button) => {
+    button.addEventListener("click", () => showBusinessModule(button.dataset.businessPanel as BusinessModule));
+  });
+  document.querySelectorAll<HTMLButtonElement>("[data-open-web]").forEach((button) => {
+    button.addEventListener("click", () => window.open(`${WEB_LOGIN_URL}${button.dataset.openWeb || ""}`, "_blank", "noopener,noreferrer"));
+  });
+  getElement<HTMLButtonElement>("wa-ai-collapse-sidebar").addEventListener("click", () => {
+    document.documentElement.classList.add(HIDDEN_CLASS);
+    applyWhatsAppOffset();
+  });
+  getElement<HTMLButtonElement>("wa-ai-refresh-sidebar").addEventListener("click", () => {
+    void checkAuthStatus();
+    updateRecognitionStatus();
+    mountQuickToolbar();
+  });
+  getElement<HTMLButtonElement>("wa-ai-bottom-save").addEventListener("click", saveCustomerToApi);
+  getElement<HTMLButtonElement>("wa-ai-refresh-cache").addEventListener("click", () => {
+    void checkAuthStatus();
+    setStatus("缓存已刷新。所有草稿仍需人工确认后发送。");
   });
 
   getElement<HTMLButtonElement>("wa-ai-save-customer").addEventListener("click", saveCustomerToApi);
@@ -636,6 +865,13 @@ function bindEvents(toggleButton: HTMLButtonElement) {
   getElement<HTMLButtonElement>("wa-ai-mark-script-quote").addEventListener("click", () => void markScriptUsageOutcomeFromSidebar("quote_created"));
   getElement<HTMLButtonElement>("wa-ai-mark-script-order").addEventListener("click", () => void markScriptUsageOutcomeFromSidebar("order_created"));
   getElement<HTMLButtonElement>("wa-ai-mark-script-no-response").addEventListener("click", () => void markScriptUsageOutcomeFromSidebar("no_response"));
+  getElement<HTMLButtonElement>("wa-ai-mark-script-outcome").addEventListener("click", () => void markScriptUsageOutcomeFromSidebar(getSelect("wa-ai-script-outcome-select").value));
+  document.addEventListener("input", (event) => {
+    if ((event.target as HTMLElement).closest(`#${SIDEBAR_ID}`)) updateContextCard();
+  });
+  document.addEventListener("change", (event) => {
+    if ((event.target as HTMLElement).closest(`#${SIDEBAR_ID}`)) updateContextCard();
+  });
   document.querySelectorAll<HTMLButtonElement>("[data-follow-up-days]").forEach((button) => {
     button.addEventListener("click", () => {
       setFollowUpDate(Number(button.dataset.followUpDays || "1"));
@@ -682,6 +918,139 @@ function bindEvents(toggleButton: HTMLButtonElement) {
       await copyTextArea(`wa-ai-reply-${variant}`, "回复已复制。请人工检查后手动发送。");
     });
   });
+}
+
+function openSidebarTab(tab: SidebarTab) {
+  activeSidebarTab = tab;
+  document.documentElement.classList.remove(HIDDEN_CLASS);
+  document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((button) => {
+    button.dataset.active = String(button.dataset.tab === tab);
+  });
+  document.querySelectorAll<HTMLElement>(".wa-ai-tab-panel").forEach((panel) => {
+    panel.dataset.active = String(panel.dataset.panel === tab);
+  });
+  applyWhatsAppOffset();
+}
+
+function showBusinessModule(module: BusinessModule) {
+  activeBusinessModule = module;
+  openSidebarTab("business");
+  document.querySelectorAll<HTMLButtonElement>("[data-business-panel]").forEach((button) => {
+    button.dataset.active = String(button.dataset.businessPanel === module);
+  });
+  document.querySelectorAll<HTMLElement>("[data-business-module]").forEach((section) => {
+    section.dataset.active = String(section.dataset.businessModule === module);
+  });
+}
+
+async function handleToolbarAction(action: string) {
+  document.documentElement.classList.remove(HIDDEN_CLASS);
+  if (action === "more") {
+    openSidebarTab("more");
+    return;
+  }
+  if (action === "quote") {
+    showBusinessModule("quote");
+    return;
+  }
+  if (action === "material") {
+    showBusinessModule("material");
+    return;
+  }
+  if (action === "translate") {
+    openSidebarTab("ai");
+    seedSelectedTextIntoMessage();
+    await handleQuickAction("translate");
+    return;
+  }
+  openSidebarTab("ai");
+  seedSelectedTextIntoMessage();
+  await handleQuickAction("reply");
+}
+
+function updateContextCard() {
+  const customer = document.getElementById("wa-ai-customer") as HTMLInputElement | null;
+  const stage = document.getElementById("wa-ai-stage") as HTMLSelectElement | null;
+  const brand = document.getElementById("wa-ai-brand-select") as HTMLSelectElement | null;
+  const intent = document.getElementById("wa-ai-intent-score");
+  const set = (id: string, value: string) => {
+    const element = document.getElementById(id);
+    if (element) element.textContent = value || "-";
+  };
+  set("wa-ai-context-customer", customer?.value || "未保存");
+  set("wa-ai-context-stage", stage?.selectedOptions[0]?.textContent || stage?.value || "新线索");
+  set("wa-ai-context-brand", brand?.selectedOptions[0]?.textContent || "未选择");
+  set("wa-ai-context-intent", intent?.textContent || "保存后计算");
+}
+
+function seedSelectedTextIntoMessage() {
+  const selectedText = window.getSelection()?.toString().trim();
+  const message = document.getElementById("wa-ai-message") as HTMLTextAreaElement | null;
+  if (selectedText && message && !message.value.trim()) message.value = selectedText;
+}
+
+function findWhatsAppInputContainer() {
+  const input = document.querySelector<HTMLElement>(
+    'footer [contenteditable="true"], [data-testid="conversation-compose-box-input"], div[role="textbox"][contenteditable="true"]'
+  );
+  if (!input) return null;
+  return input.closest<HTMLElement>("footer") || input.parentElement;
+}
+
+function mountQuickToolbar() {
+  const existing = document.getElementById(QUICK_TOOLBAR_ID);
+  const floating = document.getElementById(FLOATING_BUTTON_ID);
+  const container = findWhatsAppInputContainer();
+  if (!container || document.documentElement.classList.contains(HIDDEN_CLASS) && !document.getElementById(SIDEBAR_ID)) {
+    existing?.remove();
+    fallbackFloatingAiButton();
+    return;
+  }
+  floating?.remove();
+  if (existing && existing.parentElement === container) return;
+  existing?.remove();
+  const toolbar = document.createElement("div");
+  toolbar.id = QUICK_TOOLBAR_ID;
+  toolbar.className = "wa-ai-quick-toolbar";
+  toolbar.innerHTML = `
+    <button type="button" data-toolbar-action="reply">✨ AI 回复</button>
+    <button type="button" data-toolbar-action="translate">🌐 翻译</button>
+    <button type="button" data-toolbar-action="quote">💬 报价</button>
+    <button type="button" data-toolbar-action="material">🖼 素材</button>
+    <button type="button" data-toolbar-action="more">⋯ 更多</button>
+  `;
+  toolbar.querySelectorAll<HTMLButtonElement>("[data-toolbar-action]").forEach((button) => {
+    button.addEventListener("click", () => void handleToolbarAction(button.dataset.toolbarAction || "reply"));
+  });
+  container.insertBefore(toolbar, container.firstChild);
+}
+
+function unmountQuickToolbar() {
+  document.getElementById(QUICK_TOOLBAR_ID)?.remove();
+  document.getElementById(FLOATING_BUTTON_ID)?.remove();
+}
+
+function fallbackFloatingAiButton() {
+  if (document.getElementById(FLOATING_BUTTON_ID)) return;
+  if (location.hostname !== "web.whatsapp.com") return;
+  const button = document.createElement("button");
+  button.id = FLOATING_BUTTON_ID;
+  button.type = "button";
+  button.textContent = "AI";
+  button.title = "打开 WhatsApp AI 工作台";
+  button.addEventListener("click", () => openSidebarTab("ai"));
+  document.body.appendChild(button);
+}
+
+function setupQuickToolbarObserver() {
+  if (quickToolbarObserver) return;
+  quickToolbarObserver = new MutationObserver(() => {
+    window.requestAnimationFrame(() => {
+      if (detectRecognitionStatus() === "normal") mountQuickToolbar();
+      else unmountQuickToolbar();
+    });
+  });
+  quickToolbarObserver.observe(document.body, { childList: true, subtree: true });
 }
 
 async function checkAuthStatus() {

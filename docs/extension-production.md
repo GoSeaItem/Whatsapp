@@ -232,3 +232,21 @@ If the API returns `403`, the sidebar shows a permission message. The extension 
 - Enterprise context is advisory only; plugin-side AI drafts must still be manually copied/inserted and sent by the salesperson.
 - The extension must keep `content_scripts.matches` limited to `https://web.whatsapp.com/*` and must not simulate the WhatsApp send button.
 - If an enterprise or brand-context API returns `403`, show a permission message instead of exposing organization data.
+
+## V5 Extension UI Refresh
+
+The production extension uses a WhatsApp-native quick toolbar plus a right-side AI workbench:
+
+- The quick toolbar is mounted near the WhatsApp chat input when a chat window exists.
+- The toolbar includes `AI 回复`, `翻译`, `报价`, `素材`, and `更多`.
+- If the WhatsApp input container cannot be found, the extension falls back to a floating `AI` button.
+- The right-side workbench uses tabs: `客户`, `AI`, `业务`, `A/B`, and `更多`.
+- The `业务` tab shows compact action panels for quote, material, sample, custom, order, after-sales, reorder, and follow-up workflows.
+- The `A/B` tab uses `复制并记录`, `插入并记录`, and one outcome dropdown.
+
+Troubleshooting:
+
+- If the toolbar does not appear, open an actual chat thread and refresh WhatsApp Web.
+- If it still does not appear, check that `content_scripts.matches` includes only `https://web.whatsapp.com/*` and reload the unpacked extension.
+- If insertion fails, copy the draft manually. The extension never clicks the WhatsApp send button.
+- If the sidebar shows `403`, confirm the Web backend role, organization membership, and customer ownership.

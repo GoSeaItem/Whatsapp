@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.0-enterprise - Chrome extension UI refresh
+
+### Added
+
+- Upgraded the Chrome extension from one crowded right sidebar into a three-layer workflow: WhatsApp quick toolbar, right-side AI workbench, and Web backend links for complex management.
+- Added a WhatsApp input-area quick toolbar with `AI 回复`, `翻译`, `报价`, `素材`, and `更多`.
+- Added right-side workbench tabs: `客户`, `AI`, `业务`, `A/B`, and `更多`.
+- Added a compact customer/brand context card and a fixed bottom action bar.
+- Added A/B result marking through a dropdown instead of four large buttons.
+- Added DOM mounting fallback: input-area toolbar first, then a floating AI button if the WhatsApp input container cannot be found.
+
+### Safety
+
+- The extension still only generates, copies, records, or inserts drafts.
+- It does not call the WhatsApp official API, auto-send WhatsApp messages, bulk-send, simulate clicking the WhatsApp send button, or bypass WhatsApp controls.
+
 ## v0.6-v4-growth-ops - 2026-05-22
 
 V4 growth ops release consolidates V4-A through V4-M into one release: organization import/export jobs, cross-organization reports, AI advanced enhancement, advanced permissions and audit, business prediction and reorder reminders, order center, order fulfillment board, profit and cost review, reorder operations, after-sales management, lightweight script A/B testing, supplier/procurement collaboration, and multi-brand/store management.
