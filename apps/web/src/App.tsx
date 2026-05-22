@@ -5270,20 +5270,51 @@ export function App() {
 
   function renderPermissions() {
     const rolePermissions: Record<OrganizationRole, string[]> = {
-      owner: [...PERMISSION_KEYS],
-      manager: PERMISSION_KEYS.filter((key) => !["organization.delete", "member.updateRole", "member.remove", "export.sensitiveFields"].includes(key)),
-      sales: PERMISSION_KEYS.filter((key) => /Own|create$|ai\.|viewOrg|viewOwn|audit\.viewOwn|dashboard\.viewOwn/.test(key) && !/delete|export|report|member|organization\.delete/.test(key)),
-      support: PERMISSION_KEYS.filter((key) => ["customer.viewOwn", "followup.viewOwn", "followup.create", "followup.updateOwn", "material.viewOrg", "knowledge.viewOrg", "script.viewOrg", "audit.viewOwn", "ai.reply", "ai.riskCheck", "ai.salesSummary", "ai.useOrgKnowledge", "ai.useOrgMaterial"].includes(key))
+      owner: uniqueStrings(PERMISSION_KEYS),
+      manager: uniqueStrings(PERMISSION_KEYS.filter((key) => !["organization.delete", "member.updateRole", "member.remove", "export.sensitiveFields"].includes(key))),
+      sales: uniqueStrings(PERMISSION_KEYS.filter((key) => /Own|create$|ai\.|viewOrg|viewOwn|audit\.viewOwn|dashboard\.viewOwn/.test(key) && !/delete|export|report|member|organization\.delete/.test(key))),
+      support: uniqueStrings(PERMISSION_KEYS.filter((key) => ["customer.viewOwn", "followup.viewOwn", "followup.create", "followup.updateOwn", "material.viewOrg", "knowledge.viewOrg", "script.viewOrg", "audit.viewOwn", "ai.reply", "ai.riskCheck", "ai.salesSummary", "ai.useOrgKnowledge", "ai.useOrgMaterial"].includes(key)))
+    };
+    const roleSummaries: Record<OrganizationRole, { label: string; description: string; highlights: string[] }> = {
+      owner: {
+        label: "所有者",
+        description: "拥有组织内全部管理能力，可管理成员、敏感导出、审计日志和高风险操作。",
+        highlights: ["全部功能", "成员管理", "敏感导出", "审计导出", "组织删除"]
+      },
+      manager: {
+        label: "经理",
+        description: "可管理团队业务数据、公共资料、报表和普通导出，但不能删除组织或导出敏感字段。",
+        highlights: ["团队数据", "公共资料", "客户分配", "团队报表", "普通导出"]
+      },
+      sales: {
+        label: "销售",
+        description: "主要操作自己负责的客户、报价、跟进、样品、定制和 AI 草稿，不可管理成员或组织级导出。",
+        highlights: ["自己客户", "报价跟进", "AI 草稿", "样品定制", "无团队导出"]
+      },
+      support: {
+        label: "支持",
+        description: "以只读和售后跟进为主，可查看授权客户并生成售后类草稿，不可报价、导出或管理公共资料。",
+        highlights: ["授权客户", "售后跟进", "只读资料", "AI 风险检查", "无导出"]
+      }
     };
     return (
       <section className="grid quote-layout">
         <Panel title="Permission matrix" description="V4-D only displays the default matrix. Custom IAM, SSO and external directories are not included.">
-          <div className="table-like">
-            <div className="table-row table-head"><span>Role</span><span>Allowed permissions</span></div>
+          <div className="permission-cards">
             {ORGANIZATION_ROLES.map((role) => (
-              <div className="table-row" key={role}>
-                <strong>{role}</strong>
-                <span>{rolePermissions[role].join(", ")}</span>
+              <div className="permission-card" key={role}>
+                <div>
+                  <strong>{roleSummaries[role].label}</strong>
+                  <span>{role}</span>
+                </div>
+                <p>{roleSummaries[role].description}</p>
+                <div className="permission-tags">
+                  {roleSummaries[role].highlights.map((item) => <span key={item}>{item}</span>)}
+                </div>
+                <details>
+                  <summary>查看技术权限 key（{rolePermissions[role].length} 项）</summary>
+                  <p className="permission-key-list">{rolePermissions[role].join(", ")}</p>
+                </details>
               </div>
             ))}
           </div>
@@ -5659,6 +5690,10 @@ function RecordList({ title, items }: { title: string; items: string[] }) {
 function RiskWarnings({ items }: { items: string[] }) {
   if (!items.length) return null;
   return <div className="risk-box">{items.map((item) => <span key={item}>{item}</span>)}</div>;
+}
+
+function uniqueStrings(items: readonly string[]) {
+  return Array.from(new Set(items));
 }
 
 function predictionToReminderType(type: string) {
