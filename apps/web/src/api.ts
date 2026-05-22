@@ -192,6 +192,65 @@ export function getMe() {
   return request<AuthResponse>("/api/auth/me");
 }
 
+export type AiProviderKeySummary = {
+  id: string;
+  organizationId: string;
+  provider: string;
+  name: string;
+  mode: "instant" | "thinking";
+  maskedKey: string;
+  status: "active" | "disabled" | "exhausted";
+  priority: number;
+  totalRequests: number;
+  totalTokens: number;
+  successCount: number;
+  errorCount: number;
+  rateLimitCount: number;
+  quotaErrorCount: number;
+  lastUsedAt?: string | null;
+  lastSuccessAt?: string | null;
+  lastErrorAt?: string | null;
+  lastErrorMessage?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AiProviderKeyUpsertRequest = {
+  organizationId?: string;
+  name?: string;
+  apiKey?: string;
+  mode?: "instant" | "thinking";
+  status?: "active" | "disabled" | "exhausted";
+  priority?: number;
+};
+
+export function getAiProviderKeys(query: { organizationId: string; mode?: string; status?: string }) {
+  return request<AiProviderKeySummary[]>(
+    `/api/ai-keys${toQuery({ organizationId: query.organizationId, mode: query.mode, status: query.status })}`
+  );
+}
+
+export function createAiProviderKey(payload: AiProviderKeyUpsertRequest & { organizationId: string; apiKey: string }) {
+  return request<AiProviderKeySummary>("/api/ai-keys", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateAiProviderKey(id: string, payload: AiProviderKeyUpsertRequest) {
+  return request<AiProviderKeySummary>(`/api/ai-keys/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function disableAiProviderKey(id: string) {
+  return request<AiProviderKeySummary>(`/api/ai-keys/${id}`, {
+    method: "DELETE",
+    body: JSON.stringify({ confirm: true })
+  });
+}
+
 function toQuery(params: Record<string, string | undefined>) {
   const query = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {

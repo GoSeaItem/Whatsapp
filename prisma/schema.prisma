@@ -63,6 +63,7 @@ model User {
   createdScriptExperiments ScriptExperiment[] @relation("ScriptExperimentCreator")
   createdScriptVariants ScriptVariant[] @relation("ScriptVariantCreator")
   scriptUsages ScriptUsage[] @relation("ScriptUsageUser")
+  createdAiProviderKeys AiProviderKey[] @relation("AiProviderKeyCreator")
 }
 
 model Organization {
@@ -97,6 +98,7 @@ model Organization {
   scriptExperiments ScriptExperiment[]
   scriptVariants ScriptVariant[]
   scriptUsages ScriptUsage[]
+  aiProviderKeys AiProviderKey[]
 
   @@index([ownerId])
 }
@@ -509,6 +511,40 @@ model AIActionSuggestionLog {
   @@index([brandId])
   @@index([userId])
   @@index([actionType])
+}
+
+model AiProviderKey {
+  id                String       @id @default(cuid())
+  organizationId    String
+  provider          String       @default("openai")
+  name              String
+  mode              String       @default("instant")
+  encryptedKey      String
+  keyLast4          String
+  status            String       @default("active")
+  priority          Int          @default(100)
+  totalRequests     Int          @default(0)
+  totalTokens       Int          @default(0)
+  successCount      Int          @default(0)
+  errorCount        Int          @default(0)
+  rateLimitCount    Int          @default(0)
+  quotaErrorCount   Int          @default(0)
+  lastUsedAt        DateTime?
+  lastSuccessAt     DateTime?
+  lastErrorAt       DateTime?
+  lastErrorMessage  String?
+  createdBy         String
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  creator           User         @relation("AiProviderKeyCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([provider])
+  @@index([mode])
+  @@index([status])
+  @@index([priority])
+  @@index([createdBy])
 }
 
 model CustomerPrediction {

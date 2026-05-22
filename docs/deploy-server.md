@@ -112,8 +112,11 @@ OPENAI_API_KEY=
 # The API automatically tries the next key when one key is rate-limited or quota-exhausted.
 OPENAI_API_KEYS=
 OPENAI_MODEL=gpt-4o-mini
+OPENAI_INSTANT_MODEL=gpt-4o-mini
+OPENAI_THINKING_MODEL=gpt-4.1
 OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_TIMEOUT_MS=30000
+OPENAI_KEY_ENCRYPTION_SECRET=<generated-hex-secret>
 
 COOKIE_SECURE=false
 COOKIE_SAME_SITE=lax

@@ -8,10 +8,13 @@
 - Added automatic key rotation when a key is rate-limited, quota-exhausted, unauthorized, or the provider is temporarily unavailable.
 - Added real OpenAI-backed AI reply and translation paths for `/api/ai/reply` and `/api/ai/draft`, with local rule-based fallback when no key is configured or all keys fail.
 - Added `OPENAI_MODEL`, `OPENAI_BASE_URL`, and `OPENAI_TIMEOUT_MS` environment settings.
+- Added organization-managed backend AI key pool under `/api/ai-keys`, with encrypted key storage, `instant` / `thinking` modes, priority, enable/disable status, usage counts, token totals, rate-limit counts, quota-error counts, and last-use/error timestamps.
+- Added `OPENAI_INSTANT_MODEL`, `OPENAI_THINKING_MODEL`, and `OPENAI_KEY_ENCRYPTION_SECRET` environment settings.
 
 ### Safety
 
 - OpenAI keys remain server-side only and are never returned to Web or Chrome extension clients.
+- Database-managed keys are encrypted at rest and API responses only expose masked tail digits.
 - AI output is still draft-only. The system still does not auto-send WhatsApp messages, bulk-send, or simulate clicking the WhatsApp send button.
 
 ## V4-O - WhatsApp auto context recognition

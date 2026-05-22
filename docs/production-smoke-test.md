@@ -7,6 +7,9 @@
    ```env
    OPENAI_API_KEYS=key_1,key_2,key_3
    OPENAI_MODEL=gpt-4o-mini
+   OPENAI_INSTANT_MODEL=gpt-4o-mini
+   OPENAI_THINKING_MODEL=gpt-4.1
+   OPENAI_KEY_ENCRYPTION_SECRET=<generated-hex-secret>
    ```
 3. Restart the API container after changing `.env.production`.
 4. Open Web or the Chrome extension and generate an AI reply or translation.
@@ -15,6 +18,10 @@
 5. If one key is exhausted or rate-limited, keep the next key valid and generate again.
    - Expected: API falls through to the next configured key.
    - Expected: if all keys fail, the API returns a local fallback draft with a warning.
+6. Add an organization key from the backend AI key-pool API or UI if available.
+   - Expected: `instant` keys are used for normal reply/translation.
+   - Expected: `thinking` keys are available for requests that pass `aiMode=thinking`.
+   - Expected: list responses show only masked keys, usage counts, token counts, last used time, and errors; no plaintext key is returned.
 
 ## V4-O Chrome Extension Auto Context Smoke Test
 

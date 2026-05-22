@@ -1,3 +1,6 @@
+import { decryptProviderKey } from "./ai-key-utils.js";
+import { prisma } from "./db.js";
+
 type ChatMessage = {
   role: "system" | "user" | "assistant";
   content: string;
@@ -8,6 +11,8 @@ type OpenAiChatOptions = {
   temperature?: number;
   maxTokens?: number;
   env?: NodeJS.ProcessEnv;
+  organizationId?: string | null;
+  mode?: "instant" | "thinking" | string | null;
 };
 
 export type OpenAiChatResult = {
@@ -39,10 +44,13 @@ export function hasOpenAiKeys(env: NodeJS.ProcessEnv = process.env) {
 export async function createOpenAiChatCompletion(options: OpenAiChatOptions): Promise<OpenAiChatResult | null> {
   const env = options.env || process.env;
   if (env.NODE_ENV === "test" && env.OPENAI_ENABLE_IN_TEST !== "true") return null;
-  const keys = getOpenAiKeys(env);
+  const dbKeys = await loadDatabaseKeys(options.organizationId || "", options.mode || "instant", env);
+  const envKeys = getOpenAiKeys(env).map((apiKey, index) => ({ apiKey, id: null as string | null, keyIndex: index, source: "env" as const }));
+  const keys = [...dbKeys, ...envKeys];
   if (keys.length === 0) return null;
 
-  const model = env.OPENAI_MODEL?.trim() || DEFAULT_MODEL;
+  const mode = options.mode === "thinking" ? "thinking" : "instant";
+  const model = (mode === "thinking" ? env.OPENAI_THINKING_MODEL?.trim() : env.OPENAI_INSTANT_MODEL?.trim()) || env.OPENAI_MODEL?.trim() || DEFAULT_MODEL;
   const baseUrl = (env.OPENAI_BASE_URL?.trim() || "https://api.openai.com/v1").replace(/\/+$/, "");
   const timeoutMs = Number(env.OPENAI_TIMEOUT_MS || 30000);
   const startedIndex = nextKeyIndex % keys.length;
@@ -50,11 +58,11 @@ export async function createOpenAiChatCompletion(options: OpenAiChatOptions): Pr
 
   for (let attempt = 0; attempt < keys.length; attempt += 1) {
     const keyIndex = (startedIndex + attempt) % keys.length;
-    const apiKey = keys[keyIndex];
+    const key = keys[keyIndex];
 
     try {
-      const content = await callChatCompletions({
-        apiKey,
+      const completion = await callChatCompletions({
+        apiKey: key.apiKey,
         baseUrl,
         model,
         timeoutMs,
@@ -63,10 +71,13 @@ export async function createOpenAiChatCompletion(options: OpenAiChatOptions): Pr
         maxTokens: options.maxTokens ?? 900
       });
 
+      if (key.id) await recordDatabaseKeySuccess(key.id, completion.totalTokens);
       nextKeyIndex = keyIndex;
-      return { content, model, keyIndex };
+      return { content: completion.content, model, keyIndex: key.keyIndex };
     } catch (error) {
-      errors.push(`key#${keyIndex + 1}: ${error instanceof Error ? error.message : "unknown error"}`);
+      const message = error instanceof Error ? error.message : "unknown error";
+      if (key.id) await recordDatabaseKeyFailure(key.id, message);
+      errors.push(`${key.source} key#${key.keyIndex + 1}: ${message}`);
       nextKeyIndex = (keyIndex + 1) % keys.length;
     }
   }
@@ -108,13 +119,64 @@ async function callChatCompletions(input: {
       throw new Error(message);
     }
 
-    const payload = JSON.parse(text) as { choices?: Array<{ message?: { content?: string } }> };
+    const payload = JSON.parse(text) as { choices?: Array<{ message?: { content?: string } }>; usage?: { total_tokens?: number } };
     const content = payload.choices?.[0]?.message?.content?.trim();
     if (!content) throw new Error("empty model response");
-    return content;
+    return { content, totalTokens: Number(payload.usage?.total_tokens || 0) };
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function loadDatabaseKeys(organizationId: string, mode: string, env: NodeJS.ProcessEnv) {
+  if (!organizationId) return [];
+  const rows = await (prisma as any).aiProviderKey.findMany({
+    where: {
+      organizationId,
+      provider: "openai",
+      mode: mode === "thinking" ? "thinking" : "instant",
+      status: "active"
+    },
+    orderBy: [{ priority: "asc" }, { createdAt: "asc" }]
+  }).catch(() => []);
+
+  return rows.flatMap((row: any, index: number) => {
+    try {
+      return [{ apiKey: decryptProviderKey(row.encryptedKey, env), id: row.id as string, keyIndex: index, source: "database" as const }];
+    } catch {
+      return [];
+    }
+  });
+}
+
+async function recordDatabaseKeySuccess(id: string, totalTokens: number) {
+  await (prisma as any).aiProviderKey.update({
+    where: { id },
+    data: {
+      totalRequests: { increment: 1 },
+      totalTokens: { increment: Math.max(0, totalTokens) },
+      successCount: { increment: 1 },
+      lastUsedAt: new Date(),
+      lastSuccessAt: new Date(),
+      lastErrorMessage: null
+    }
+  }).catch(() => undefined);
+}
+
+async function recordDatabaseKeyFailure(id: string, message: string) {
+  const lower = message.toLowerCase();
+  await (prisma as any).aiProviderKey.update({
+    where: { id },
+    data: {
+      totalRequests: { increment: 1 },
+      errorCount: { increment: 1 },
+      rateLimitCount: lower.includes("rate limited") || lower.includes("429") ? { increment: 1 } : undefined,
+      quotaErrorCount: lower.includes("quota") || lower.includes("exhausted") ? { increment: 1 } : undefined,
+      lastUsedAt: new Date(),
+      lastErrorAt: new Date(),
+      lastErrorMessage: message.slice(0, 500)
+    }
+  }).catch(() => undefined);
 }
 
 function summarizeOpenAiError(status: number, body: string) {

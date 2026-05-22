@@ -101,6 +101,7 @@ Current release target: `v1.0-enterprise`.
 
 - AI reply and translation can now use OpenAI when `OPENAI_API_KEY` or `OPENAI_API_KEYS` is configured. Other advanced modules may still include rule/template fallback paths and should keep draft-only behavior.
 - If every OpenAI key is rate-limited, quota-exhausted, invalid, or unavailable, the API falls back to local draft rules and returns a warning instead of exposing keys or blocking the salesperson.
+- Backend AI key pool stores keys encrypted and tracks usage, but key creation still requires an organization owner/manager and a stable encryption secret. Rotating `OPENAI_KEY_ENCRYPTION_SECRET` without re-encrypting stored keys will make existing stored keys unreadable.
 - `AIActionSuggestionLog` stores sanitized snapshots for troubleshooting, not full raw chat transcripts.
 - Follow-up plans do not create tasks unless `createTasks=true`; they never send WhatsApp messages automatically.
 

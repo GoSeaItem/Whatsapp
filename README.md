@@ -27,8 +27,11 @@ API 已支持真实 OpenAI / ChatGPT 草稿生成。生产环境可在服务器 
 ```env
 OPENAI_API_KEYS=key_1,key_2,key_3
 OPENAI_MODEL=gpt-4o-mini
+OPENAI_INSTANT_MODEL=gpt-4o-mini
+OPENAI_THINKING_MODEL=gpt-4.1
 OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_TIMEOUT_MS=30000
+OPENAI_KEY_ENCRYPTION_SECRET=your-long-random-secret
 ```
 
 也兼容单 key：
@@ -38,6 +41,15 @@ OPENAI_API_KEY=key_single
 ```
 
 当某个 key 额度用完、触发 429 限流、认证失败或 OpenAI 临时不可用时，后端会自动尝试下一个 key。所有 key 只保存在服务器环境变量中，不会返回给前端或 Chrome 插件。若未配置 key，系统会回退到本地规则草稿，仍然保持“只生成草稿、不自动发送 WhatsApp”。
+
+也可以使用后端数据库 Key 池，避免每次上服务器改 `.env.production`：
+
+- API：`/api/ai-keys`
+- 支持模式：`instant`（快速回复/翻译）和 `thinking`（更复杂推理）
+- 支持字段：名称、模式、状态、优先级、尾号、成功次数、失败次数、限流次数、quota 错误次数、token 统计、最后使用时间
+- 权限：仅组织 `owner/manager` 可新增、更新、禁用 key
+- 安全：key 使用 `OPENAI_KEY_ENCRYPTION_SECRET` 加密入库；接口永远不返回明文 key，只显示 `****尾号`
+- 调用优先级：组织数据库 key 池优先，`.env` key 作为 fallback
 
 ## Chrome 插件 UI：快捷工具条 + AI 工作台
 

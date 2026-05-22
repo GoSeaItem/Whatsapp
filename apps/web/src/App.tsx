@@ -323,10 +323,13 @@ import {
   assignBrand,
   createBrand,
   createBrandRule,
+  createAiProviderKey,
   deleteBrandRule,
+  disableAiProviderKey,
   getBrand,
   getBrandContext,
   getBrands,
+  getAiProviderKeys,
   linkBrandKnowledgeBase,
   linkBrandMaterial,
   linkBrandProduct,
@@ -339,15 +342,16 @@ import {
   unlinkBrandScript,
   updateBrand,
   updateBrandRule,
+  updateAiProviderKey,
   type AuthUser
 } from "./api";
-import type { CsvImportResult, ImportExportType, OrganizationExportJob, OrganizationImportExportType, OrganizationImportJob } from "./api";
+import type { AiProviderKeySummary, CsvImportResult, ImportExportType, OrganizationExportJob, OrganizationImportExportType, OrganizationImportJob } from "./api";
 import { exportCsvUrl, templateCsvUrl } from "./api";
 
 // Release safety copy kept in source for regression checks: drafts are copied and sent manually by the salesperson.
 // Navigation regression marker: navButton("roles", "Roles")
 
-type View = "dashboard" | "enterprise" | "teamDashboard" | "reports" | "predictions" | "reorderOps" | "afterSales" | "scriptTests" | "suppliers" | "brands" | "organizations" | "roles" | "permissions" | "customers" | "products" | "orgProducts" | "quotes" | "orders" | "fulfillment" | "profit" | "knowledge" | "orgKnowledge" | "orgScripts" | "materials" | "orgMaterials" | "samples" | "custom" | "importExport" | "auditLogs" | "riskEvents";
+type View = "dashboard" | "enterprise" | "aiKeys" | "teamDashboard" | "reports" | "predictions" | "reorderOps" | "afterSales" | "scriptTests" | "suppliers" | "brands" | "organizations" | "roles" | "permissions" | "customers" | "products" | "orgProducts" | "quotes" | "orders" | "fulfillment" | "profit" | "knowledge" | "orgKnowledge" | "orgScripts" | "materials" | "orgMaterials" | "samples" | "custom" | "importExport" | "auditLogs" | "riskEvents";
 type CustomerFilters = { q: string; tag: string; stage: string; sort: "" | "intentScore"; intentLevel: "" | "low" | "medium" | "high"; organizationId: string };
 type ProductFilters = { q: string; category: string };
 type KnowledgeFilters = { q: string; category: string; language: string; productId: string };
@@ -370,6 +374,7 @@ type BrandFilters = { organizationId: string; status: string; keyword: string };
 type EnterpriseForm = { organizationId: string; parentId: string; name: string; type: string; status: string };
 type EnterpriseRoleForm = { organizationId: string; roleName: string; permissions: string; description: string };
 type EnterpriseReportForm = { organizationId: string; reportType: string };
+type AiKeyForm = { organizationId: string; name: string; apiKey: string; mode: "instant" | "thinking"; status: "active" | "disabled" | "exhausted"; priority: string };
 
 type OrganizationForm = {
   name: string;
@@ -562,6 +567,7 @@ const emptyRoleForm: RoleForm = { organizationId: "", name: "sales", description
 const emptyEnterpriseForm: EnterpriseForm = { organizationId: "", parentId: "", name: "", type: "subsidiary", status: "active" };
 const emptyEnterpriseRoleForm: EnterpriseRoleForm = { organizationId: "", roleName: "enterprise_manager", permissions: "enterprise.organization.view\nenterprise.report.view\nenterprise.audit.view", description: "" };
 const emptyEnterpriseReportForm: EnterpriseReportForm = { organizationId: "", reportType: "enterprise_summary" };
+const emptyAiKeyForm: AiKeyForm = { organizationId: "", name: "", apiKey: "", mode: "instant", status: "active", priority: "100" };
 
 const emptyCustomerForm: CustomerForm = {
   name: "",
@@ -840,6 +846,7 @@ export function App() {
   const [enterpriseReports, setEnterpriseReports] = useState<EnterpriseReportSummary[]>([]);
   const [enterpriseAuditLogs, setEnterpriseAuditLogs] = useState<EnterpriseAuditLogSummary[]>([]);
   const [enterpriseBrandContext, setEnterpriseBrandContext] = useState<EnterpriseBrandContextResponse | null>(null);
+  const [aiProviderKeys, setAiProviderKeys] = useState<AiProviderKeySummary[]>([]);
   const [predictionScript, setPredictionScript] = useState("");
   const [predictionRiskWarnings, setPredictionRiskWarnings] = useState<string[]>([]);
   const [reorderOperationScript, setReorderOperationScript] = useState("");
@@ -921,6 +928,7 @@ export function App() {
   const [enterpriseForm, setEnterpriseForm] = useState<EnterpriseForm>(emptyEnterpriseForm);
   const [enterpriseRoleForm, setEnterpriseRoleForm] = useState<EnterpriseRoleForm>(emptyEnterpriseRoleForm);
   const [enterpriseReportForm, setEnterpriseReportForm] = useState<EnterpriseReportForm>(emptyEnterpriseReportForm);
+  const [aiKeyForm, setAiKeyForm] = useState<AiKeyForm>(emptyAiKeyForm);
   const [brandProductLinkId, setBrandProductLinkId] = useState("");
   const [brandMaterialLinkId, setBrandMaterialLinkId] = useState("");
   const [brandKnowledgeLinkId, setBrandKnowledgeLinkId] = useState("");
@@ -1079,6 +1087,7 @@ export function App() {
       setEnterpriseForm((form) => ({ ...form, organizationId: id }));
       setEnterpriseRoleForm((form) => ({ ...form, organizationId: id }));
       setEnterpriseReportForm((form) => ({ ...form, organizationId: id }));
+      setAiKeyForm((form) => ({ ...form, organizationId: id }));
       setOrganizations((items) => items.map((item) => (item.id === detail.id ? { ...item, ...detail } : item)));
       await Promise.all([
         loadRoles(id),
@@ -1090,6 +1099,7 @@ export function App() {
         loadAfterSales({ ...afterSalesFilters, organizationId: id }),
         loadAuditLogs({ ...auditLogFilters, organizationId: id }),
         loadRiskEvents(id),
+        loadAiProviderKeys(id),
         loadTeamDashboard(id),
         loadReports({ ...reportFilters, organizationId: id }),
         loadPredictions({ ...predictionFilters, organizationId: id }),
@@ -1122,6 +1132,7 @@ export function App() {
       setEnterpriseReports([]);
       setEnterpriseAuditLogs([]);
       setEnterpriseBrandContext(null);
+      setAiProviderKeys([]);
     }
   }
 
@@ -1147,6 +1158,73 @@ export function App() {
       setEnterpriseReports([]);
       setEnterpriseAuditLogs([]);
       setStatus("Enterprise platform data failed to load.");
+    }
+  }
+
+  async function loadAiProviderKeys(organizationId = selectedOrganizationId) {
+    if (!organizationId) return;
+    try {
+      const list = await getAiProviderKeys({ organizationId });
+      setAiProviderKeys(list);
+    } catch {
+      setAiProviderKeys([]);
+      setStatus("AI key pool failed to load. Owner or manager role is required.");
+    }
+  }
+
+  async function saveAiProviderKey() {
+    const organizationId = aiKeyForm.organizationId || selectedOrganizationId;
+    if (!organizationId) return setStatus("Select an organization first.");
+    if (!aiKeyForm.apiKey.trim()) return setStatus("Paste an OpenAI API key before saving.");
+    setLoading(true);
+    try {
+      await createAiProviderKey({
+        organizationId,
+        name: aiKeyForm.name,
+        apiKey: aiKeyForm.apiKey.trim(),
+        mode: aiKeyForm.mode,
+        status: aiKeyForm.status,
+        priority: Number(aiKeyForm.priority) || 100
+      });
+      setAiKeyForm({ ...emptyAiKeyForm, organizationId, mode: aiKeyForm.mode });
+      await loadAiProviderKeys(organizationId);
+      setStatus("AI key saved. The plaintext key is encrypted and will not be shown again.");
+    } catch {
+      setStatus("AI key save failed. Check owner/manager permission and encryption secret.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function updateAiProviderKeyRecord(id: string, payload: Partial<AiKeyForm>) {
+    setLoading(true);
+    try {
+      await updateAiProviderKey(id, {
+        name: payload.name,
+        mode: payload.mode,
+        status: payload.status,
+        priority: payload.priority !== undefined ? Number(payload.priority) : undefined
+      });
+      await loadAiProviderKeys(selectedOrganizationId);
+      setStatus("AI key updated.");
+    } catch {
+      setStatus("AI key update failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function disableAiProviderKeyRecord(id: string) {
+    if (!window.confirm("Disable this AI key? Existing usage stats will be kept.")) return;
+    setLoading(true);
+    try {
+      await disableAiProviderKey(id);
+      await loadAiProviderKeys(selectedOrganizationId);
+      setStatus("AI key disabled.");
+    } catch {
+      setStatus("AI key disable failed.");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -3490,6 +3568,7 @@ export function App() {
           {navButton("suppliers", "Suppliers")}
           {navButton("brands", "Brands / stores")}
           {canManageSelectedOrganization && navButton("enterprise", "Enterprise")}
+          {canManageSelectedOrganization && navButton("aiKeys", "AI keys")}
           {navButton("organizations", "Organizations")}
           {navButton("roles", "Roles")}
           {navButton("permissions", "Permissions")}
@@ -3536,6 +3615,7 @@ export function App() {
         {view === "suppliers" && renderSuppliers()}
         {view === "brands" && renderBrands()}
         {view === "enterprise" && renderEnterprise()}
+        {view === "aiKeys" && renderAiKeys()}
         {view === "organizations" && renderOrganizations()}
         {view === "roles" && renderRoles()}
         {view === "permissions" && renderPermissions()}
@@ -4637,6 +4717,62 @@ export function App() {
               "AI output remains a draft or recommendation. Salespeople must manually confirm before sending.",
               "Sensitive exports, destructive changes and role changes stay permission-gated and audited."
             ]} />
+          </Panel>
+        </section>
+      </>
+    );
+  }
+
+  function renderAiKeys() {
+    const instantKeys = aiProviderKeys.filter((item) => item.mode === "instant");
+    const thinkingKeys = aiProviderKeys.filter((item) => item.mode === "thinking");
+    return (
+      <>
+        <section className="metrics">
+          <Metric label="Instant keys" value={instantKeys.length} />
+          <Metric label="Thinking keys" value={thinkingKeys.length} />
+          <Metric label="Total requests" value={aiProviderKeys.reduce((sum, item) => sum + item.totalRequests, 0)} />
+          <Metric label="Errors" value={aiProviderKeys.reduce((sum, item) => sum + item.errorCount, 0)} />
+        </section>
+        <section className="customer-layout">
+          <Panel title="AI key pool" description="Owner/manager only. Keys are encrypted at rest, masked in UI, and selected by mode plus priority. Environment keys remain fallback keys.">
+            <div className="form-grid">
+              <SelectField label="Organization" value={aiKeyForm.organizationId || selectedOrganizationId} onChange={(value) => setAiKeyForm({ ...aiKeyForm, organizationId: value })} options={organizations.map((item) => [item.id, item.name])} emptyLabel="Select organization" />
+              <Field label="Name"><input value={aiKeyForm.name} onChange={(event) => setAiKeyForm({ ...aiKeyForm, name: event.target.value })} placeholder="OpenAI key label" /></Field>
+              <SelectField label="Mode" value={aiKeyForm.mode} onChange={(value) => setAiKeyForm({ ...aiKeyForm, mode: value as "instant" | "thinking" })} options={[["instant", "Instant"], ["thinking", "Thinking"]]} />
+              <SelectField label="Status" value={aiKeyForm.status} onChange={(value) => setAiKeyForm({ ...aiKeyForm, status: value as "active" | "disabled" | "exhausted" })} options={[["active", "Active"], ["disabled", "Disabled"], ["exhausted", "Exhausted"]]} />
+              <Field label="Priority"><input value={aiKeyForm.priority} onChange={(event) => setAiKeyForm({ ...aiKeyForm, priority: event.target.value })} placeholder="Lower number is tried first" /></Field>
+              <Field label="API key"><input type="password" value={aiKeyForm.apiKey} onChange={(event) => setAiKeyForm({ ...aiKeyForm, apiKey: event.target.value })} placeholder="sk-..." autoComplete="off" /></Field>
+            </div>
+            <div className="detail-actions">
+              <button onClick={saveAiProviderKey} disabled={loading || !canManageSelectedOrganization}>Save key</button>
+              <button className="secondary-button" onClick={() => loadAiProviderKeys(aiKeyForm.organizationId || selectedOrganizationId)} disabled={!selectedOrganizationId}>Refresh usage</button>
+            </div>
+            <RiskWarnings items={[
+              "Stored keys are never displayed again. Only masked suffix and usage counters are shown.",
+              "Instant mode is for fast replies/translations. Thinking mode is for heavier reasoning prompts.",
+              "If all database keys fail, the server can still fall back to OPENAI_API_KEYS / OPENAI_API_KEY."
+            ]} />
+          </Panel>
+
+          <Panel title="Usage and health" description="The backend automatically tries active keys by mode and priority, then switches to the next key after rate-limit, quota, network, or API errors.">
+            <SimpleList items={aiProviderKeys} render={(item) => (
+              <div className="customer-row">
+                <strong>{item.name} / {item.mode} / {item.maskedKey}</strong>
+                <span>Status {item.status} / priority {item.priority} / tokens {item.totalTokens}</span>
+                <span>Requests {item.totalRequests} / success {item.successCount} / errors {item.errorCount} / 429 {item.rateLimitCount} / quota {item.quotaErrorCount}</span>
+                <span>Last used {formatDate(item.lastUsedAt)} / last success {formatDate(item.lastSuccessAt)} / last error {item.lastErrorMessage || "-"}</span>
+                <div className="detail-actions">
+                  <button className="secondary-button" onClick={() => updateAiProviderKeyRecord(item.id, { status: item.status === "active" ? "disabled" : "active" })} disabled={!canManageSelectedOrganization}>
+                    {item.status === "active" ? "Disable" : "Enable"}
+                  </button>
+                  <button className="secondary-button" onClick={() => updateAiProviderKeyRecord(item.id, { mode: item.mode === "instant" ? "thinking" : "instant" })} disabled={!canManageSelectedOrganization}>
+                    Switch to {item.mode === "instant" ? "thinking" : "instant"}
+                  </button>
+                  <button className="danger-button" onClick={() => disableAiProviderKeyRecord(item.id)} disabled={!canManageSelectedOrganization}>Disable with confirm</button>
+                </div>
+              </div>
+            )} />
           </Panel>
         </section>
       </>
@@ -6042,6 +6178,7 @@ function titleForView(view: View) {
     suppliers: "Suppliers / procurement",
     brands: "Brands / stores",
     enterprise: "Enterprise platform",
+    aiKeys: "AI key pool",
     organizations: "Organizations",
     roles: "Roles",
     permissions: "Permission matrix",

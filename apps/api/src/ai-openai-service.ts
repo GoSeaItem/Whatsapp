@@ -1,7 +1,7 @@
 import type { AiReplyRequest, AiReplyResponse, GenerateDraftRequest, GenerateDraftResponse } from "@wa-ai/shared";
 import { generateAiReply } from "./ai-reply.js";
 import { generateDraft } from "./ai-draft.js";
-import { createOpenAiChatCompletion, hasOpenAiKeys } from "./openai-client.js";
+import { createOpenAiChatCompletion } from "./openai-client.js";
 
 type AiReplyJson = {
   translationZh?: string;
@@ -23,10 +23,12 @@ const COMMON_SAFETY_RULES = [
 
 export async function generateAiReplySmart(input: AiReplyRequest): Promise<AiReplyResponse> {
   const fallback = generateAiReply(input);
-  if (!hasOpenAiKeys()) return fallback;
+  const aiMode = (input as any).aiMode === "thinking" || (input as any).mode === "thinking" ? "thinking" : "instant";
 
   try {
     const completion = await createOpenAiChatCompletion({
+      organizationId: input.organizationId || null,
+      mode: aiMode,
       messages: [
         {
           role: "system",
@@ -83,11 +85,14 @@ export async function generateAiReplySmart(input: AiReplyRequest): Promise<AiRep
 
 export async function generateDraftSmart(input: GenerateDraftRequest): Promise<GenerateDraftResponse> {
   const fallback = generateDraft(input);
-  if (!hasOpenAiKeys() || !input.sourceText?.trim()) return fallback;
+  if (!input.sourceText?.trim()) return fallback;
+  const aiMode = (input as any).aiMode === "thinking" || (input as any).mode === "thinking" ? "thinking" : "instant";
 
   try {
     const targetLanguage = input.languageTo || (input.intent === "translate" ? "Chinese" : "English");
     const completion = await createOpenAiChatCompletion({
+      organizationId: (input as any).organizationId || null,
+      mode: aiMode,
       messages: [
         {
           role: "system",
@@ -143,4 +148,3 @@ function stringArray(value: unknown) {
 function mergeUnique(values: string[]) {
   return Array.from(new Set(values.filter(Boolean)));
 }
-
