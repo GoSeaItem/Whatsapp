@@ -1,5 +1,35 @@
 # Changelog
 
+## Unreleased - OpenAI key pool and real translation
+
+### Added
+
+- Added a server-side OpenAI client with `OPENAI_API_KEYS` key-pool support. Keys can be separated by comma, semicolon, or new line.
+- Added automatic key rotation when a key is rate-limited, quota-exhausted, unauthorized, or the provider is temporarily unavailable.
+- Added real OpenAI-backed AI reply and translation paths for `/api/ai/reply` and `/api/ai/draft`, with local rule-based fallback when no key is configured or all keys fail.
+- Added `OPENAI_MODEL`, `OPENAI_BASE_URL`, and `OPENAI_TIMEOUT_MS` environment settings.
+
+### Safety
+
+- OpenAI keys remain server-side only and are never returned to Web or Chrome extension clients.
+- AI output is still draft-only. The system still does not auto-send WhatsApp messages, bulk-send, or simulate clicking the WhatsApp send button.
+
+## V4-O - WhatsApp auto context recognition
+
+### Added
+
+- Added `POST /api/customers/match` for draft-only Chrome extension customer matching by visible WhatsApp contact name and normalized phone number.
+- Added phone parsing with `libphonenumber-js` for E.164 normalization, country calling code, country code, country name, validity and confidence.
+- Added Chrome extension current-chat detection for the visible WhatsApp conversation title, phone hint, recent visible messages, latest customer message, language hint and intent hint.
+- Added ContextCard auto-fill for matched saved customers and suggested new-customer payloads.
+- AI reply requests from the extension now include latest visible customer message and recent visible messages when available, while preserving manual paste fallback.
+
+### Safety
+
+- The extension only reads the currently visible WhatsApp chat and at most 10 visible messages.
+- Country is displayed as a phone-number-based hint, not a verified customer location.
+- Draft insertion still only inserts text into the WhatsApp input box. It does not auto-send, bulk-send, call the WhatsApp official API, or simulate clicking the send button.
+
 ## v1.0-enterprise - Chrome extension UI refresh
 
 ### Added

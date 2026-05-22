@@ -311,6 +311,48 @@ describe("Customer CRUD API", () => {
     expect(response.body).toMatchObject({ id: "assign-me", assignedTo: "sales-2" });
     expect(response.body.assignmentLogs[0]).toMatchObject({ fromUserId: "sales-1", toUserId: "sales-2", operatedBy: "manager" });
   });
+
+  it("matches current WhatsApp context by normalized phone inside visible organization scope", async () => {
+    const { app } = createTestApp([
+      makeCustomer({ id: "match", ownerId: "manager", organizationId: "org-a", assignedTo: "sales-1", name: "Amina Trading", whatsappNumber: "+628123456789", country: "Indonesia" }),
+      makeCustomer({ id: "hidden", ownerId: "other", organizationId: "org-b", name: "Other Org", whatsappNumber: "+628123456789" })
+    ]);
+
+    const response = await request(app)
+      .post("/api/customers/match")
+      .set("x-user-id", "sales-1")
+      .send({ organizationId: "org-a", contactName: "Amina Trading", whatsappNumber: "+62 812-3456-789", phoneCountry: "Indonesia", phoneCountryCode: "ID", source: "whatsapp_web" })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      matched: true,
+      matchReason: "whatsappNumber",
+      customer: { id: "match", name: "Amina Trading", country: "Indonesia" }
+    });
+  });
+
+  it("returns suggested create payload when current WhatsApp context is not matched", async () => {
+    const { app } = createTestApp();
+
+    const response = await request(app)
+      .post("/api/customers/match")
+      .set("x-user-id", "sales-1")
+      .send({ contactName: "New Buyer", whatsappNumber: "+91 98765 43210", phoneCountry: "India", phoneCountryCode: "IN", source: "whatsapp_web" })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      matched: false,
+      customer: null,
+      duplicateWarning: null,
+      suggestedCreatePayload: {
+        name: "New Buyer",
+        whatsappNumber: "+919876543210",
+        country: "India",
+        countryCode: "IN",
+        source: "whatsapp_web"
+      }
+    });
+  });
 });
 
 function makeCustomer(overrides: Partial<TestCustomer>): TestCustomer {
@@ -340,6 +382,7 @@ function makeCustomer(overrides: Partial<TestCustomer>): TestCustomer {
 }
 
 function matchesWhere(customer: TestCustomer, where: Record<string, any>) {
+  if (where.AND) return where.AND.every((condition: Record<string, any>) => matchesWhere(customer, condition));
   if (where.NOT?.id && customer.id === where.NOT.id) return false;
   if (where.ownerId && customer.ownerId !== where.ownerId) return false;
   if (where.id && customer.id !== where.id) return false;

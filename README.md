@@ -20,6 +20,25 @@ Safety boundary remains unchanged: no WhatsApp official API, no automatic sendin
 
 Docs: [enterprise platform](docs/enterprise-platform.md), [enterprise permissions and audit](docs/enterprise-permissions-audit.md), [enterprise reports](docs/enterprise-reports.md), [enterprise audit](docs/enterprise-audit.md).
 
+## ChatGPT / OpenAI Key 池
+
+API 已支持真实 OpenAI / ChatGPT 草稿生成。生产环境可在服务器 `.env.production` 中配置一个或多个 key：
+
+```env
+OPENAI_API_KEYS=key_1,key_2,key_3
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_TIMEOUT_MS=30000
+```
+
+也兼容单 key：
+
+```env
+OPENAI_API_KEY=key_single
+```
+
+当某个 key 额度用完、触发 429 限流、认证失败或 OpenAI 临时不可用时，后端会自动尝试下一个 key。所有 key 只保存在服务器环境变量中，不会返回给前端或 Chrome 插件。若未配置 key，系统会回退到本地规则草稿，仍然保持“只生成草稿、不自动发送 WhatsApp”。
+
 ## Chrome 插件 UI：快捷工具条 + AI 工作台
 
 Chrome 插件已升级为 WhatsApp 页面快捷工具条 + 右侧 AI 工作台：
@@ -1211,5 +1230,3 @@ rg -n "\.click\(|dispatchEvent|KeyboardEvent|send button|compose-btn-send|bulk s
 ```
 
 允许命中测试文件里的“不自动发送”断言；源代码中不应出现自动点击 WhatsApp 发送按钮、自动群发、批量发送或定时发送逻辑。
-
-

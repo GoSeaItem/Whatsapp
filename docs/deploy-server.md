@@ -108,6 +108,12 @@ CORS_ORIGINS=http://187.77.138.174
 CHROME_EXTENSION_ORIGIN=
 
 OPENAI_API_KEY=
+# Recommended when using multiple keys. Separate by comma, semicolon, or new line.
+# The API automatically tries the next key when one key is rate-limited or quota-exhausted.
+OPENAI_API_KEYS=
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_TIMEOUT_MS=30000
 
 COOKIE_SECURE=false
 COOKIE_SAME_SITE=lax

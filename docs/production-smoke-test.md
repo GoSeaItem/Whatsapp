@@ -1,5 +1,38 @@
 # Production Smoke Test
 
+## OpenAI / ChatGPT Key-Pool Smoke Test
+
+1. In server `.env.production`, configure either `OPENAI_API_KEY` or `OPENAI_API_KEYS`.
+2. Recommended multi-key format:
+   ```env
+   OPENAI_API_KEYS=key_1,key_2,key_3
+   OPENAI_MODEL=gpt-4o-mini
+   ```
+3. Restart the API container after changing `.env.production`.
+4. Open Web or the Chrome extension and generate an AI reply or translation.
+   - Expected: output is a natural translation/draft instead of local placeholder text.
+   - Expected: no OpenAI key appears in browser devtools, logs, CSV export, or API responses.
+5. If one key is exhausted or rate-limited, keep the next key valid and generate again.
+   - Expected: API falls through to the next configured key.
+   - Expected: if all keys fail, the API returns a local fallback draft with a warning.
+
+## V4-O Chrome Extension Auto Context Smoke Test
+
+1. Open `https://web.whatsapp.com` and select one active chat.
+   - Expected: the quick toolbar is visible and the sidebar ContextCard shows the current contact or `New customer / not saved`.
+2. Select a chat whose title contains an international phone number.
+   - Expected: the sidebar shows E.164 phone and `根据手机号推测国家`.
+3. Send/receive visible test messages in the open chat.
+   - Expected: the sidebar detects up to 10 visible recent messages and uses the latest customer message for AI reply.
+4. Switch to another chat.
+   - Expected: context refreshes once after debounce; duplicate toolbars or sidebars are not injected.
+5. Click `AI 回复`.
+   - Expected: AI uses detected latest customer message when present; manual paste still works if detection fails.
+6. Click insert draft.
+   - Expected: the draft is inserted into the WhatsApp input box only. The extension does not click send, auto-send, bulk-send, or call WhatsApp official APIs.
+7. Save an unmatched customer.
+   - Expected: the suggested payload includes contact name, WhatsApp number, phone-country hint and latest visible customer message; after save, matching refreshes.
+
 ## V4-C/V4-D/V4-E/V4-F Regression Additions
 
 Run these after the existing login, CRM, product, quote, follow-up, import/export, and extension checks:

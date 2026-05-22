@@ -3,8 +3,7 @@ import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 import { PRODUCT_BOUNDARIES, type AiReplyRequest, type GenerateDraftRequest } from "@wa-ai/shared";
-import { generateAiReply } from "./ai-reply.js";
-import { generateDraft } from "./ai-draft.js";
+import { generateAiReplySmart, generateDraftSmart } from "./ai-openai-service.js";
 import { aiAdvancedRouter } from "./ai-advanced-api.js";
 import { securityRouter } from "./security-api.js";
 import { authRouter } from "./auth-api.js";
@@ -153,7 +152,7 @@ app.use("/api/import", requireAuth, importRouter);
 app.post("/api/ai/draft", async (req, res, next) => {
   try {
     const body = req.body as GenerateDraftRequest;
-    const draft = generateDraft(body);
+    const draft = await generateDraftSmart(body);
 
     if (body.sourceText?.trim()) {
       await prisma.messageDraft
@@ -225,7 +224,7 @@ app.post("/api/ai/reply", optionalAuth, async (req, res, next) => {
             knowledgeUsed: [...(brandContext.knowledgeUsed || []), ...knowledge.knowledgeUsed]
           }
         : knowledge;
-      const result = generateAiReply({ ...body, ...mergedKnowledge });
+      const result = await generateAiReplySmart({ ...body, ...mergedKnowledge });
       res.json({
         ...result,
         brandUsed: brandContext?.brandUsed || null,
@@ -235,7 +234,7 @@ app.post("/api/ai/reply", optionalAuth, async (req, res, next) => {
       return;
     }
 
-    res.json(generateAiReply(body));
+    res.json(await generateAiReplySmart(body));
   } catch (error) {
     next(error);
   }

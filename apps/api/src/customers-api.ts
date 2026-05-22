@@ -17,6 +17,7 @@ import {
   organizationIdFromRequest
 } from "./organization-permissions.js";
 import { recordSecurityAudit, requireConfirm } from "./permissions.js";
+import { looksLikePhone, normalizedPhoneDigits, normalizePhoneForMatch, parsePhoneNumberFromText } from "./phone-utils.js";
 
 type CustomerDb = Pick<typeof prisma, "customer"> & Partial<Pick<typeof prisma, "quote" | "followUpTask" | "sampleOrder" | "customRequest" | "organizationMember" | "customerAssignmentLog" | "customerDuplicateEventLog" | "auditLog">>;
 
@@ -111,6 +112,92 @@ customersRouter.post("/check-duplicate", async (req, res, next) => {
     res.json({
       hasDuplicate: Boolean(duplicate),
       matches: duplicate ? [duplicateToResponse(duplicate.customer, duplicate.fields)] : []
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+customersRouter.post("/match", async (req, res, next) => {
+  try {
+    const contactName = cleanQuery(req.body?.contactName);
+    const requestedNumber = cleanQuery(req.body?.whatsappNumber);
+    const parsedPhone = parsePhoneNumberFromText(requestedNumber || contactName);
+    const whatsappNumber = normalizePhoneForMatch(requestedNumber || parsedPhone.e164 || "");
+    const whatsappDigits = normalizedPhoneDigits(whatsappNumber);
+    const phoneCountry = cleanQuery(req.body?.phoneCountry);
+    const phoneCountryCode = cleanQuery(req.body?.phoneCountryCode);
+    const source = cleanQuery(req.body?.source) || "unknown";
+    const organizationId = organizationIdFromRequest(req);
+    const role = organizationId ? await requireCustomerOrganizationAccess(db, organizationId, req.user!.id) : null;
+    if (organizationId && !role) {
+      await recordSecurityAudit(db as any, req, {
+        organizationId,
+        action: "customer_match_denied",
+        entityType: "Customer",
+        entityId: "match",
+        failureReason: "organization membership required",
+        metadata: { source },
+        riskLevel: "medium"
+      });
+      return res.status(403).json({ message: "organization membership required" });
+    }
+    const where = customerListWhere(req.user!.id, organizationId, role);
+    const OR: Prisma.CustomerWhereInput[] = [];
+
+    if (whatsappNumber) {
+      OR.push({ whatsappNumber });
+      if (whatsappDigits) OR.push({ whatsappNumber: { contains: whatsappDigits, mode: "insensitive" } });
+    }
+    if (contactName && !looksLikePhone(contactName)) {
+      OR.push({ name: { equals: contactName, mode: "insensitive" } });
+      OR.push({ name: { contains: contactName, mode: "insensitive" } });
+    }
+    if (!OR.length) {
+      return res.json(matchNotFoundPayload({ contactName, whatsappNumber, phoneCountry, phoneCountryCode, source }));
+    }
+
+    const candidates = await db.customer.findMany({
+      where: { AND: [where, { OR }] },
+      orderBy: { updatedAt: "desc" },
+      take: 10
+    }) as any;
+
+    const ranked = candidates
+      .map((customer: any) => ({
+        customer,
+        score: scoreCustomerMatch(customer, { contactName, whatsappDigits }),
+        reason: matchReasonForCustomer(customer, { contactName, whatsappDigits })
+      }))
+      .filter((item: any) => item.score > 0)
+      .sort((left: any, right: any) => right.score - left.score);
+    const best = ranked[0];
+    const duplicateCandidates = ranked.filter((item: any) => item.score >= Math.max(20, best?.score || 0) - 10);
+
+    const customer = best?.customer;
+    if (!customer) {
+      return res.json(matchNotFoundPayload({ contactName, whatsappNumber, phoneCountry, phoneCountryCode, source }));
+    }
+
+    const related = await findRelatedIntentData(db, req.user!.id, [customer.id]);
+    const serialized = serializeCustomerWithIntent(customer, related);
+    const brand = await findCustomerBrand(db, customer.id);
+    res.json({
+      matched: true,
+      customer: {
+        ...serialized,
+        brandId: brand?.id || null,
+        brandName: brand?.name || null
+      },
+      duplicateWarning: duplicateCandidates.length > 1
+        ? {
+            message: "multiple possible customers matched current WhatsApp context",
+            candidates: duplicateCandidates.map((item: any) => duplicateToResponse(item.customer, [item.reason]))
+          }
+        : null,
+      suggestedCreatePayload: null,
+      matchReason: best.reason,
+      matchConfidence: best.score >= 90 ? "high" : best.score >= 60 ? "medium" : "low"
     });
   } catch (error) {
     next(error);
@@ -464,6 +551,60 @@ function duplicateToResponse(customer: any, fields: string[]) {
     organizationId: customer.organizationId || null,
     matchedFields: fields
   };
+}
+
+function matchNotFoundPayload(input: { contactName: string; whatsappNumber: string; phoneCountry: string; phoneCountryCode: string; source: string }) {
+  return {
+    matched: false,
+    customer: null,
+    duplicateWarning: null,
+    suggestedCreatePayload: {
+      name: input.contactName || input.whatsappNumber || "",
+      whatsappNumber: input.whatsappNumber || null,
+      country: input.phoneCountry || null,
+      countryCode: input.phoneCountryCode || null,
+      source: input.source || "whatsapp_web"
+    }
+  };
+}
+
+function scoreCustomerMatch(customer: any, input: { contactName: string; whatsappDigits: string }) {
+  let score = 0;
+  const customerDigits = normalizedPhoneDigits(customer.whatsappNumber || "");
+  if (input.whatsappDigits && customerDigits) {
+    if (customerDigits === input.whatsappDigits) score = Math.max(score, 100);
+    else if (customerDigits.endsWith(input.whatsappDigits) || input.whatsappDigits.endsWith(customerDigits)) score = Math.max(score, 85);
+    else if (customerDigits.includes(input.whatsappDigits) || input.whatsappDigits.includes(customerDigits)) score = Math.max(score, 70);
+  }
+
+  const name = cleanQuery(customer.name).toLowerCase();
+  const contactName = cleanQuery(input.contactName).toLowerCase();
+  if (contactName && !looksLikePhone(contactName)) {
+    if (name === contactName) score = Math.max(score, 55);
+    else if (name.includes(contactName) || contactName.includes(name)) score = Math.max(score, 35);
+  }
+  return score;
+}
+
+function matchReasonForCustomer(customer: any, input: { contactName: string; whatsappDigits: string }) {
+  const customerDigits = normalizedPhoneDigits(customer.whatsappNumber || "");
+  if (input.whatsappDigits && customerDigits) {
+    if (customerDigits === input.whatsappDigits) return "whatsappNumber";
+    if (customerDigits.includes(input.whatsappDigits) || input.whatsappDigits.includes(customerDigits)) return "whatsappNumberPartial";
+  }
+  return "contactName";
+}
+
+async function findCustomerBrand(db: CustomerDb, customerId: string) {
+  const assignment = await (db as any).brandAssignment?.findFirst?.({
+    where: { entityType: "customer", entityId: customerId },
+    orderBy: { createdAt: "desc" }
+  });
+  if (!assignment?.brandId) return null;
+  return (db as any).brand?.findFirst?.({
+    where: { id: assignment.brandId, organizationId: assignment.organizationId },
+    select: { id: true, name: true, displayName: true, organizationId: true }
+  });
 }
 
 async function recordDuplicateEvent(

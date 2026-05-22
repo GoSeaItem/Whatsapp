@@ -10,6 +10,23 @@ https://web.whatsapp.com/*
 
 It does not auto-send WhatsApp messages, does not bulk send, and does not click the WhatsApp send button. It only generates drafts that the salesperson can copy or insert, then manually review and send.
 
+## V4-O WhatsApp Auto Context Recognition
+
+- The content script detects only the currently visible WhatsApp conversation.
+- It reads the visible chat title/header to infer `contactName`.
+- If the title contains a phone number, it normalizes the number with `libphonenumber-js` and records E.164, country calling code, country code, country name and confidence.
+- The country label is only a hint: show it as `根据手机号推测国家`, never as verified customer location.
+- It reads at most 10 visible message bubbles from the current chat window and tries to classify them as `customer`, `me`, or `unknown`.
+- The latest visible customer message is used as AI reply context. If detection fails, the manual paste textarea remains the fallback.
+- The extension calls `POST /api/customers/match` with the visible contact name and phone number. A matched customer fills the ContextCard; an unmatched contact shows `New customer / not saved` and can be saved manually.
+
+Troubleshooting:
+
+1. If the toolbar appears but context stays empty, open DevTools and check whether WhatsApp changed header/message DOM selectors.
+2. If phone parsing fails, verify the visible title includes a full international number such as `+62 ...`.
+3. If customer matching fails, verify the Web backend login session and organization membership.
+4. If the extension falls back to manual paste, the user can still paste the message and generate drafts normally.
+
 ## V4-F Order Center Sidebar
 
 - The sidebar can load current customer orders, create a manual order record, and generate an order script draft.

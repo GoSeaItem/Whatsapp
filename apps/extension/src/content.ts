@@ -25,6 +25,7 @@ import type {
   SampleScriptScenario
 } from "@wa-ai/shared";
 import { AI_SAFETY_NOTE } from "@wa-ai/shared";
+import { findPhoneNumbersInText, parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 const WEB_LOGIN_URL = import.meta.env.VITE_WEB_LOGIN_URL || "http://localhost:5173";
@@ -32,10 +33,13 @@ const SIDEBAR_ID = "wa-ai-sidebar";
 const QUICK_TOOLBAR_ID = "wa-ai-quick-toolbar";
 const FLOATING_BUTTON_ID = "wa-ai-floating-button";
 const HIDDEN_CLASS = "wa-ai-hidden";
+const SIDEBAR_MODE_KEY = "waai_sidebar_mode";
+const SIDEBAR_BREAKPOINT = 1280;
 
 type QuickAction = "translate" | "reply" | "quote" | "urge" | "product" | "material" | "sample" | "custom" | "afterSales" | "followUp";
 type SidebarTab = "customer" | "ai" | "business" | "ab" | "more";
 type BusinessModule = "quote" | "material" | "sample" | "custom" | "order" | "afterSales" | "reorder" | "followUp" | "product";
+type SidebarMode = "docked" | "collapsed" | "overlay";
 type ReplyVariant = "short" | "professional" | "closing";
 type RecognitionStatus = "normal" | "abnormal" | "notChat" | "whatsappNotOpen";
 type SidebarAuthState = { status: "checking" | "authenticated" | "anonymous"; user?: AuthUser };
@@ -56,6 +60,40 @@ let sidebarBrands: Array<any> = [];
 let quickToolbarObserver: MutationObserver | null = null;
 let activeSidebarTab: SidebarTab = "ai";
 let activeBusinessModule: BusinessModule = "quote";
+let sidebarMode: SidebarMode = "docked";
+let offsetRoot: HTMLElement | null = null;
+let whatsappContextObserver: MutationObserver | null = null;
+let contextRefreshTimer: number | null = null;
+let lastContextSignature = "";
+let lastMatchSignature = "";
+
+type PhoneParseConfidence = "high" | "medium" | "low" | "none";
+type RecentMessage = {
+  role: "customer" | "me" | "unknown";
+  text: string;
+  time: string;
+  direction: "in" | "out" | "unknown";
+};
+type WhatsAppConversationContext = {
+  contactName: string | null;
+  rawTitle: string | null;
+  whatsappNumber: string | null;
+  phoneCountry: string | null;
+  phoneCountryCode: string | null;
+  countryCallingCode: string | null;
+  phoneParseConfidence: PhoneParseConfidence;
+  recentMessages: RecentMessage[];
+  latestCustomerMessage: string | null;
+  detectedLanguage: string;
+  detectedIntent: string;
+  concerns: string[];
+  matchedCustomer: any | null;
+  isSavedCustomer: boolean;
+  suggestedCreatePayload: any | null;
+  duplicateWarning: any | null;
+};
+
+let currentWhatsAppContext: WhatsAppConversationContext = emptyWhatsAppContext();
 
 type StoredCustomerProfile = {
   customerId?: string;
@@ -125,6 +163,14 @@ function createSidebar() {
           <button id="wa-ai-refresh-brands" type="button" class="wa-ai-link-button">Refresh brands</button>
         </div>
         <div class="wa-ai-safety-note">Brand context only filters products/materials and draft policies. It does not switch WhatsApp accounts, sync stores, auto-send, or promise brand policy.</div>
+        <div class="wa-ai-auto-context">
+          <div><span>Auto context</span><strong id="wa-ai-auto-context-state">Manual paste fallback</strong></div>
+          <div><span>Phone</span><strong id="wa-ai-auto-phone">-</strong></div>
+          <div><span>Country hint</span><strong id="wa-ai-auto-country">-</strong></div>
+          <div><span>Language</span><strong id="wa-ai-auto-language">auto</strong></div>
+          <div><span>Intent</span><strong id="wa-ai-auto-intent">unknown</strong></div>
+          <div class="wa-ai-auto-context-wide"><span>Latest customer message</span><strong id="wa-ai-auto-latest">No visible customer message detected</strong></div>
+        </div>
         <label class="wa-ai-field"><span>客户名称</span><input id="wa-ai-customer" type="text" placeholder="例如 Amina Trading" /></label>
         <div class="wa-ai-two-cols">
           <label class="wa-ai-field"><span>WhatsApp 号码</span><input id="wa-ai-whatsapp-number" type="text" placeholder="+971..." /></label>
@@ -548,16 +594,20 @@ function createSidebar() {
   document.body.appendChild(sidebar);
 
   upgradeSidebarWorkbench(sidebar);
+  initializeSidebarMode();
   mountQuickToolbar();
   setupQuickToolbarObserver();
+  setupWhatsAppContextObserver();
   bindEvents(toggleButton);
   applyWhatsAppOffset();
   updateRecognitionStatus();
   window.addEventListener("focus", updateRecognitionStatus);
   window.addEventListener("hashchange", updateRecognitionStatus);
-  window.addEventListener("resize", applyWhatsAppOffset);
+  window.addEventListener("resize", handleSidebarResize);
+  window.addEventListener("beforeunload", cleanupExtensionObservers);
   void restoreCustomerProfile();
   void checkAuthStatus();
+  scheduleWhatsAppContextRefresh();
 }
 
 function replyCard(id: ReplyVariant, title: string, rows: number) {
@@ -763,9 +813,8 @@ function classifyBusinessModule(section: HTMLElement): BusinessModule | null {
 
 function bindEvents(toggleButton: HTMLButtonElement) {
   toggleButton.addEventListener("click", () => {
-    document.documentElement.classList.toggle(HIDDEN_CLASS);
-    applyWhatsAppOffset();
-    mountQuickToolbar();
+    setSidebarMode("docked", { persist: true });
+    openSidebarTab(activeSidebarTab || "ai");
   });
 
   document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((button) => {
@@ -781,8 +830,7 @@ function bindEvents(toggleButton: HTMLButtonElement) {
     button.addEventListener("click", () => window.open(`${WEB_LOGIN_URL}${button.dataset.openWeb || ""}`, "_blank", "noopener,noreferrer"));
   });
   getElement<HTMLButtonElement>("wa-ai-collapse-sidebar").addEventListener("click", () => {
-    document.documentElement.classList.add(HIDDEN_CLASS);
-    applyWhatsAppOffset();
+    setSidebarMode("collapsed", { persist: true });
   });
   getElement<HTMLButtonElement>("wa-ai-refresh-sidebar").addEventListener("click", () => {
     void checkAuthStatus();
@@ -944,7 +992,7 @@ function showBusinessModule(module: BusinessModule) {
 }
 
 async function handleToolbarAction(action: string) {
-  document.documentElement.classList.remove(HIDDEN_CLASS);
+  setSidebarMode("docked", { persist: true });
   if (action === "more") {
     openSidebarTab("more");
     return;
@@ -987,6 +1035,9 @@ function seedSelectedTextIntoMessage() {
   const selectedText = window.getSelection()?.toString().trim();
   const message = document.getElementById("wa-ai-message") as HTMLTextAreaElement | null;
   if (selectedText && message && !message.value.trim()) message.value = selectedText;
+  else if (currentWhatsAppContext.latestCustomerMessage && message && !message.value.trim()) {
+    message.value = currentWhatsAppContext.latestCustomerMessage;
+  }
 }
 
 function findWhatsAppInputContainer() {
@@ -994,6 +1045,7 @@ function findWhatsAppInputContainer() {
     'footer [contenteditable="true"], [data-testid="conversation-compose-box-input"], div[role="textbox"][contenteditable="true"]'
   );
   if (!input) return null;
+  if (input.getBoundingClientRect().width < 120) return null;
   return input.closest<HTMLElement>("footer") || input.parentElement;
 }
 
@@ -1038,7 +1090,10 @@ function fallbackFloatingAiButton() {
   button.type = "button";
   button.textContent = "AI";
   button.title = "打开 WhatsApp AI 工作台";
-  button.addEventListener("click", () => openSidebarTab("ai"));
+  button.addEventListener("click", () => {
+    setSidebarMode("docked", { persist: true });
+    openSidebarTab("ai");
+  });
   document.body.appendChild(button);
 }
 
@@ -1046,11 +1101,337 @@ function setupQuickToolbarObserver() {
   if (quickToolbarObserver) return;
   quickToolbarObserver = new MutationObserver(() => {
     window.requestAnimationFrame(() => {
+      applyWhatsAppOffset();
       if (detectRecognitionStatus() === "normal") mountQuickToolbar();
       else unmountQuickToolbar();
     });
   });
   quickToolbarObserver.observe(document.body, { childList: true, subtree: true });
+}
+
+function setupWhatsAppContextObserver() {
+  if (whatsappContextObserver) return;
+  whatsappContextObserver = new MutationObserver(() => scheduleWhatsAppContextRefresh());
+  whatsappContextObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
+}
+
+function scheduleWhatsAppContextRefresh(delay = 450) {
+  if (contextRefreshTimer) window.clearTimeout(contextRefreshTimer);
+  contextRefreshTimer = window.setTimeout(() => {
+    contextRefreshTimer = null;
+    void refreshWhatsAppContext();
+  }, delay);
+}
+
+async function refreshWhatsAppContext() {
+  const detected = detectCurrentWhatsAppConversation();
+  const recentMessages = readRecentVisibleMessages(10);
+  const latestCustomerMessage = [...recentMessages].reverse().find((message) => message.role === "customer")?.text || null;
+  const detectedLanguage = detectMessageLanguage(latestCustomerMessage || "", detected.phoneCountryCode);
+  const intent = detectCustomerIntent(latestCustomerMessage || "");
+  const nextContext: WhatsAppConversationContext = {
+    ...currentWhatsAppContext,
+    ...detected,
+    recentMessages,
+    latestCustomerMessage,
+    detectedLanguage,
+    detectedIntent: intent.intent,
+    concerns: intent.concerns,
+    matchedCustomer: currentWhatsAppContext.matchedCustomer,
+    isSavedCustomer: currentWhatsAppContext.isSavedCustomer,
+    suggestedCreatePayload: currentWhatsAppContext.suggestedCreatePayload,
+    duplicateWarning: currentWhatsAppContext.duplicateWarning
+  };
+  const signature = JSON.stringify({
+    contactName: nextContext.contactName,
+    whatsappNumber: nextContext.whatsappNumber,
+    latestCustomerMessage: nextContext.latestCustomerMessage,
+    messages: nextContext.recentMessages.map((message) => `${message.direction}:${message.text}`).join("|")
+  });
+  if (signature === lastContextSignature) return;
+  lastContextSignature = signature;
+  currentWhatsAppContext = nextContext;
+  applyDetectedContextToForm(false);
+  renderAutoContext();
+  await matchCurrentCustomer();
+}
+
+function detectCurrentWhatsAppConversation() {
+  const rawTitle = firstText([
+    'header span[title]',
+    'header [data-testid="conversation-info-header-chat-title"]',
+    'header [role="button"] span[dir="auto"]',
+    'header span[dir="auto"]',
+    '[data-testid="conversation-info-header"] span[dir="auto"]',
+    '[aria-selected="true"] span[title]',
+    '[aria-selected="true"] span[dir="auto"]'
+  ]);
+  const phone = parsePhoneNumberFromTextLocal(rawTitle || "");
+  return {
+    contactName: cleanContactName(rawTitle, phone.raw),
+    rawTitle,
+    whatsappNumber: phone.e164,
+    phoneCountry: phone.countryName,
+    phoneCountryCode: phone.countryCode,
+    countryCallingCode: phone.countryCallingCode,
+    phoneParseConfidence: phone.confidence
+  };
+}
+
+function readRecentVisibleMessages(limit = 10): RecentMessage[] {
+  const main = document.querySelector<HTMLElement>("main") || document.querySelector<HTMLElement>('[role="main"]');
+  if (!main) return [];
+  const nodes = Array.from(main.querySelectorAll<HTMLElement>(".message-in, .message-out, [data-testid='msg-container'], [role='row']"));
+  const messages = nodes
+    .map((node) => messageFromNode(node))
+    .filter((message): message is RecentMessage => Boolean(message && message.text && !isSystemMessage(message.text)));
+  return messages.slice(-limit);
+}
+
+function messageFromNode(node: HTMLElement): RecentMessage | null {
+  const className = node.className?.toString() || "";
+  const direction: RecentMessage["direction"] = className.includes("message-out") ? "out" : className.includes("message-in") ? "in" : "unknown";
+  const role: RecentMessage["role"] = direction === "out" ? "me" : direction === "in" ? "customer" : "unknown";
+  const textNode = node.querySelector<HTMLElement>(".selectable-text, span[dir='ltr'], span[dir='auto'], div[dir='auto']");
+  const text = cleanVisibleText(textNode?.innerText || node.innerText || "");
+  if (!text) return null;
+  const time = firstTextFromNode(node, ["[data-pre-plain-text]", "time", "span[aria-label*=':']"]) || "";
+  return { role, text, time, direction };
+}
+
+async function matchCurrentCustomer() {
+  if (authState.status !== "authenticated") return;
+  const signature = JSON.stringify({
+    organizationId: sidebarOrganizationId,
+    contactName: currentWhatsAppContext.contactName,
+    whatsappNumber: currentWhatsAppContext.whatsappNumber,
+    phoneCountry: currentWhatsAppContext.phoneCountry
+  });
+  if (signature === lastMatchSignature) return;
+  lastMatchSignature = signature;
+  if (!currentWhatsAppContext.contactName && !currentWhatsAppContext.whatsappNumber) return;
+  try {
+    const response = await apiFetch("/api/customers/match", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        organizationId: sidebarOrganizationId || undefined,
+        contactName: currentWhatsAppContext.contactName,
+        whatsappNumber: currentWhatsAppContext.whatsappNumber,
+        phoneCountry: currentWhatsAppContext.phoneCountry,
+        phoneCountryCode: currentWhatsAppContext.phoneCountryCode,
+        source: "whatsapp_web"
+      })
+    });
+    if (!response.ok) throw new Error("match failed");
+    const result = (await response.json()) as any;
+    currentWhatsAppContext = {
+      ...currentWhatsAppContext,
+      matchedCustomer: result.customer || null,
+      isSavedCustomer: Boolean(result.matched && result.customer),
+      suggestedCreatePayload: result.suggestedCreatePayload || null,
+      duplicateWarning: result.duplicateWarning || null
+    };
+    applyMatchedCustomerToForm();
+    renderAutoContext();
+    updateContextCard();
+  } catch {
+    currentWhatsAppContext = {
+      ...currentWhatsAppContext,
+      matchedCustomer: null,
+      isSavedCustomer: false
+    };
+    renderAutoContext();
+  }
+}
+
+function applyDetectedContextToForm(force: boolean) {
+  const name = getInput("wa-ai-customer");
+  const phone = getInput("wa-ai-whatsapp-number");
+  const country = getInput("wa-ai-country");
+  const language = getSelect("wa-ai-language");
+  const latest = getTextArea("wa-ai-latest-summary");
+  const message = getTextArea("wa-ai-message");
+  if ((force || !name.value.trim()) && currentWhatsAppContext.contactName) name.value = currentWhatsAppContext.contactName;
+  if ((force || !phone.value.trim()) && currentWhatsAppContext.whatsappNumber) phone.value = currentWhatsAppContext.whatsappNumber;
+  if ((force || !country.value.trim()) && currentWhatsAppContext.phoneCountry) country.value = currentWhatsAppContext.phoneCountry;
+  if (language.value === "auto" && currentWhatsAppContext.detectedLanguage) language.value = currentWhatsAppContext.detectedLanguage;
+  if (!latest.value.trim() && currentWhatsAppContext.latestCustomerMessage) latest.value = currentWhatsAppContext.latestCustomerMessage;
+  if (!message.value.trim() && currentWhatsAppContext.latestCustomerMessage) message.value = currentWhatsAppContext.latestCustomerMessage;
+  updateContextCard();
+}
+
+function applyMatchedCustomerToForm() {
+  const customer = currentWhatsAppContext.matchedCustomer;
+  if (!customer) {
+    applyDetectedContextToForm(false);
+    getInput("wa-ai-customer-id").value = "";
+    return;
+  }
+  getInput("wa-ai-customer-id").value = customer.id || "";
+  getInput("wa-ai-customer").value = customer.name || currentWhatsAppContext.contactName || "";
+  getInput("wa-ai-whatsapp-number").value = customer.whatsappNumber || currentWhatsAppContext.whatsappNumber || "";
+  getInput("wa-ai-country").value = customer.country || currentWhatsAppContext.phoneCountry || "";
+  if (customer.language) getSelect("wa-ai-language").value = customer.language;
+  if (customer.stage) getSelect("wa-ai-stage").value = customer.stage;
+  if (Array.isArray(customer.tags)) getInput("wa-ai-tags").value = customer.tags.join(", ");
+  getInput("wa-ai-interested-product").value = customer.interestedProduct || "";
+  getTextArea("wa-ai-latest-summary").value = customer.latestSummary || currentWhatsAppContext.latestCustomerMessage || "";
+  getTextArea("wa-ai-notes").value = customer.notes || "";
+  if (customer.brandId) getElement<HTMLSelectElement>("wa-ai-brand-select").value = customer.brandId;
+  if (customer.intentScore !== undefined) getElement("wa-ai-intent-score").textContent = `${customer.intentScore} / ${customer.intentLevel || "low"}`;
+}
+
+function renderAutoContext() {
+  setText("wa-ai-auto-context-state", currentWhatsAppContext.isSavedCustomer ? "Matched saved customer" : currentWhatsAppContext.contactName ? "New customer / not saved" : "Manual paste fallback");
+  setText("wa-ai-auto-phone", currentWhatsAppContext.whatsappNumber || "-");
+  setText(
+    "wa-ai-auto-country",
+    currentWhatsAppContext.phoneCountry
+      ? `根据手机号推测国家: ${currentWhatsAppContext.phoneCountry} (${currentWhatsAppContext.phoneParseConfidence})`
+      : "-"
+  );
+  setText("wa-ai-auto-language", currentWhatsAppContext.detectedLanguage || "auto");
+  setText("wa-ai-auto-intent", [currentWhatsAppContext.detectedIntent, ...currentWhatsAppContext.concerns].filter(Boolean).join(" / ") || "unknown");
+  setText("wa-ai-auto-latest", currentWhatsAppContext.latestCustomerMessage || "No visible customer message detected");
+}
+
+function setText(id: string, value: string) {
+  const element = document.getElementById(id);
+  if (element) element.textContent = value;
+}
+
+function emptyWhatsAppContext(): WhatsAppConversationContext {
+  return {
+    contactName: null,
+    rawTitle: null,
+    whatsappNumber: null,
+    phoneCountry: null,
+    phoneCountryCode: null,
+    countryCallingCode: null,
+    phoneParseConfidence: "none",
+    recentMessages: [],
+    latestCustomerMessage: null,
+    detectedLanguage: "auto",
+    detectedIntent: "unknown",
+    concerns: [],
+    matchedCustomer: null,
+    isSavedCustomer: false,
+    suggestedCreatePayload: null,
+    duplicateWarning: null
+  };
+}
+
+function parsePhoneNumberFromTextLocal(input: string) {
+  const text = cleanVisibleText(input);
+  const empty = {
+    raw: null as string | null,
+    e164: null as string | null,
+    countryCallingCode: null as string | null,
+    countryCode: null as string | null,
+    countryName: null as string | null,
+    confidence: "none" as PhoneParseConfidence
+  };
+  if (!text) return empty;
+  const found = findPhoneNumbersInText(text)[0];
+  const phone = found?.number || parsePhoneNumberFromString(text);
+  if (!phone) return empty;
+  const countryCode = phone.country || null;
+  const countryCallingCode = phone.countryCallingCode || null;
+  const valid = phone.isValid();
+  const confidence: PhoneParseConfidence = valid && countryCode && countryCallingCode && !["1", "7"].includes(countryCallingCode)
+    ? "high"
+    : valid && (countryCode || countryCallingCode)
+      ? "medium"
+      : "low";
+  return {
+    raw: found ? text.slice(found.startsAt, found.endsAt) : text,
+    e164: phone.number || null,
+    countryCallingCode,
+    countryCode,
+    countryName: countryCode ? countryDisplayName(countryCode) : null,
+    confidence
+  };
+}
+
+function countryDisplayName(code: CountryCode) {
+  try {
+    return new Intl.DisplayNames(["en"], { type: "region" }).of(code) || code;
+  } catch {
+    return code;
+  }
+}
+
+function firstText(selectors: string[]) {
+  for (const selector of selectors) {
+    const element = document.querySelector<HTMLElement>(selector);
+    const text = cleanVisibleText(element?.getAttribute("title") || element?.getAttribute("aria-label") || element?.innerText || "");
+    if (text) return text;
+  }
+  return null;
+}
+
+function firstTextFromNode(root: HTMLElement, selectors: string[]) {
+  for (const selector of selectors) {
+    const element = root.querySelector<HTMLElement>(selector);
+    const text = cleanVisibleText(element?.getAttribute("data-pre-plain-text") || element?.getAttribute("aria-label") || element?.innerText || "");
+    if (text) return text;
+  }
+  return null;
+}
+
+function cleanContactName(title: string | null, rawPhone: string | null) {
+  const text = cleanVisibleText(title || "");
+  if (!text) return null;
+  if (rawPhone && text.replace(rawPhone, "").trim()) return text.replace(rawPhone, "").trim();
+  return text;
+}
+
+function cleanVisibleText(value: string) {
+  return value.replace(/\u200e|\u200f/g, "").replace(/\s+/g, " ").trim();
+}
+
+function isSystemMessage(text: string) {
+  return /end-to-end encrypted|messages and calls are encrypted|today|yesterday|unread messages|missed voice call/i.test(text) && text.length < 120;
+}
+
+function detectMessageLanguage(text: string, countryCode: string | null) {
+  const value = text.trim();
+  if (/[\u0600-\u06ff]/.test(value)) return "Arabic";
+  if (/[\u4e00-\u9fff]/.test(value)) return "Chinese";
+  if (/\b(cu[aá]nto|precio|env[ií]o|gracias|hola)\b/i.test(value)) return "Spanish";
+  if (/\b(pre[cç]o|obrigado|frete|ol[aá])\b/i.test(value)) return "Portuguese";
+  if (countryCode === "MX" || countryCode === "CO" || countryCode === "ES" || countryCode === "PE") return "Spanish";
+  if (countryCode === "BR" || countryCode === "PT") return "Portuguese";
+  if (countryCode === "SA" || countryCode === "AE" || countryCode === "EG") return "Arabic";
+  if (countryCode === "CN") return "Chinese";
+  return "English";
+}
+
+function detectCustomerIntent(text: string) {
+  const value = text.toLowerCase();
+  const hits: string[] = [];
+  const rules: Array<[string, RegExp]> = [
+    ["price", /\b(price|precio|cu[aá]nto|cost|quote)\b|价格|多少钱/],
+    ["moq", /\bmoq\b|起订量|minimum order/],
+    ["shipping", /\b(shipping|freight|env[ií]o|delivery fee)\b|运费/],
+    ["lead_time", /\b(lead time|delivery time|entrega|交期)\b/],
+    ["sample", /\b(sample|muestra)\b|样品/],
+    ["custom", /\b(logo|packaging|oem|odm|custom)\b|定制|包装/],
+    ["material", /\b(photo|video|catalog|material)\b|素材|图片|视频/],
+    ["too_expensive", /\b(too expensive|expensive|price high)\b|太贵/],
+    ["payment", /\b(payment|paypal|bank transfer|paid)\b|付款|支付/],
+    ["logistics", /\b(tracking|logistics|shipped|parcel)\b|物流|快递/],
+    ["after_sales", /\b(refund|return|broken|quality|complaint)\b|退款|退货|质量|投诉/],
+    ["reorder", /\b(reorder|repeat|restock)\b|复购|补货|再来/]
+  ];
+  for (const [name, pattern] of rules) {
+    if (pattern.test(value)) hits.push(name);
+  }
+  return {
+    intent: hits[0] || "unknown",
+    concerns: hits.slice(1, 5)
+  };
 }
 
 async function checkAuthStatus() {
@@ -1064,6 +1445,7 @@ async function checkAuthStatus() {
     await loadProducts();
     await loadMaterials();
     await loadScriptExperimentsForSidebar();
+    scheduleWhatsAppContextRefresh();
   } catch {
     authState = { status: "anonymous" };
     renderAuthState();
@@ -1689,6 +2071,8 @@ async function saveCustomerToApi() {
     await storeCustomerProfile(saved);
     await loadCustomerIntentScore();
     await loadReorderPrediction();
+    lastMatchSignature = "";
+    scheduleWhatsAppContextRefresh(150);
     setStatus(`客户已保存：${saved.name}`);
   } catch {
     setStatus("客户保存失败。请确认本地 API 和 PostgreSQL 已启动。");
@@ -2140,7 +2524,8 @@ function selectedScriptVariant() {
 }
 
 async function handleQuickAction(action: Exclude<QuickAction, "product" | "quote">) {
-  const customerMessage = getTextArea("wa-ai-message").value.trim();
+  const manualMessage = getTextArea("wa-ai-message").value.trim();
+  const customerMessage = currentWhatsAppContext.latestCustomerMessage || manualMessage;
   if (!customerMessage) return setStatus("请先粘贴客户消息，或读取选中文本。");
 
   setButtonsBusy(true);
@@ -2151,8 +2536,15 @@ async function handleQuickAction(action: Exclude<QuickAction, "product" | "quote
       scenario: actionScenarioMap[action],
       productContext: buildProductContext(action),
       productId: selectedProduct()?.id || undefined,
+      customerId: getInput("wa-ai-customer-id").value.trim() || undefined,
+      latestCustomerMessage: currentWhatsAppContext.latestCustomerMessage || undefined,
+      recentMessages: currentWhatsAppContext.recentMessages,
+      contactName: currentWhatsAppContext.contactName || undefined,
+      whatsappNumber: currentWhatsAppContext.whatsappNumber || undefined,
+      phoneCountry: currentWhatsAppContext.phoneCountry || undefined,
+      matchedCustomerId: currentWhatsAppContext.matchedCustomer?.id || undefined,
       useKnowledgeBase: true
-    });
+    } as AiReplyRequest & Record<string, unknown>);
     renderAiReply(result);
     getTextArea("wa-ai-latest-summary").value = `${result.intent}；关注点：${result.concerns.join("、")}`;
     setStatus(statusForAction(action, result.riskWarnings));
@@ -2335,15 +2727,16 @@ function defaultFollowUpScript(taskType: FollowUpTaskType) {
 }
 
 function buildCustomerPayload(): CustomerUpsertRequest {
+  const suggested = currentWhatsAppContext.suggestedCreatePayload || {};
   return {
-    name: getInput("wa-ai-customer").value,
-    whatsappNumber: getInput("wa-ai-whatsapp-number").value,
-    country: getInput("wa-ai-country").value,
-    language: getSelect("wa-ai-language").value === "auto" ? null : getSelect("wa-ai-language").value,
+    name: getInput("wa-ai-customer").value || suggested.name || currentWhatsAppContext.contactName || "",
+    whatsappNumber: getInput("wa-ai-whatsapp-number").value || suggested.whatsappNumber || currentWhatsAppContext.whatsappNumber || "",
+    country: getInput("wa-ai-country").value || suggested.country || currentWhatsAppContext.phoneCountry || "",
+    language: getSelect("wa-ai-language").value === "auto" ? currentWhatsAppContext.detectedLanguage || null : getSelect("wa-ai-language").value,
     tags: parseTags(getInput("wa-ai-tags").value),
     stage: getSelect("wa-ai-stage").value,
     interestedProduct: getInput("wa-ai-interested-product").value,
-    latestSummary: getTextArea("wa-ai-latest-summary").value,
+    latestSummary: getTextArea("wa-ai-latest-summary").value || currentWhatsAppContext.latestCustomerMessage || "",
     nextFollowUpAt: getInput("wa-ai-next-follow-up").value ? new Date(getInput("wa-ai-next-follow-up").value).toISOString() : null,
     notes: getTextArea("wa-ai-notes").value
   };
@@ -2581,16 +2974,89 @@ function escapeHtml(value: string) {
   })[char] || char);
 }
 
+function initializeSidebarMode() {
+  const storedMode = localStorage.getItem(SIDEBAR_MODE_KEY);
+  const preferredMode: SidebarMode = storedMode === "collapsed" ? "collapsed" : "docked";
+  setSidebarMode(window.innerWidth < SIDEBAR_BREAKPOINT ? "collapsed" : preferredMode, { persist: false });
+}
+
+function handleSidebarResize() {
+  if (window.innerWidth < SIDEBAR_BREAKPOINT && sidebarMode === "docked") {
+    setSidebarMode("collapsed", { persist: false });
+    return;
+  }
+  applyWhatsAppOffset();
+  mountQuickToolbar();
+}
+
+function setSidebarMode(mode: SidebarMode, options: { persist?: boolean } = {}) {
+  const nextMode: SidebarMode = mode === "docked" && window.innerWidth < SIDEBAR_BREAKPOINT ? "overlay" : mode;
+  sidebarMode = nextMode;
+  document.documentElement.classList.toggle(HIDDEN_CLASS, nextMode === "collapsed");
+  document.body.classList.toggle("waai-sidebar-open", nextMode !== "collapsed");
+  document.body.classList.toggle("waai-sidebar-collapsed", nextMode === "collapsed");
+  document.body.classList.toggle("waai-sidebar-overlay", nextMode === "overlay");
+  if (options.persist) {
+    localStorage.setItem(SIDEBAR_MODE_KEY, mode === "collapsed" ? "collapsed" : "docked");
+  }
+  applyWhatsAppOffset();
+  mountQuickToolbar();
+}
+
+function findWhatsAppRoot() {
+  return (
+    document.getElementById("app") ||
+    document.querySelector<HTMLElement>('[data-testid="app"]') ||
+    document.querySelector<HTMLElement>('div[role="application"]')
+  );
+}
+
+function resetWhatsAppRootOffset(root: HTMLElement | null) {
+  if (!root) return;
+  root.style.width = "";
+  root.style.maxWidth = "";
+  root.style.marginRight = "";
+  root.style.transition = "";
+  root.style.overflowX = "";
+  root.removeAttribute("data-waai-docked");
+}
+
 function applyWhatsAppOffset() {
-  const appRoot = document.getElementById("app");
-  if (!appRoot) return;
-  if (document.documentElement.classList.contains(HIDDEN_CLASS)) {
-    appRoot.style.marginRight = "";
+  if (offsetRoot && offsetRoot !== findWhatsAppRoot()) {
+    resetWhatsAppRootOffset(offsetRoot);
+    offsetRoot = null;
+  }
+
+  const appRoot = findWhatsAppRoot();
+  if (!appRoot) {
+    document.body.classList.toggle("waai-sidebar-overlay", sidebarMode !== "collapsed");
+    return;
+  }
+  offsetRoot = appRoot;
+
+  if (sidebarMode !== "docked" || window.innerWidth < SIDEBAR_BREAKPOINT) {
+    resetWhatsAppRootOffset(appRoot);
     return;
   }
 
-  const sidebarWidth = document.getElementById(SIDEBAR_ID)?.getBoundingClientRect().width || 0;
-  appRoot.style.marginRight = sidebarWidth > 0 ? `${Math.ceil(sidebarWidth)}px` : "";
+  appRoot.dataset.waaiDocked = "true";
+  appRoot.style.width = "calc(100vw - var(--waai-sidebar-width))";
+  appRoot.style.maxWidth = "calc(100vw - var(--waai-sidebar-width))";
+  appRoot.style.marginRight = "var(--waai-sidebar-width)";
+  appRoot.style.overflowX = "hidden";
+  appRoot.style.transition = "width 0.2s ease, max-width 0.2s ease, margin-right 0.2s ease";
+}
+
+function cleanupSidebarLayout() {
+  resetWhatsAppRootOffset(offsetRoot || findWhatsAppRoot());
+  document.body.classList.remove("waai-sidebar-open", "waai-sidebar-collapsed", "waai-sidebar-overlay");
+}
+
+function cleanupExtensionObservers() {
+  cleanupSidebarLayout();
+  quickToolbarObserver?.disconnect();
+  whatsappContextObserver?.disconnect();
+  if (contextRefreshTimer) window.clearTimeout(contextRefreshTimer);
 }
 
 createSidebar();

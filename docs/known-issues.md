@@ -2,6 +2,14 @@
 
 Current release target: `v1.0-enterprise`.
 
+## V4-O WhatsApp Auto Context Recognition
+
+- WhatsApp Web DOM selectors are not a public API. If Meta changes header, message bubble, or input DOM structure, the extension may fall back to manual paste mode until selectors are updated.
+- Phone country is inferred from the phone number only. It should be displayed as `根据手机号推测国家` and must not be treated as verified customer location.
+- Recent-message reading is limited to visible messages in the open chat and does not scan unopened chats or historical conversations.
+- Message direction is best-effort based on visible bubble classes such as inbound/outbound containers. When direction cannot be determined, messages are marked `unknown`.
+- The matching endpoint does not create customers automatically. Users must click save, and duplicate prevention still applies.
+
 ## V5 Enterprise Platform
 
 - V5 adds enterprise organization units, role overlays, audit logs, reports, and brand-context lookup. It does not yet implement a full enterprise IAM/SSO directory, complex approval engine, or asynchronous big-data reporting queue.
@@ -91,7 +99,8 @@ Current release target: `v1.0-enterprise`.
 
 ## V4-C AI Advanced Enhancement
 
-- AI advanced outputs are rule/template based in this version. They can be upgraded to a real LLM later, but still must keep draft-only behavior.
+- AI reply and translation can now use OpenAI when `OPENAI_API_KEY` or `OPENAI_API_KEYS` is configured. Other advanced modules may still include rule/template fallback paths and should keep draft-only behavior.
+- If every OpenAI key is rate-limited, quota-exhausted, invalid, or unavailable, the API falls back to local draft rules and returns a warning instead of exposing keys or blocking the salesperson.
 - `AIActionSuggestionLog` stores sanitized snapshots for troubleshooting, not full raw chat transcripts.
 - Follow-up plans do not create tasks unless `createTasks=true`; they never send WhatsApp messages automatically.
 
