@@ -1397,3 +1397,165 @@ model EnterpriseResourceLink {
   @@index([resourceId])
   @@index([status])
 }
+
+model MultiChannelCustomer {
+  id                String   @id @default(cuid())
+  organizationId    String?
+  customerId        String?
+  primaryName       String
+  primaryChannel    String   @default("whatsapp")
+  whatsappNumber    String?
+  telegramHandle    String?
+  wechatId          String?
+  email             String?
+  phoneCountry      String?
+  phoneCountryCode  String?
+  preferredLanguage String?
+  preferredCurrency String?
+  brandId           String?
+  ownerId           String?
+  assignedTo        String?
+  tags              String[]
+  metadata          Json?
+  createdBy         String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([customerId])
+  @@index([primaryChannel])
+  @@index([whatsappNumber])
+  @@index([email])
+  @@index([brandId])
+  @@index([ownerId])
+  @@index([assignedTo])
+  @@index([createdBy])
+}
+
+model Department {
+  id             String   @id @default(cuid())
+  organizationId String
+  parentId       String?
+  name           String
+  status         String   @default("active")
+  createdBy      String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@index([parentId])
+  @@index([status])
+  @@index([createdBy])
+}
+
+model Team {
+  id             String   @id @default(cuid())
+  organizationId String
+  departmentId   String?
+  name           String
+  status         String   @default("active")
+  managerId      String?
+  createdBy      String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@index([departmentId])
+  @@index([status])
+  @@index([managerId])
+  @@index([createdBy])
+}
+
+model Permission {
+  id             String   @id @default(cuid())
+  organizationId String?
+  key            String
+  name           String
+  description    String?
+  scope          String   @default("organization")
+  createdBy      String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([organizationId, key])
+  @@index([organizationId])
+  @@index([key])
+  @@index([scope])
+  @@index([createdBy])
+}
+
+model ConversationHistory {
+  id                     String   @id @default(cuid())
+  organizationId         String?
+  multiChannelCustomerId String?
+  customerId             String?
+  channel                String
+  externalConversationId String?
+  direction              String
+  senderRole             String
+  messageText            String?
+  language               String?
+  translatedText         String?
+  messageAt              DateTime @default(now())
+  metadata               Json?
+  createdBy              String?
+  createdAt              DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([multiChannelCustomerId])
+  @@index([customerId])
+  @@index([channel])
+  @@index([direction])
+  @@index([senderRole])
+  @@index([messageAt])
+}
+
+model InteractionLog {
+  id                     String   @id @default(cuid())
+  organizationId         String?
+  multiChannelCustomerId String?
+  customerId             String?
+  channel                String?
+  action                 String
+  entityType             String?
+  entityId               String?
+  summary                String?
+  metadata               Json?
+  createdBy              String
+  createdAt              DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([multiChannelCustomerId])
+  @@index([customerId])
+  @@index([channel])
+  @@index([action])
+  @@index([entityType])
+  @@index([createdBy])
+  @@index([createdAt])
+}
+
+model AIKeyUsageLog {
+  id              String   @id @default(cuid())
+  organizationId  String?
+  aiProviderKeyId String?
+  provider        String?
+  mode            String?
+  model           String?
+  requestSource   String?
+  promptTokens    Int      @default(0)
+  completionTokens Int     @default(0)
+  totalTokens     Int      @default(0)
+  success         Boolean  @default(true)
+  errorMessage    String?
+  createdAt       DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([aiProviderKeyId])
+  @@index([provider])
+  @@index([mode])
+  @@index([model])
+  @@index([success])
+  @@index([createdAt])
+}

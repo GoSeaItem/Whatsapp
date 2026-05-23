@@ -1,5 +1,21 @@
 # Changelog
 
+## v6.0.0 - V6 enterprise intelligent operations
+
+### Added
+
+- Added V6 multi-channel customer foundation with `MultiChannelCustomer` for WhatsApp, Telegram, WeChat, email, Instagram and other channel identities.
+- Added `Department`, `Team`, and `Permission` tables while reusing the existing V5 `Role` / `EnterpriseRole` layers for backward compatibility.
+- Added `ConversationHistory` and `InteractionLog` to store enterprise-scoped message summaries and operation records.
+- Added `AIKeyUsageLog` and connected the AI provider client so DeepSeek V4 / ChatGPT 5.5 key usage can be tracked per key, provider, mode, model, token count, success and error.
+- Added V6 enterprise APIs under `/api/enterprise`: `/v6/overview`, `/multi-channel-customers`, `/conversation-history`, `/interaction-logs`, and `/ai-key-usage`.
+- Added Web backend entry `V6 智能运营` with multi-channel KPIs, customer summaries, recent messages, interaction logs and AI key usage details.
+
+### Safety
+
+- V6 keeps the V5/V4 safety boundary: AI output is draft-only, and the system does not auto-send WhatsApp messages, bulk-send, simulate clicking the send button, auto-contact suppliers, auto-confirm payments, auto-refund, auto-ship, auto-confirm cost, or export plaintext secrets.
+- Cross-organization V6 data uses organization membership and role checks before returning or writing data.
+
 ## Unreleased - DeepSeek V4 and ChatGPT 5.5 key pool
 
 ### Added

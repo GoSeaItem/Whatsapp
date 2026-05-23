@@ -188,7 +188,7 @@ function providerRank(provider: string) {
 }
 
 async function recordDatabaseKeySuccess(id: string, totalTokens: number) {
-  await (prisma as any).aiProviderKey.update({
+  const updated = await (prisma as any).aiProviderKey.update({
     where: { id },
     data: {
       totalRequests: { increment: 1 },
@@ -199,11 +199,12 @@ async function recordDatabaseKeySuccess(id: string, totalTokens: number) {
       lastErrorMessage: null
     }
   }).catch(() => undefined);
+  await recordAIKeyUsageLog(updated, Math.max(0, totalTokens), true);
 }
 
 async function recordDatabaseKeyFailure(id: string, message: string) {
   const lower = message.toLowerCase();
-  await (prisma as any).aiProviderKey.update({
+  const updated = await (prisma as any).aiProviderKey.update({
     where: { id },
     data: {
       totalRequests: { increment: 1 },
@@ -213,6 +214,24 @@ async function recordDatabaseKeyFailure(id: string, message: string) {
       lastUsedAt: new Date(),
       lastErrorAt: new Date(),
       lastErrorMessage: message.slice(0, 500)
+    }
+  }).catch(() => undefined);
+  await recordAIKeyUsageLog(updated, 0, false, message);
+}
+
+async function recordAIKeyUsageLog(key: any, totalTokens: number, success: boolean, errorMessage?: string) {
+  if (!key || !(prisma as any).aIKeyUsageLog?.create) return;
+  await (prisma as any).aIKeyUsageLog.create({
+    data: {
+      organizationId: key.organizationId || null,
+      aiProviderKeyId: key.id,
+      provider: key.provider || null,
+      mode: key.mode || null,
+      model: key.model || null,
+      requestSource: "ai-service",
+      totalTokens,
+      success,
+      errorMessage: errorMessage ? errorMessage.slice(0, 500) : null
     }
   }).catch(() => undefined);
 }

@@ -1,8 +1,23 @@
 ﻿# WhatsApp AI 销售助手 V1
 
-Current version: `v1.0-enterprise`
+Current version: `v6.0.0`
 
-Current development stage: `V5 Enterprise Platform`
+Current development stage: `V6 Enterprise Intelligent Operations Platform`
+
+## v6.0.0 - Enterprise Intelligent Operations
+
+V6 keeps the existing V5 enterprise platform and adds the first enterprise intelligent-operations layer for multi-channel customer views, team/department foundations, conversation history, interaction logs, detailed AI key usage logs, and a Web entry named `V6 智能运营`.
+
+- Added `MultiChannelCustomer` for a unified customer view across WhatsApp, Telegram, WeChat, email, Instagram and other channels.
+- Added `Department`, `Team`, and `Permission` foundations while reusing the existing `Role` / `EnterpriseRole` role layers for backward compatibility.
+- Added `ConversationHistory` and `InteractionLog` for current business-context message and action logging.
+- Added `AIKeyUsageLog` so each DeepSeek V4 / ChatGPT 5.5 key call can be tracked by provider, mode, model, token count, success and error.
+- Added `/api/enterprise/v6/overview`, `/api/enterprise/multi-channel-customers`, `/api/enterprise/conversation-history`, `/api/enterprise/interaction-logs`, and `/api/enterprise/ai-key-usage`.
+- Added Web backend entry `V6 智能运营` for KPIs, multi-channel customers, recent conversation history, interaction logs and AI key usage details.
+
+Safety boundary remains unchanged: no WhatsApp official API, no automatic WhatsApp sending, no bulk sending, no simulated send-button click, no automatic customer/supplier contact, no automatic payment/refund/shipment/procurement, and no automatic promise of price, stock, lead time, freight, payment, logistics, after-sales, cost, supplier, brand or store policy. All AI output remains draft-only and must be manually checked.
+
+Docs: [V6 enterprise intelligent operations](docs/v6-enterprise-intelligent-ops.md).
 
 ## v1.0-enterprise
 

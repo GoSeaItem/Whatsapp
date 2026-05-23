@@ -795,7 +795,15 @@ export const PERMISSION_KEYS = [
   "enterprise.report.view",
   "enterprise.report.export",
   "enterprise.audit.view",
-  "enterprise.brandContext.use"
+  "enterprise.brandContext.use",
+  "v6.multichannel.view",
+  "v6.multichannel.manage",
+  "v6.conversation.view",
+  "v6.conversation.log",
+  "v6.interaction.view",
+  "v6.interaction.log",
+  "v6.aiUsage.view",
+  "v6.intelligentOps.view"
 ] as const;
 export type PermissionKey = typeof PERMISSION_KEYS[number];
 export type SecurityRiskLevel = "low" | "medium" | "high";
@@ -805,6 +813,132 @@ export type OrganizationUnitType = typeof ORGANIZATION_UNIT_TYPES[number];
 
 export const ENTERPRISE_ENTITY_STATUSES = ["active", "inactive", "archived"] as const;
 export type EnterpriseEntityStatus = typeof ENTERPRISE_ENTITY_STATUSES[number];
+
+export const V6_CHANNEL_TYPES = ["whatsapp", "telegram", "wechat", "email", "instagram", "other"] as const;
+export type V6ChannelType = typeof V6_CHANNEL_TYPES[number];
+
+export type MultiChannelCustomerSummary = {
+  id: string;
+  organizationId?: string | null;
+  customerId?: string | null;
+  primaryName: string;
+  primaryChannel: V6ChannelType | string;
+  whatsappNumber?: string | null;
+  telegramHandle?: string | null;
+  wechatId?: string | null;
+  email?: string | null;
+  phoneCountry?: string | null;
+  phoneCountryCode?: string | null;
+  preferredLanguage?: string | null;
+  preferredCurrency?: string | null;
+  brandId?: string | null;
+  ownerId?: string | null;
+  assignedTo?: string | null;
+  tags: string[];
+  metadata?: unknown;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type DepartmentSummary = {
+  id: string;
+  organizationId: string;
+  parentId?: string | null;
+  name: string;
+  status: EnterpriseEntityStatus | string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TeamSummary = {
+  id: string;
+  organizationId: string;
+  departmentId?: string | null;
+  name: string;
+  status: EnterpriseEntityStatus | string;
+  managerId?: string | null;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PermissionSummary = {
+  id: string;
+  organizationId?: string | null;
+  key: string;
+  name: string;
+  description?: string | null;
+  scope: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ConversationHistorySummary = {
+  id: string;
+  organizationId?: string | null;
+  multiChannelCustomerId?: string | null;
+  customerId?: string | null;
+  channel: V6ChannelType | string;
+  externalConversationId?: string | null;
+  direction: "in" | "out" | "unknown" | string;
+  senderRole: "customer" | "agent" | "system" | "unknown" | string;
+  messageText?: string | null;
+  language?: string | null;
+  translatedText?: string | null;
+  messageAt: string;
+  metadata?: unknown;
+  createdBy?: string | null;
+  createdAt: string;
+};
+
+export type InteractionLogSummary = {
+  id: string;
+  organizationId?: string | null;
+  multiChannelCustomerId?: string | null;
+  customerId?: string | null;
+  channel?: V6ChannelType | string | null;
+  action: string;
+  entityType?: string | null;
+  entityId?: string | null;
+  summary?: string | null;
+  metadata?: unknown;
+  createdBy: string;
+  createdAt: string;
+};
+
+export type AIKeyUsageLogSummary = {
+  id: string;
+  organizationId?: string | null;
+  aiProviderKeyId?: string | null;
+  provider?: string | null;
+  mode?: "instant" | "thinking" | string | null;
+  model?: string | null;
+  requestSource?: string | null;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  success: boolean;
+  errorMessage?: string | null;
+  createdAt: string;
+};
+
+export type V6EnterpriseOverview = {
+  organizationId: string;
+  generatedAt: string;
+  kpis: {
+    multiChannelCustomers: number;
+    conversationMessages: number;
+    interactionLogs: number;
+    aiKeyTokens: number;
+    aiKeyCalls: number;
+    activeTeams: number;
+    activeDepartments: number;
+  };
+  safetyBoundaries: string[];
+};
 
 export type OrganizationUnitSummary = {
   id: string;

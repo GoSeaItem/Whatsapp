@@ -20,6 +20,25 @@ It does not auto-send WhatsApp messages, does not bulk send, and does not click 
 - The latest visible customer message is used as AI reply context. If detection fails, the manual paste textarea remains the fallback.
 - The extension calls `POST /api/customers/match` with the visible contact name and phone number. A matched customer fills the ContextCard; an unmatched contact shows `New customer / not saved` and can be saved manually.
 
+## Chrome 插件中文化 Docked 工作台
+
+- 插件采用三层结构：WhatsApp 输入框快捷工具条、右侧 Docked AI 工作台、Web 后台复杂管理入口。
+- 右侧面板打开时会给 WhatsApp 主界面让出 `390px` 空间，避免遮挡聊天内容、输入框和发送按钮。
+- 浏览器宽度小于 `1280px` 时自动收起，只显示右侧浮动 `AI` 按钮；点击后以 overlay 方式临时打开面板。
+- 面板统一使用简体中文，Tab 分为：客户信息、AI 回复、业务操作、A/B 测试、更多。
+- 顶部 ContextCard 显示当前客户、阶段、品牌和意向，并提供保存客户、刷新、更新阶段三个高频操作。
+- 中部 AI 回复区展示最近客户消息、模型选择、草稿生成、复制、插入和风险提示。
+- 底部快捷栏固定展示：AI 回复、翻译、报价、素材、更多。
+- A/B 测试不再常驻展开，标记结果合并为下拉菜单：已回复、已报价、已下单、无回复。
+- 插件只生成、复制或插入草稿，不会自动发送 WhatsApp 消息，也不会模拟点击发送按钮。
+
+排查工具条或面板样式：
+
+1. 如果右侧面板遮挡聊天，检查 `body.waai-sidebar-open` 是否存在，以及 `#app[data-waai-docked="true"]` 是否设置了右侧让位宽度。
+2. 如果小屏没有自动收起，检查浏览器宽度是否低于 `1280px`，以及 `localStorage.waai_sidebar_mode` 是否为 `collapsed`。
+3. 如果输入框快捷工具条不显示，检查 WhatsApp 输入框 DOM selector 是否仍匹配，失败时应显示右侧浮动 `AI` 按钮。
+4. 如果插入草稿失败，仍可复制草稿后手动粘贴；插件不会点击 WhatsApp 原生发送按钮。
+
 Troubleshooting:
 
 1. If the toolbar appears but context stays empty, open DevTools and check whether WhatsApp changed header/message DOM selectors.
@@ -275,3 +294,29 @@ Troubleshooting:
 - If it still does not appear, check that `content_scripts.matches` includes only `https://web.whatsapp.com/*` and reload the unpacked extension.
 - If insertion fails, copy the draft manually. The extension never clicks the WhatsApp send button.
 - If the sidebar shows `403`, confirm the Web backend role, organization membership, and customer ownership.
+
+## Mockup-aligned Chinese AI Workbench
+
+The Chrome extension sidebar now follows the WhatsApp-style mockup layout for Chinese cross-border sales users:
+
+- The sidebar is docked on the right and the WhatsApp main area reserves space, so chat messages and the input box are not covered.
+- The header shows draft mode, backend connection state, refresh, settings, and collapse controls.
+- The customer context card shows customer name, WhatsApp number, saved/matched state, stage, intent level, brand/store, and inferred country.
+- Tabs are grouped as `客户信息`, `AI 回复`, `业务操作`, `A/B 测试`, and `更多`.
+- The AI tab includes latest customer message, model selector, AI draft area, copy/insert actions, and risk warnings.
+- The model selector supports DeepSeek V4 and ChatGPT 5.5 instant/thinking modes through the backend AIService.
+- The bottom quick bar keeps high-frequency actions visible: `AI 回复`, `翻译`, `报价`, `素材`, `更多`.
+- The `更多` tab is for navigation and lightweight status only. Complex supplier, profit, fulfillment, brand, and A/B management should open in the Web backend.
+- `goseashop@gmail.com` can see a masked AI Key usage card with request and token counters. Plaintext keys are never shown in the extension.
+
+Safety behavior remains unchanged:
+
+- AI output is only a draft.
+- Insert only fills the WhatsApp input box.
+- The extension never auto-sends, bulk-sends, clicks the WhatsApp send button, switches WhatsApp accounts, or bypasses permissions.
+
+Responsive behavior:
+
+- At widths below `1280px`, the full sidebar auto-collapses to the floating `AI` button.
+- Clicking the floating `AI` button opens a temporary overlay with a close button.
+- The quick toolbar falls back to the floating `AI` button when the WhatsApp input container cannot be found.

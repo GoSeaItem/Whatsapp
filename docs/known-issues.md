@@ -9,6 +9,13 @@ Current release target: `v1.0-enterprise`.
 - JSON/YAML key import supports simple documents and lists. Complex nested secret-management exports should be normalized before upload.
 - Usage counters use provider-reported `usage.total_tokens` when present. Providers that do not return usage may show request counts but low or zero token totals.
 
+## Chrome 插件中文化 Docked 工作台
+
+- 插件右侧面板现在按 Docked / collapsed / overlay 三种模式运行。WhatsApp Web DOM 如果调整了根容器结构，主界面让位可能退化为 overlay，需要更新 `findWhatsAppRoot()` selector。
+- 输入框快捷工具条优先挂载到 WhatsApp 输入框上方。如果 WhatsApp 改动输入框 DOM，工具条会退化为右侧浮动 `AI` 按钮。
+- 当前已优先中文化高频路径：客户信息、AI 回复、业务操作、A/B 测试、更多、快捷工具条和 ContextCard。少量低频历史表单枚举仍可能保留英文枚举值，后续可做完整本地化清理。
+- 所有按钮仍只生成、复制或插入草稿；插件不会自动发送 WhatsApp、不会群发、不会模拟点击发送按钮。
+
 ## V4-O WhatsApp Auto Context Recognition
 
 - WhatsApp Web DOM selectors are not a public API. If Meta changes header, message bubble, or input DOM structure, the extension may fall back to manual paste mode until selectors are updated.
@@ -161,6 +168,19 @@ Current development track: `V4-B Cross-organization reports`.
 - Experiment and usage exports/imports are noted as a future V4-A extension and are not fully wired in this lightweight pass.
 
 ## V3-G Audit Logs
+
+## Chrome Extension Mockup-aligned Workbench
+
+- The current sidebar is optimized for the provided WhatsApp-style mockup and Chinese sales workflows, but it is still implemented inside WhatsApp Web through DOM injection. If WhatsApp changes its DOM selectors, the quick toolbar may fall back to the floating `AI` button.
+- The AI Key usage card is intentionally visible only to `goseashop@gmail.com`; other users should manage normal AI usage through existing AI features and will not see the Key pool entry.
+- The extension displays masked key usage counters only. Plaintext keys are not shown or exported from the sidebar.
+- Low-frequency business panels remain available through tabs or Web backend links. The extension should not become a full admin console; complex supplier/profit/fulfillment management stays in the Web backend.
+- V6 adds multi-channel customer, team, department, conversation, interaction and AI key usage foundations, but Telegram, WeChat, email and Instagram channel APIs are not connected yet. These records must be created through internal API/UI flows or future connectors.
+- V6 `Team` / `Department` / `Permission` tables are foundational. Existing organization membership and `EnterpriseRole` remain the active permission enforcement layer until a later enterprise IAM pass.
+- `ConversationHistory` is for current business-context summaries and audit. The product still must not background-scrape unopened chats or bulk collect WhatsApp history.
+- `AIKeyUsageLog` records token totals returned by providers. If a provider response omits detailed prompt/completion token split, only `totalTokens` may be populated.
+- On Windows development machines, `prisma generate` can fail with `EPERM rename query_engine-windows.dll.node` when another local Node/Vite/API process holds the Prisma engine DLL. Stop the local dev server or close the process using the DLL, then rerun `npm run prisma:generate`. `npx prisma validate`, typecheck, tests and Docker production builds are not affected by the schema itself.
+- The extension still does not auto-send WhatsApp messages, bulk-send, simulate the WhatsApp send button, switch WhatsApp accounts, or auto-contact suppliers/customers.
 
 - Audit logs are organization scoped. Legacy personal-only V1/V2 operations without `organizationId` are intentionally not written into organization audit logs.
 - `actorId` is kept for compatibility with V3-E/V3-F records; new writes also set `userId`.

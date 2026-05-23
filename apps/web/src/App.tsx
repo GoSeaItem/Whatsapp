@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import {
   AI_SAFETY_NOTE,
@@ -11,11 +11,13 @@ import {
   BRAND_ASSIGNMENT_ENTITY_TYPES,
   BRAND_RULE_TYPES,
   BRAND_STATUSES,
+  type AIKeyUsageLogSummary,
   type AuditLogAction,
   type AuditLogSummary,
   type AfterSalesCaseDetail,
   type AfterSalesCaseSummary,
   type AfterSalesScriptScenario,
+  type ConversationHistorySummary,
   CUSTOM_REQUEST_STATUSES,
   CUSTOM_REQUEST_TYPES,
   CUSTOM_SCRIPT_SCENARIOS,
@@ -67,6 +69,7 @@ import {
   type EnterpriseRoleSummary,
   type FollowUpSummary,
   type FollowUpTaskType,
+  type InteractionLogSummary,
   type KnowledgeBaseCategory,
   type KnowledgeBaseLanguage,
   type KnowledgeBaseOrgSummary,
@@ -83,6 +86,7 @@ import {
   type OrganizationMemberUpdateRequest,
   type OrganizationRole,
   type OrganizationUnitSummary,
+  type MultiChannelCustomerSummary,
   type OrderFulfillmentBoardResponse,
   type OrderFulfillmentAlertSummary,
   type OrderFulfillmentScriptScenario,
@@ -125,6 +129,7 @@ import {
   type ScriptVariantSummary,
   type TeamDashboardCustomer,
   type TeamDashboardSummary,
+  type V6EnterpriseOverview,
   type WorkbenchDashboard
 } from "@wa-ai/shared";
 import {
@@ -139,8 +144,11 @@ import {
   createEnterpriseOrganizationUnit,
   createEnterpriseReport,
   createEnterpriseRole,
+  createConversationHistory,
   createCustomer,
   createFollowUp,
+  createInteractionLog,
+  createMultiChannelCustomer,
   createKnowledgeBaseItem,
   createMaterial,
   createOrgKnowledgeBaseItem,
@@ -224,12 +232,16 @@ import {
   getEnterpriseOrganizationUnits,
   getEnterpriseReports,
   getEnterpriseRoles,
+  getAiKeyUsageLogs,
+  getConversationHistory,
   getFollowUps,
   getHighIntentCustomers,
+  getInteractionLogs,
   getKnowledgeBase,
   getKnowledgeBaseItem,
   getMaterials,
   getMe,
+  getMultiChannelCustomers,
   getOrgKnowledgeBase,
   getOrgKnowledgeBaseItem,
   getOrgScripts,
@@ -269,6 +281,7 @@ import {
   getSupplier,
   getSuppliers,
   getTeamSummary,
+  getV6EnterpriseOverview,
   getWorkbenchDashboard,
   generateReportJob,
   login,
@@ -352,9 +365,9 @@ import type { AiModelDefinition, AiProviderKeySummary, CsvImportResult, ImportEx
 import { exportCsvUrl, templateCsvUrl } from "./api";
 
 // Release safety copy kept in source for regression checks: drafts are copied and sent manually by the salesperson.
-// Navigation regression marker: navButton("roles", "Roles")
+// Navigation regression marker: navButton("roles", "角色")
 
-type View = "dashboard" | "enterprise" | "aiKeys" | "teamDashboard" | "reports" | "predictions" | "reorderOps" | "afterSales" | "scriptTests" | "suppliers" | "brands" | "organizations" | "roles" | "permissions" | "customers" | "products" | "orgProducts" | "quotes" | "orders" | "fulfillment" | "profit" | "knowledge" | "orgKnowledge" | "orgScripts" | "materials" | "orgMaterials" | "samples" | "custom" | "importExport" | "auditLogs" | "riskEvents";
+type View = "dashboard" | "v6Ops" | "enterprise" | "aiKeys" | "teamDashboard" | "reports" | "predictions" | "reorderOps" | "afterSales" | "scriptTests" | "suppliers" | "brands" | "organizations" | "roles" | "permissions" | "customers" | "products" | "orgProducts" | "quotes" | "orders" | "fulfillment" | "profit" | "knowledge" | "orgKnowledge" | "orgScripts" | "materials" | "orgMaterials" | "samples" | "custom" | "importExport" | "auditLogs" | "riskEvents";
 type CustomerFilters = { q: string; tag: string; stage: string; sort: "" | "intentScore"; intentLevel: "" | "low" | "medium" | "high"; organizationId: string };
 type ProductFilters = { q: string; category: string };
 type KnowledgeFilters = { q: string; category: string; language: string; productId: string };
@@ -860,6 +873,11 @@ export function App() {
   const [enterpriseReports, setEnterpriseReports] = useState<EnterpriseReportSummary[]>([]);
   const [enterpriseAuditLogs, setEnterpriseAuditLogs] = useState<EnterpriseAuditLogSummary[]>([]);
   const [enterpriseBrandContext, setEnterpriseBrandContext] = useState<EnterpriseBrandContextResponse | null>(null);
+  const [v6Overview, setV6Overview] = useState<V6EnterpriseOverview | null>(null);
+  const [multiChannelCustomers, setMultiChannelCustomers] = useState<MultiChannelCustomerSummary[]>([]);
+  const [conversationHistory, setConversationHistory] = useState<ConversationHistorySummary[]>([]);
+  const [interactionLogs, setInteractionLogs] = useState<InteractionLogSummary[]>([]);
+  const [aiKeyUsageLogs, setAiKeyUsageLogs] = useState<AIKeyUsageLogSummary[]>([]);
   const [aiProviderKeys, setAiProviderKeys] = useState<AiProviderKeySummary[]>([]);
   const [aiModels, setAiModels] = useState<AiModelDefinition[]>([]);
   const [aiKeyImportContent, setAiKeyImportContent] = useState("");
@@ -1110,6 +1128,7 @@ export function App() {
       await Promise.all([
         loadRoles(id),
         loadEnterpriseData(id),
+        loadV6OpsData(id),
         loadOrgProducts({ ...orgProductFilters, organizationId: id }),
         loadOrgKnowledgeBase({ ...orgKnowledgeFilters, organizationId: id }),
         loadOrgScriptsList({ ...orgScriptFilters, organizationId: id }),
@@ -1150,6 +1169,11 @@ export function App() {
       setEnterpriseReports([]);
       setEnterpriseAuditLogs([]);
       setEnterpriseBrandContext(null);
+      setV6Overview(null);
+      setMultiChannelCustomers([]);
+      setConversationHistory([]);
+      setInteractionLogs([]);
+      setAiKeyUsageLogs([]);
       setAiProviderKeys([]);
     }
   }
@@ -1176,6 +1200,31 @@ export function App() {
       setEnterpriseReports([]);
       setEnterpriseAuditLogs([]);
       setStatus("Enterprise platform data failed to load.");
+    }
+  }
+
+  async function loadV6OpsData(organizationId = selectedOrganizationId) {
+    if (!organizationId) return;
+    try {
+      const [overview, customers, messages, interactions, keyUsage] = await Promise.all([
+        getV6EnterpriseOverview(organizationId),
+        getMultiChannelCustomers(organizationId),
+        getConversationHistory({ organizationId }),
+        getInteractionLogs(organizationId),
+        getAiKeyUsageLogs(organizationId).catch(() => [])
+      ]);
+      setV6Overview(overview);
+      setMultiChannelCustomers(customers);
+      setConversationHistory(messages);
+      setInteractionLogs(interactions);
+      setAiKeyUsageLogs(keyUsage);
+    } catch {
+      setV6Overview(null);
+      setMultiChannelCustomers([]);
+      setConversationHistory([]);
+      setInteractionLogs([]);
+      setAiKeyUsageLogs([]);
+      setStatus("V6 智能运营数据加载失败。");
     }
   }
 
@@ -3611,41 +3660,42 @@ export function App() {
           <div className="brand-mark">WA</div>
           <div>
             <h1>WhatsApp AI 销售助手</h1>
-            <p>V5 企业平台版</p>
+            <p>V6 企业智能运营平台</p>
           </div>
         </div>
         <nav className="nav-list">
-          {navButton("dashboard", "Home")}
-          {canManageSelectedOrganization && navButton("teamDashboard", "Team board")}
-          {canManageSelectedOrganization && navButton("reports", "Reports")}
-          {navButton("predictions", "Predictions")}
-          {navButton("reorderOps", "Reorder ops")}
-          {navButton("afterSales", "After sales")}
-          {navButton("scriptTests", "A/B scripts")}
-          {navButton("suppliers", "Suppliers")}
-          {navButton("brands", "Brands / stores")}
-          {canManageSelectedOrganization && navButton("enterprise", "Enterprise")}
-          {canManageAiKeys && navButton("aiKeys", "AI keys")}
-          {navButton("organizations", "Organizations")}
-          {navButton("roles", "Roles")}
-          {navButton("permissions", "Permissions")}
-          {navButton("customers", "Customers")}
-          {navButton("products", "Products")}
-          {navButton("orgProducts", "Org products")}
-          {navButton("quotes", "Quotes")}
-          {navButton("orders", "Orders")}
-          {navButton("fulfillment", "Fulfillment")}
-          {navButton("profit", "Profit review")}
-          {navButton("knowledge", "Knowledge")}
-          {navButton("orgKnowledge", "Org knowledge")}
-          {navButton("orgScripts", "Org scripts")}
-          {navButton("materials", "Materials")}
-          {navButton("orgMaterials", "Org materials")}
-          {navButton("samples", "Samples")}
-          {navButton("custom", "Custom")}
-          {navButton("importExport", "Import/export")}
-          {navButton("auditLogs", "Audit logs")}
-          {canManageSelectedOrganization && navButton("riskEvents", "Risk events")}
+          {navButton("dashboard", "首页")}
+          {canManageSelectedOrganization && navButton("v6Ops", "V6 智能运营")}
+          {canManageSelectedOrganization && navButton("teamDashboard", "主管看板")}
+          {canManageSelectedOrganization && navButton("reports", "企业报表")}
+          {navButton("predictions", "经营预测")}
+          {navButton("reorderOps", "复购运营")}
+          {navButton("afterSales", "售后异常")}
+          {navButton("scriptTests", "A/B 话术")}
+          {navButton("suppliers", "供应商")}
+          {navButton("brands", "品牌/店铺")}
+          {canManageSelectedOrganization && navButton("enterprise", "企业组织")}
+          {canManageAiKeys && navButton("aiKeys", "AI Key")}
+          {navButton("organizations", "组织")}
+          {navButton("roles", "角色")}
+          {navButton("permissions", "权限")}
+          {navButton("customers", "客户")}
+          {navButton("products", "产品")}
+          {navButton("orgProducts", "组织产品")}
+          {navButton("quotes", "报价")}
+          {navButton("orders", "订单")}
+          {navButton("fulfillment", "履约")}
+          {navButton("profit", "利润复盘")}
+          {navButton("knowledge", "知识库")}
+          {navButton("orgKnowledge", "组织知识")}
+          {navButton("orgScripts", "组织话术")}
+          {navButton("materials", "素材")}
+          {navButton("orgMaterials", "组织素材")}
+          {navButton("samples", "样品单")}
+          {navButton("custom", "定制需求")}
+          {navButton("importExport", "导入/导出")}
+          {navButton("auditLogs", "审计日志")}
+          {canManageSelectedOrganization && navButton("riskEvents", "风险事件")}
         </nav>
       </aside>
       <main className="workspace">
@@ -3661,8 +3711,9 @@ export function App() {
             <button className="secondary-button" onClick={handleLogout}>Logout</button>
           </div>
         </header>
-        <div className="safety-note">{AI_SAFETY_NOTE} All generated text is draft only. 系统不会自动发送 WhatsApp 消息，所有内容都需要业务员手动确认。</div>
+        <div className="safety-note">{AI_SAFETY_NOTE} 所有 AI 内容仅生成草稿，不会自动发送 WhatsApp 消息，必须由业务员手动确认。</div>
         {view === "dashboard" && renderDashboard()}
+        {view === "v6Ops" && renderV6Ops()}
         {view === "teamDashboard" && renderTeamDashboard()}
         {view === "reports" && renderReports()}
         {view === "predictions" && renderPredictions()}
@@ -4639,6 +4690,87 @@ export function App() {
           )}
         </Panel>
       </section>
+    );
+  }
+
+  function renderV6Ops() {
+    if (!selectedOrganizationId) {
+      return (
+        <Panel title="V6 企业智能运营" description="请选择组织后查看多渠道客户、消息历史、交互日志和 AI Key 消耗。">
+          <p>V6 延续 V5 数据结构，新增企业级多渠道和智能运营视图。</p>
+        </Panel>
+      );
+    }
+    const tokenTotal = aiKeyUsageLogs.reduce((sum, item) => sum + item.totalTokens, 0);
+    const safetyBoundaries = v6Overview?.safetyBoundaries || [
+      "AI 内容仅生成草稿，发送前必须人工确认。",
+      "不自动发送 WhatsApp 消息，不自动群发，不模拟点击发送按钮。",
+      "不自动承诺价格、库存、交期、运费、付款、售后或成本。",
+      "跨组织数据访问必须通过组织成员和角色权限校验。"
+    ];
+    return (
+      <div className="stack">
+        <section className="metrics">
+          <Metric label="多渠道客户" value={v6Overview?.kpis.multiChannelCustomers || multiChannelCustomers.length} />
+          <Metric label="消息记录" value={v6Overview?.kpis.conversationMessages || conversationHistory.length} />
+          <Metric label="交互日志" value={v6Overview?.kpis.interactionLogs || interactionLogs.length} />
+          <Metric label="AI Token" value={v6Overview?.kpis.aiKeyTokens || tokenTotal} />
+        </section>
+        <section className="dashboard-grid">
+          <Panel title="V6 能力范围" description="企业级自动化运营、智能决策、多渠道、多语言、多品牌管理的统一入口。">
+            <div className="tag-list">
+              <span>WhatsApp</span>
+              <span>Telegram</span>
+              <span>WeChat</span>
+              <span>Email</span>
+              <span>多语言</span>
+              <span>多货币</span>
+              <span>DeepSeek V4</span>
+              <span>ChatGPT 5.5</span>
+            </div>
+            <button className="secondary-button" onClick={() => loadV6OpsData(selectedOrganizationId)}>刷新 V6 数据</button>
+          </Panel>
+          <Panel title="安全边界" description="V6 不扩大 WhatsApp 自动化边界。">
+            {safetyBoundaries.map((item) => <p key={item} className="notice-line">{item}</p>)}
+          </Panel>
+          <Panel title="多渠道统一客户" description="来自 WhatsApp、Telegram、WeChat、邮件等渠道的客户统一视图。">
+            <SimpleList items={multiChannelCustomers.slice(0, 8)} empty="暂无多渠道客户" render={(item) => (
+              <div className="customer-row">
+                <strong>{item.primaryName}</strong>
+                <span>{item.primaryChannel} / {item.whatsappNumber || item.email || item.telegramHandle || item.wechatId || "未填写联系方式"}</span>
+                <span>{item.phoneCountry || "国家未确认"} / {item.preferredLanguage || "语言未确认"} / {item.preferredCurrency || "币种未确认"}</span>
+              </div>
+            )} />
+          </Panel>
+          <Panel title="最近消息历史" description="只保存业务允许范围内的多渠道消息摘要，用于上下文和审计。">
+            <SimpleList items={conversationHistory.slice(0, 8)} empty="鏆傛棤娑堟伅鍘嗗彶" render={(item) => (
+              <div className="customer-row">
+                <strong>{item.channel} / {item.senderRole} / {item.direction}</strong>
+                <span>{item.messageText || "无文本内容"}</span>
+                <span>{formatDate(item.messageAt)}</span>
+              </div>
+            )} />
+          </Panel>
+          <Panel title="智能运营交互日志" description="记录 AI 建议、报价、订单、售后、复购等关键运营动作。">
+            <SimpleList items={interactionLogs.slice(0, 8)} empty="暂无交互日志" render={(item) => (
+              <div className="customer-row">
+                <strong>{item.action}</strong>
+                <span>{item.channel || "web"} / {item.entityType || "operation"} / {item.summary || "无摘要"}</span>
+                <span>{formatDate(item.createdAt)}</span>
+              </div>
+            )} />
+          </Panel>
+          <Panel title="AI Key 消耗明细" description="按 key、模型和模式记录调用结果，完整 key 不会在页面或导出中显示。">
+            <SimpleList items={aiKeyUsageLogs.slice(0, 8)} empty="暂无 AI Key 使用明细" render={(item) => (
+              <div className="customer-row">
+                <strong>{item.provider || "provider"} / {item.mode || "mode"} / {item.model || "model"}</strong>
+                <span>{item.success ? "成功" : "失败"} / {item.totalTokens} tokens / {item.requestSource || "ai-service"}</span>
+                <span>{formatDate(item.createdAt)}</span>
+              </div>
+            )} />
+          </Panel>
+        </section>
+      </div>
     );
   }
 
@@ -6196,8 +6328,8 @@ function OrgContentFilterBar({
   );
 }
 
-function SimpleList<T extends { id: string }>({ items, render }: { items: T[]; render: (item: T) => ReactNode }) {
-  return <div className="customer-list">{items.length ? items.map((item) => <div key={item.id}>{render(item)}</div>) : <p className="empty-note">No records.</p>}</div>;
+function SimpleList<T extends { id: string }>({ items, render, empty = "No records." }: { items: T[]; render: (item: T) => ReactNode; empty?: string }) {
+  return <div className="customer-list">{items.length ? items.map((item) => <div key={item.id}>{render(item)}</div>) : <p className="empty-note">{empty}</p>}</div>;
 }
 
 function BrandLinkedRow({ item, label, onRemove }: { item: any; label: string; onRemove: () => void }) {
@@ -6273,37 +6405,38 @@ function opportunityToScriptScenario(type: string): ReorderOperationScriptScenar
 
 function titleForView(view: View) {
   const titles: Record<View, string> = {
-    dashboard: "Home",
-    teamDashboard: "Team board",
-    reports: "Reports",
-    predictions: "Predictions / reorder reminders",
-    reorderOps: "Reorder operations",
-    afterSales: "After-sales and exceptions",
-    scriptTests: "A/B script testing",
-    suppliers: "Suppliers / procurement",
-    brands: "Brands / stores",
-    enterprise: "Enterprise platform",
-    aiKeys: "AI key pool",
-    organizations: "Organizations",
-    roles: "Roles",
-    permissions: "Permission matrix",
-    customers: "Customer CRM",
-    products: "Products",
-    orgProducts: "Org products",
-    quotes: "Quotes",
-    orders: "Order center",
-    fulfillment: "Order fulfillment",
-    profit: "Profit review",
-    knowledge: "Knowledge",
-    orgKnowledge: "Org knowledge",
-    orgScripts: "Org scripts",
-    materials: "Materials",
-    orgMaterials: "Org materials",
-    samples: "Sample orders",
-    custom: "Custom requests",
-    importExport: "CSV import/export",
-    auditLogs: "Audit logs",
-    riskEvents: "Risk events"
+    dashboard: "首页",
+    v6Ops: "V6 企业智能运营",
+    teamDashboard: "主管看板",
+    reports: "企业报表",
+    predictions: "经营预测 / 复购提醒",
+    reorderOps: "复购运营",
+    afterSales: "售后与异常",
+    scriptTests: "A/B 话术测试",
+    suppliers: "供应商 / 采购",
+    brands: "品牌 / 店铺",
+    enterprise: "企业平台",
+    aiKeys: "AI Key 池",
+    organizations: "组织",
+    roles: "角色",
+    permissions: "权限矩阵",
+    customers: "客户 CRM",
+    products: "产品",
+    orgProducts: "组织产品",
+    quotes: "报价",
+    orders: "订单中心",
+    fulfillment: "订单履约",
+    profit: "利润复盘",
+    knowledge: "知识库",
+    orgKnowledge: "组织知识库",
+    orgScripts: "组织话术",
+    materials: "素材",
+    orgMaterials: "组织素材",
+    samples: "样品单",
+    custom: "定制需求",
+    importExport: "CSV 导入/导出",
+    auditLogs: "审计日志",
+    riskEvents: "风险事件"
   };
   return titles[view];
 }
@@ -6668,3 +6801,12 @@ function formatRate(value?: number | null) {
 function nextVariantLabel(index: number) {
   return ["A", "B", "C", "D", "E"][Math.max(0, Math.min(index, 4))] || "A";
 }
+
+
+
+
+
+
+
+
+

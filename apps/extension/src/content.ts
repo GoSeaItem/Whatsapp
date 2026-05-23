@@ -43,6 +43,18 @@ type SidebarMode = "docked" | "collapsed" | "overlay";
 type ReplyVariant = "short" | "professional" | "closing";
 type RecognitionStatus = "normal" | "abnormal" | "notChat" | "whatsappNotOpen";
 type SidebarAuthState = { status: "checking" | "authenticated" | "anonymous"; user?: AuthUser };
+type AiKeyUsageSummary = {
+  id: string;
+  name?: string;
+  model?: string;
+  mode?: string;
+  keyLast4?: string;
+  maskedKey?: string;
+  totalTokens?: number;
+  totalRequests?: number;
+  lastUsedAt?: string | null;
+  status?: string;
+};
 type SupplierScriptResponse = {
   scriptText: string;
   alternativeScripts?: string[];
@@ -57,6 +69,7 @@ let scriptVariants: Array<any> = [];
 let lastScriptUsageId = "";
 let sidebarOrganizationId = "";
 let sidebarBrands: Array<any> = [];
+let sidebarAiKeyUsage: AiKeyUsageSummary[] = [];
 let quickToolbarObserver: MutationObserver | null = null;
 let activeSidebarTab: SidebarTab = "ai";
 let activeBusinessModule: BusinessModule = "quote";
@@ -115,10 +128,10 @@ const actionScenarioMap: Partial<Record<QuickAction, AiReplyScenario>> = {
 };
 
 const recognitionStatusText: Record<RecognitionStatus, string> = {
-  normal: "识别正常",
-  abnormal: "识别异常，已切换复制粘贴模式",
-  notChat: "当前不是聊天窗口",
-  whatsappNotOpen: "WhatsApp 页面未打开"
+  normal: "\u5df2\u8bc6\u522b\u5f53\u524d\u804a\u5929",
+  abnormal: "\u8bc6\u522b\u5f02\u5e38\uff0c\u5df2\u5207\u6362\u4e3a\u624b\u52a8\u7c98\u8d34\u6a21\u5f0f",
+  notChat: "\u5f53\u524d\u4e0d\u662f\u804a\u5929\u7a97\u53e3",
+  whatsappNotOpen: "WhatsApp \u9875\u9762\u672a\u6253\u5f00"
 };
 
 function createSidebar() {
@@ -128,12 +141,12 @@ function createSidebar() {
   toggleButton.className = "wa-ai-toggle";
   toggleButton.type = "button";
   toggleButton.textContent = "AI";
-  toggleButton.title = "显示或隐藏 WhatsApp AI 销售助手";
+  toggleButton.title = "\u6253\u5f00 AI \u9500\u552e\u52a9\u624b";
   document.body.appendChild(toggleButton);
 
   const sidebar = document.createElement("aside");
   sidebar.id = SIDEBAR_ID;
-  sidebar.setAttribute("aria-label", "WhatsApp AI 销售助手");
+  sidebar.setAttribute("aria-label", "WhatsApp AI \u9500\u552e\u52a9\u624b");
   sidebar.innerHTML = `
     <header class="wa-ai-header">
       <div>
@@ -181,23 +194,23 @@ function createSidebar() {
             <span>回复语言</span>
             <select id="wa-ai-language">
               <option value="auto">跟随客户语言</option>
-              <option value="English">English</option>
-              <option value="Spanish">Spanish</option>
-              <option value="Portuguese">Portuguese</option>
-              <option value="Arabic">Arabic</option>
+              <option value="English">\u82f1\u8bed</option>
+              <option value="Spanish">\u897f\u73ed\u7259\u8bed</option>
+              <option value="Portuguese">\u8461\u8404\u7259\u8bed</option>
+              <option value="Arabic">\u963f\u62c9\u4f2f\u8bed</option>
             </select>
           </label>
           <label class="wa-ai-field">
             <span>AI model</span>
             <select id="wa-ai-model-select">
-              <option value="deepseek-v4-fastest">DeepSeek V4 fastest</option>
-              <option value="instant">instant</option>
-              <option value="thinking">thinking</option>
-              <option value="deepseek-v4-pro">DeepSeek V4 thinking</option>
-              <option value="deepseek-v4-chat">DeepSeek V4 chat</option>
-              <option value="deepseek-v4-reasoner">DeepSeek V4 reasoner</option>
-              <option value="chatgpt-5.5-instant">ChatGPT 5.5 instant</option>
-              <option value="chatgpt-5.5-thinking">ChatGPT 5.5 thinking</option>
+              <option value="deepseek-v4-fastest">DeepSeek V4 \u5feb\u901f</option>
+              <option value="instant">\u5feb\u901f\u6a21\u5f0f\uff08\u81ea\u52a8\u9009 Key\uff09</option>
+              <option value="thinking">\u6df1\u5ea6\u601d\u8003\uff08\u81ea\u52a8\u9009 Key\uff09</option>
+              <option value="deepseek-v4-pro">DeepSeek V4 \u6df1\u5ea6</option>
+              <option value="deepseek-v4-chat">DeepSeek V4 \u5bf9\u8bdd</option>
+              <option value="deepseek-v4-reasoner">DeepSeek V4 \u63a8\u7406</option>
+              <option value="chatgpt-5.5-instant">ChatGPT 5.5 \u5feb\u901f</option>
+              <option value="chatgpt-5.5-thinking">ChatGPT 5.5 \u6df1\u5ea6\u601d\u8003</option>
             </select>
           </label>
           <label class="wa-ai-field">
@@ -626,9 +639,9 @@ function createSidebar() {
 function replyCard(id: ReplyVariant, title: string, rows: number) {
   return `
     <article class="wa-ai-reply-card">
-      <div class="wa-ai-reply-title"><strong>${title}</strong><button type="button" data-copy="${id}">复制</button></div>
+      <div class="wa-ai-reply-title"><strong>${title}</strong><button type="button" data-copy="${id}">\u590d\u5236</button></div>
       <textarea id="wa-ai-reply-${id}" rows="${rows}"></textarea>
-      <button type="button" class="wa-ai-reserved" disabled>插入 WhatsApp 输入框（预留）</button>
+      <button type="button" class="wa-ai-reserved" disabled>\u5982\u9700\u63d2\u5165\u8bf7\u4f7f\u7528\u4e0b\u65b9\u201c\u63d2\u5165\u8349\u7a3f\u201d\u6309\u94ae</button>
     </article>
   `;
 }
@@ -637,14 +650,15 @@ function upgradeSidebarWorkbench(sidebar: HTMLElement) {
   const header = sidebar.querySelector<HTMLElement>(".wa-ai-header");
   if (header) {
     header.innerHTML = `
-      <div>
-        <p class="wa-ai-kicker">复制粘贴模式 / 已连接后台</p>
-        <h2>WhatsApp AI 销售助手</h2>
+      <div class="wa-ai-header-brand">
+        <p class="wa-ai-kicker">\u8349\u7a3f\u6a21\u5f0f / \u5df2\u8fde\u63a5\u540e\u53f0</p>
+        <h2>\u2726 WhatsApp AI \u9500\u552e\u52a9\u624b</h2>
       </div>
       <div class="wa-ai-header-actions">
-        <span class="wa-ai-pill">草稿模式</span>
-        <button id="wa-ai-refresh-sidebar" type="button" title="刷新">↻</button>
-        <button id="wa-ai-collapse-sidebar" type="button" title="收起">×</button>
+        <span class="wa-ai-pill">\u4ec5\u751f\u6210\u8349\u7a3f</span>
+        <button id="wa-ai-refresh-sidebar" type="button" title="\u5237\u65b0">\u5237</button>
+        <button id="wa-ai-settings-sidebar" type="button" title="\u8bbe\u7f6e">\u8bbe</button>
+        <button id="wa-ai-collapse-sidebar" type="button" title="\u6536\u8d77">\u6536</button>
       </div>
     `;
   }
@@ -654,26 +668,43 @@ function upgradeSidebarWorkbench(sidebar: HTMLElement) {
   const contextCard = document.createElement("section");
   contextCard.className = "wa-ai-context-card";
   contextCard.innerHTML = `
-    <div class="wa-ai-context-row">
-      <div><span>客户</span><strong id="wa-ai-context-customer">未保存</strong></div>
-      <div><span>阶段</span><strong id="wa-ai-context-stage">新线索</strong></div>
+    <div class="wa-ai-context-topline">
+      <span>\u5f53\u524d\u4e0a\u4e0b\u6587</span>
+      <strong id="wa-ai-context-mode">\u590d\u5236\u7c98\u8d34\u6a21\u5f0f</strong>
+    </div>
+    <div class="wa-ai-context-primary">
+      <div>
+        <span>\u5f53\u524d\u5ba2\u6237</span>
+        <strong id="wa-ai-context-customer">\u672a\u4fdd\u5b58</strong>
+        <small id="wa-ai-context-phone">-</small>
+      </div>
+      <span id="wa-ai-context-saved-badge">\u65b0\u5ba2\u6237</span>
     </div>
     <div class="wa-ai-context-row">
-      <div><span>品牌</span><strong id="wa-ai-context-brand">未选择</strong></div>
-      <div><span>意向</span><strong id="wa-ai-context-intent">保存后计算</strong></div>
+      <div><span>\u9636\u6bb5</span><strong id="wa-ai-context-stage">\u65b0\u7ebf\u7d22</strong></div>
+      <div><span>\u610f\u5411\u7b49\u7ea7</span><strong id="wa-ai-context-intent">\u4fdd\u5b58\u540e\u8ba1\u7b97</strong></div>
     </div>
-    <p>品牌仅影响产品、素材、知识库和草稿策略，不会切换 WhatsApp 账号。</p>
+    <div class="wa-ai-context-row">
+      <div><span>\u54c1\u724c</span><strong id="wa-ai-context-brand">\u672a\u9009\u62e9</strong></div>
+      <div><span>\u56fd\u5bb6</span><strong id="wa-ai-context-country">\u672a\u8bc6\u522b</strong></div>
+    </div>
+    <div class="wa-ai-context-actions">
+      <button id="wa-ai-context-save" type="button">\u4fdd\u5b58\u5ba2\u6237</button>
+      <button id="wa-ai-context-refresh" type="button">\u5237\u65b0</button>
+      <button id="wa-ai-context-stage-action" type="button">\u66f4\u65b0\u9636\u6bb5</button>
+    </div>
+    <p>\u54c1\u724c\u4ec5\u5f71\u54cd\u4ea7\u54c1\u3001\u7d20\u6750\u3001\u77e5\u8bc6\u5e93\u548c\u8349\u7a3f\u7b56\u7565\uff0c\u4e0d\u4f1a\u5207\u6362 WhatsApp \u8d26\u53f7\u3002</p>
   `;
   authPanel.insertAdjacentElement("afterend", contextCard);
 
   const tabs = document.createElement("nav");
   tabs.className = "wa-ai-tabs";
   tabs.innerHTML = `
-    <button type="button" data-tab="customer">客户</button>
-    <button type="button" data-tab="ai">AI</button>
-    <button type="button" data-tab="business">业务</button>
-    <button type="button" data-tab="ab">A/B</button>
-    <button type="button" data-tab="more">更多</button>
+    <button type="button" data-tab="customer">\u5ba2\u6237\u4fe1\u606f</button>
+    <button type="button" data-tab="ai">AI \u56de\u590d</button>
+    <button type="button" data-tab="business">\u4e1a\u52a1\u64cd\u4f5c</button>
+    <button type="button" data-tab="ab">A/B \u6d4b\u8bd5</button>
+    <button type="button" data-tab="more">\u66f4\u591a</button>
   `;
   contextCard.insertAdjacentElement("afterend", tabs);
 
@@ -697,6 +728,7 @@ function upgradeSidebarWorkbench(sidebar: HTMLElement) {
   const morePanel = panels.querySelector<HTMLElement>('[data-panel="more"]')!;
   businessPanel.appendChild(createBusinessLauncher());
   morePanel.appendChild(createMorePanel());
+  morePanel.appendChild(createAiKeyUsageCard());
 
   Array.from(sidebar.querySelectorAll<HTMLElement>(".wa-ai-section")).forEach((section) => {
     const module = classifyBusinessModule(section);
@@ -716,7 +748,9 @@ function upgradeSidebarWorkbench(sidebar: HTMLElement) {
       return;
     }
     if (section.querySelector("#wa-ai-supplier-script")) {
-      morePanel.appendChild(section);
+      section.dataset.businessModule = "supplier";
+      section.classList.add("wa-ai-business-module", "wa-ai-low-frequency-module");
+      businessPanel.appendChild(section);
       return;
     }
     if (module) {
@@ -733,12 +767,14 @@ function upgradeSidebarWorkbench(sidebar: HTMLElement) {
   const bottomBar = document.createElement("section");
   bottomBar.className = "wa-ai-bottom-bar";
   bottomBar.innerHTML = `
-    <button type="button" data-toolbar-action="reply">AI 回复</button>
-    <button type="button" data-toolbar-action="quote">报价</button>
-    <button type="button" id="wa-ai-bottom-save">保存</button>
-    <button type="button" data-toolbar-action="more">更多</button>
+    <button type="button" data-toolbar-action="reply">AI \u56de\u590d</button>
+    <button type="button" data-toolbar-action="translate">\u7ffb\u8bd1</button>
+    <button type="button" data-toolbar-action="quote">\u62a5\u4ef7</button>
+    <button type="button" data-toolbar-action="material">\u7d20\u6750</button>
+    <button type="button" data-toolbar-action="more">\u66f4\u591a</button>
   `;
   sidebar.insertBefore(bottomBar, sidebar.querySelector(".wa-ai-footer"));
+  localizeSidebarText();
   openSidebarTab("ai");
   showBusinessModule("quote");
   updateContextCard();
@@ -748,16 +784,16 @@ function createBusinessLauncher() {
   const section = document.createElement("section");
   section.className = "wa-ai-section wa-ai-business-launcher";
   section.innerHTML = `
-    <div class="wa-ai-section-title"><h3>业务动作</h3><span>当前客户快捷操作</span></div>
+    <div class="wa-ai-section-title"><h3>\u4e1a\u52a1\u64cd\u4f5c</h3><span>\u5f53\u524d\u5ba2\u6237\u5feb\u6377\u529f\u80fd</span></div>
     <div class="wa-ai-business-grid">
-      <button type="button" data-business-panel="quote">💬 报价</button>
-      <button type="button" data-business-panel="material">🖼 素材</button>
-      <button type="button" data-business-panel="sample">🧪 样品</button>
-      <button type="button" data-business-panel="custom">🎨 定制</button>
-      <button type="button" data-business-panel="order">📦 订单</button>
-      <button type="button" data-business-panel="afterSales">🛟 售后</button>
-      <button type="button" data-business-panel="reorder">🔁 复购</button>
-      <button type="button" data-business-panel="followUp">⏰ 跟进</button>
+      <button type="button" data-business-panel="quote">\u62a5\u4ef7</button>
+      <button type="button" data-business-panel="material">\u7d20\u6750</button>
+      <button type="button" data-business-panel="sample">\u6837\u54c1</button>
+      <button type="button" data-business-panel="custom">\u5b9a\u5236</button>
+      <button type="button" data-business-panel="order">\u8ba2\u5355</button>
+      <button type="button" data-business-panel="afterSales">\u552e\u540e</button>
+      <button type="button" data-business-panel="reorder">\u590d\u8d2d</button>
+      <button type="button" data-business-panel="followUp">\u8ddf\u8fdb</button>
     </div>
   `;
   return section;
@@ -767,48 +803,179 @@ function createMorePanel() {
   const section = document.createElement("section");
   section.className = "wa-ai-section";
   section.innerHTML = `
-    <div class="wa-ai-section-title"><h3>更多入口</h3><span>复杂管理到 Web 后台完成</span></div>
+    <div class="wa-ai-section-title"><h3>\u66f4\u591a\u5165\u53e3</h3><span>\u590d\u6742\u7ba1\u7406\u8bf7\u5230 Web \u540e\u53f0\u5b8c\u6210</span></div>
     <div class="wa-ai-more-grid">
-      <button type="button" data-open-web="">打开 Web 后台</button>
-      <button type="button" data-open-web="#brands">品牌管理</button>
-      <button type="button" data-open-web="#suppliers">供应商</button>
-      <button type="button" data-open-web="#profit">利润复盘</button>
-      <button type="button" data-open-web="#fulfillment">履约看板</button>
-      <button type="button" data-open-web="#script-tests">A/B 实验管理</button>
-      <button type="button" id="wa-ai-refresh-cache">刷新缓存</button>
-      <button type="button" disabled>退出登录请到 Web 后台</button>
+      <button type="button" data-open-web="">\u6253\u5f00 Web \u540e\u53f0</button>
+      <button type="button" data-open-web="#brands">\u54c1\u724c\u7ba1\u7406</button>
+      <button type="button" data-open-web="#suppliers">\u4f9b\u5e94\u5546</button>
+      <button type="button" data-open-web="#profit">\u5229\u6da6\u590d\u76d8</button>
+      <button type="button" data-open-web="#fulfillment">\u5c65\u7ea6\u770b\u677f</button>
+      <button type="button" data-open-web="#script-tests">A/B \u5b9e\u9a8c\u7ba1\u7406</button>
+      <button type="button" id="wa-ai-refresh-cache">\u5237\u65b0\u7f13\u5b58</button>
+      <button type="button" disabled>\u9000\u51fa\u767b\u5f55\u8bf7\u5230 Web \u540e\u53f0</button>
     </div>
-    <div class="wa-ai-info-note">仅生成草稿，不会自动发送 WhatsApp 消息。</div>
+    <div class="wa-ai-info-note">\u4ec5\u751f\u6210\u8349\u7a3f\uff0c\u4e0d\u4f1a\u81ea\u52a8\u53d1\u9001 WhatsApp \u6d88\u606f\u3002</div>
+  `;
+  return section;
+}
+
+function createAiKeyUsageCard() {
+  const section = document.createElement("section");
+  section.id = "wa-ai-key-usage-card";
+  section.className = "wa-ai-section wa-ai-key-usage-card";
+  section.hidden = true;
+  section.innerHTML = `
+    <div class="wa-ai-section-title"><h3>AI Key \u6d88\u8017</h3><span>\u4ec5 goseashop@gmail.com \u53ef\u89c1</span></div>
+    <div class="wa-ai-key-metrics">
+      <div><span>\u603b\u8bf7\u6c42</span><strong id="wa-ai-key-total-requests">0</strong></div>
+      <div><span>\u603b Token</span><strong id="wa-ai-key-total-tokens">0</strong></div>
+    </div>
+    <div id="wa-ai-key-usage-list" class="wa-ai-key-usage-list">
+      <span>\u6682\u65e0\u6d88\u8017\u6570\u636e</span>
+    </div>
+    <div class="wa-ai-two-actions">
+      <button id="wa-ai-refresh-ai-keys" type="button" class="wa-ai-wide-button">\u5237\u65b0\u6d88\u8017</button>
+      <button type="button" data-open-web="#aiKeys" class="wa-ai-wide-button wa-ai-secondary-wide">\u7ba1\u7406 Key</button>
+    </div>
+    <div class="wa-ai-info-note">\u53ea\u663e\u793a\u63a9\u7801 Key \u548c\u6d88\u8017\u7edf\u8ba1\uff0c\u4e0d\u663e\u793a\u660e\u6587 Key\u3002</div>
   `;
   return section;
 }
 
 function enhanceAbSection(section: HTMLElement) {
+  const title = section.querySelector<HTMLElement>(".wa-ai-section-title h3");
+  if (title) title.textContent = "A/B \u8bdd\u672f\u6d4b\u8bd5";
   const safety = section.querySelector<HTMLElement>(".wa-ai-safety-note");
   if (safety) {
     safety.className = "wa-ai-info-note";
-    safety.textContent = "A/B 话术仅记录草稿使用，最终发送需手动完成。";
+    safety.textContent = "A/B \u8bdd\u672f\u4ec5\u8bb0\u5f55\u8349\u7a3f\u4f7f\u7528\uff0c\u6700\u7ec8\u53d1\u9001\u9700\u624b\u52a8\u5b8c\u6210\u3002";
   }
   const copy = document.getElementById("wa-ai-copy-script-test");
   const insert = document.getElementById("wa-ai-insert-script-test");
-  if (copy) copy.textContent = "复制并记录";
-  if (insert) insert.textContent = "插入并记录";
+  if (copy) copy.textContent = "\u590d\u5236\u5e76\u8bb0\u5f55";
+  if (insert) insert.textContent = "\u63d2\u5165\u5e76\u8bb0\u5f55";
   ["wa-ai-mark-script-replied", "wa-ai-mark-script-quote", "wa-ai-mark-script-order", "wa-ai-mark-script-no-response"].forEach((id) => {
     document.getElementById(id)?.classList.add("wa-ai-hidden-control");
   });
   const controls = document.createElement("div");
   controls.className = "wa-ai-two-actions";
   controls.innerHTML = `
-    <label class="wa-ai-field"><span>标记结果</span><select id="wa-ai-script-outcome-select">
-      <option value="customer_replied">已回复</option>
-      <option value="quote_created">已报价</option>
-      <option value="order_created">已下单</option>
-      <option value="no_response">无回复</option>
+    <label class="wa-ai-field"><span>\u6807\u8bb0\u7ed3\u679c</span><select id="wa-ai-script-outcome-select">
+      <option value="customer_replied">\u5df2\u56de\u590d</option>
+      <option value="quote_created">\u5df2\u62a5\u4ef7</option>
+      <option value="order_created">\u5df2\u4e0b\u5355</option>
+      <option value="no_response">\u65e0\u56de\u590d</option>
     </select></label>
-    <button id="wa-ai-mark-script-outcome" type="button" class="wa-ai-wide-button wa-ai-secondary-wide">标记结果</button>
+    <button id="wa-ai-mark-script-outcome" type="button" class="wa-ai-wide-button wa-ai-secondary-wide">\u6807\u8bb0\u7ed3\u679c</button>
   `;
   const draft = document.getElementById("wa-ai-script-test-draft");
   draft?.closest(".wa-ai-field")?.insertAdjacentElement("afterend", controls);
+}
+
+
+function localizeSidebarText() {
+  const setButton = (id: string, label: string) => {
+    const element = document.getElementById(id);
+    if (element) element.textContent = label;
+  };
+  const setPlaceholder = (id: string, label: string) => {
+    const element = document.getElementById(id) as HTMLInputElement | HTMLTextAreaElement | null;
+    if (element) element.placeholder = label;
+  };
+  const setField = (id: string, label: string) => {
+    const element = document.getElementById(id);
+    const field = element?.closest(".wa-ai-field");
+    const span = field?.querySelector("span");
+    if (span) span.textContent = label;
+  };
+  const setTitleByChild = (id: string, title: string) => {
+    const element = document.getElementById(id);
+    const section = element?.closest(".wa-ai-section");
+    const heading = section?.querySelector(".wa-ai-section-title h3");
+    if (heading) heading.textContent = title;
+  };
+
+  setButton("wa-ai-open-login", "\u6253\u5f00 Web \u540e\u53f0\u767b\u5f55");
+  setButton("wa-ai-save-customer", "\u4fdd\u5b58\u5ba2\u6237");
+  setButton("wa-ai-refresh-brands", "\u5237\u65b0\u54c1\u724c");
+  setButton("wa-ai-refresh-intent", "\u8ba1\u7b97\u610f\u5411\u5206");
+  setButton("wa-ai-load-reorder", "\u67e5\u770b\u590d\u8d2d\u5efa\u8bae");
+  setButton("wa-ai-generate-reorder", "\u751f\u6210\u590d\u8d2d\u8bdd\u672f");
+  setButton("wa-ai-copy-reorder-script", "\u590d\u5236\u590d\u8d2d\u8bdd\u672f");
+  setButton("wa-ai-insert-reorder-script", "\u63d2\u5165\u8349\u7a3f");
+  setButton("wa-ai-refresh-products", "\u5237\u65b0");
+  setButton("wa-ai-search-products", "\u641c\u7d22");
+  setButton("wa-ai-copy-product-intro", "\u590d\u5236\u4ea7\u54c1\u4ecb\u7ecd");
+  setButton("wa-ai-insert-product-intro", "\u63d2\u5165\u8349\u7a3f");
+  setButton("wa-ai-copy-quote", "\u590d\u5236\u62a5\u4ef7");
+  setButton("wa-ai-insert-quote", "\u63d2\u5165\u8349\u7a3f");
+  setButton("wa-ai-save-quote", "\u4fdd\u5b58\u62a5\u4ef7\u5230\u5ba2\u6237\u8bb0\u5f55");
+  setButton("wa-ai-save-follow-up", "\u4fdd\u5b58\u8ddf\u8fdb\u63d0\u9192");
+  setButton("wa-ai-refresh-materials", "\u5237\u65b0");
+  setButton("wa-ai-search-materials", "\u641c\u7d22");
+  setButton("wa-ai-copy-material-intro", "\u590d\u5236\u7d20\u6750\u8bf4\u660e");
+  setButton("wa-ai-insert-material-intro", "\u63d2\u5165\u8349\u7a3f");
+  setButton("wa-ai-read-selection", "\u8bfb\u53d6\u9009\u4e2d");
+  setButton("wa-ai-refresh-script-tests", "\u5237\u65b0");
+
+  setField("wa-ai-brand-select", "\u54c1\u724c / \u5e97\u94fa");
+  setField("wa-ai-customer", "\u5ba2\u6237\u540d\u79f0");
+  setField("wa-ai-whatsapp-number", "WhatsApp \u53f7\u7801");
+  setField("wa-ai-country", "\u6839\u636e\u624b\u673a\u53f7\u63a8\u6d4b\u56fd\u5bb6");
+  setField("wa-ai-language", "\u56de\u590d\u8bed\u8a00");
+  setField("wa-ai-model-select", "AI \u6a21\u578b");
+  setField("wa-ai-stage", "\u9500\u552e\u9636\u6bb5");
+  setField("wa-ai-tags", "\u6807\u7b7e");
+  setField("wa-ai-interested-product", "\u610f\u5411\u4ea7\u54c1");
+  setField("wa-ai-latest-summary", "\u6700\u8fd1\u6c9f\u901a\u6458\u8981");
+  setField("wa-ai-next-follow-up", "\u4e0b\u6b21\u8ddf\u8fdb\u65f6\u95f4");
+  setField("wa-ai-notes", "\u5907\u6ce8");
+  setField("wa-ai-message", "\u6700\u8fd1\u5ba2\u6237\u6d88\u606f");
+  setField("wa-ai-product-context", "\u4ea7\u54c1\u4e0a\u4e0b\u6587\uff08\u53ef\u9009\uff09");
+  setField("wa-ai-translation", "\u4e2d\u6587\u7ffb\u8bd1");
+  setField("wa-ai-product-select", "\u9009\u62e9\u4ea7\u54c1");
+  setField("wa-ai-product-intro", "\u4ea7\u54c1\u4ecb\u7ecd\u8349\u7a3f");
+  setField("wa-ai-material-type", "\u7d20\u6750\u7c7b\u578b");
+  setField("wa-ai-material-select", "\u9009\u62e9\u7d20\u6750");
+  setField("wa-ai-material-intro", "\u7d20\u6750\u8bf4\u660e\u8349\u7a3f");
+  setField("wa-ai-quote-quantity", "\u6570\u91cf");
+  setField("wa-ai-quote-unit-price", "\u5355\u4ef7");
+  setField("wa-ai-quote-currency", "\u5e01\u79cd");
+  setField("wa-ai-quote-shipping", "\u8fd0\u8d39");
+  setField("wa-ai-quote-moq", "MOQ");
+  setField("wa-ai-quote-lead-time", "\u4ea4\u671f");
+  setField("wa-ai-quote-tiers", "\u9636\u68af\u62a5\u4ef7\uff08\u6bcf\u884c\uff1a\u6570\u91cf,\u5355\u4ef7\uff09");
+  setField("wa-ai-quote-text", "\u62a5\u4ef7\u8349\u7a3f");
+  setField("wa-ai-follow-up-type", "\u4efb\u52a1\u7c7b\u578b");
+  setField("wa-ai-follow-up-remind-at", "\u81ea\u5b9a\u4e49\u63d0\u9192\u65f6\u95f4");
+  setField("wa-ai-follow-up-script", "\u8ddf\u8fdb\u8bdd\u672f\u8349\u7a3f");
+
+  setTitleByChild("wa-ai-customer", "\u5ba2\u6237\u4fe1\u606f");
+  setTitleByChild("wa-ai-message", "\u5ba2\u6237\u6d88\u606f\u7406\u89e3");
+  setTitleByChild("wa-ai-quote-text", "\u62a5\u4ef7\u52a9\u624b");
+  setTitleByChild("wa-ai-material-select", "\u7d20\u6750\u4e2d\u5fc3");
+  setTitleByChild("wa-ai-product-select", "\u4ea7\u54c1\u8d44\u6599\u5e93");
+  setTitleByChild("wa-ai-follow-up-type", "\u8bbe\u7f6e\u8ddf\u8fdb");
+
+  const stage = document.getElementById("wa-ai-stage") as HTMLSelectElement | null;
+  if (stage) {
+    const value = stage.value;
+    stage.innerHTML = [
+      ["\u65b0\u7ebf\u7d22", "\u65b0\u7ebf\u7d22"],
+      ["\u5df2\u6c9f\u901a\u9700\u6c42", "\u5df2\u6c9f\u901a\u9700\u6c42"],
+      ["\u5df2\u63a8\u8350\u4ea7\u54c1", "\u5df2\u63a8\u8350\u4ea7\u54c1"],
+      ["\u5df2\u62a5\u4ef7", "\u5df2\u62a5\u4ef7"],
+      ["\u5f85\u4ed8\u6b3e", "\u5f85\u4ed8\u6b3e"],
+      ["\u5df2\u6210\u4ea4", "\u5df2\u6210\u4ea4"],
+      ["\u5f85\u590d\u8d2d", "\u5f85\u590d\u8d2d"],
+      ["\u65e0\u6548\u5ba2\u6237", "\u65e0\u6548\u5ba2\u6237"]
+    ].map(([optionValue, label]) => '<option value="' + optionValue + '">' + label + '</option>').join("");
+    if (value) stage.value = value;
+  }
+  setPlaceholder("wa-ai-message", "\u81ea\u52a8\u8bfb\u53d6\u5931\u8d25\u65f6\uff0c\u53ef\u624b\u52a8\u7c98\u8d34\u5ba2\u6237\u6d88\u606f");
+  setPlaceholder("wa-ai-customer", "\u4f8b\u5982\uff1aAmina Trading");
+  setPlaceholder("wa-ai-product-search", "\u641c\u7d22\u4ea7\u54c1\u540d\u79f0\u3001SKU \u6216\u7c7b\u76ee");
+  setPlaceholder("wa-ai-material-search", "\u641c\u7d22\u7d20\u6750\u6807\u9898\u3001\u63cf\u8ff0\u6216\u6807\u7b7e");
 }
 
 function classifyBusinessModule(section: HTMLElement): BusinessModule | null {
@@ -845,17 +1012,30 @@ function bindEvents(toggleButton: HTMLButtonElement) {
   getElement<HTMLButtonElement>("wa-ai-collapse-sidebar").addEventListener("click", () => {
     setSidebarMode("collapsed", { persist: true });
   });
+  document.getElementById("wa-ai-settings-sidebar")?.addEventListener("click", () => openSidebarTab("more"));
   getElement<HTMLButtonElement>("wa-ai-refresh-sidebar").addEventListener("click", () => {
     void checkAuthStatus();
     updateRecognitionStatus();
     mountQuickToolbar();
   });
-  getElement<HTMLButtonElement>("wa-ai-bottom-save").addEventListener("click", saveCustomerToApi);
+  document.getElementById("wa-ai-bottom-save")?.addEventListener("click", saveCustomerToApi);
+  getElement<HTMLButtonElement>("wa-ai-context-save").addEventListener("click", saveCustomerToApi);
+  getElement<HTMLButtonElement>("wa-ai-context-refresh").addEventListener("click", () => {
+    void checkAuthStatus();
+    scheduleWhatsAppContextRefresh(50);
+    setStatus("\u5df2\u5237\u65b0\u5f53\u524d\u5ba2\u6237\u4e0a\u4e0b\u6587\u3002");
+  });
+  getElement<HTMLButtonElement>("wa-ai-context-stage-action").addEventListener("click", () => {
+    openSidebarTab("customer");
+    getElement<HTMLSelectElement>("wa-ai-stage").focus();
+    setStatus("\u8bf7\u9009\u62e9\u65b0\u7684\u9500\u552e\u9636\u6bb5\u540e\u70b9\u51fb\u201c\u4fdd\u5b58\u5ba2\u6237\u201d\u3002");
+  });
   getElement<HTMLButtonElement>("wa-ai-refresh-cache").addEventListener("click", () => {
     void checkAuthStatus();
     setStatus("缓存已刷新。所有草稿仍需人工确认后发送。");
   });
 
+  document.getElementById("wa-ai-refresh-ai-keys")?.addEventListener("click", () => void loadAiKeyUsageForSidebar());
   getElement<HTMLButtonElement>("wa-ai-save-customer").addEventListener("click", saveCustomerToApi);
   getElement<HTMLButtonElement>("wa-ai-refresh-intent").addEventListener("click", () => void loadCustomerIntentScore());
   getElement<HTMLButtonElement>("wa-ai-load-reorder").addEventListener("click", () => void loadReorderPrediction());
@@ -1031,6 +1211,8 @@ async function handleToolbarAction(action: string) {
 
 function updateContextCard() {
   const customer = document.getElementById("wa-ai-customer") as HTMLInputElement | null;
+  const phone = document.getElementById("wa-ai-whatsapp-number") as HTMLInputElement | null;
+  const country = document.getElementById("wa-ai-country") as HTMLInputElement | null;
   const stage = document.getElementById("wa-ai-stage") as HTMLSelectElement | null;
   const brand = document.getElementById("wa-ai-brand-select") as HTMLSelectElement | null;
   const intent = document.getElementById("wa-ai-intent-score");
@@ -1038,10 +1220,14 @@ function updateContextCard() {
     const element = document.getElementById(id);
     if (element) element.textContent = value || "-";
   };
-  set("wa-ai-context-customer", customer?.value || "未保存");
-  set("wa-ai-context-stage", stage?.selectedOptions[0]?.textContent || stage?.value || "新线索");
-  set("wa-ai-context-brand", brand?.selectedOptions[0]?.textContent || "未选择");
-  set("wa-ai-context-intent", intent?.textContent || "保存后计算");
+  set("wa-ai-context-customer", customer?.value || "\u672a\u4fdd\u5b58");
+  set("wa-ai-context-stage", stage?.selectedOptions[0]?.textContent || stage?.value || "\u65b0\u7ebf\u7d22");
+  set("wa-ai-context-brand", brand?.selectedOptions[0]?.textContent || "\u672a\u9009\u62e9");
+  set("wa-ai-context-intent", intent?.textContent || "\u4fdd\u5b58\u540e\u8ba1\u7b97");
+  set("wa-ai-context-phone", phone?.value || currentWhatsAppContext.whatsappNumber || "-");
+  set("wa-ai-context-country", country?.value || currentWhatsAppContext.phoneCountry || "\u672a\u8bc6\u522b");
+  set("wa-ai-context-saved-badge", currentWhatsAppContext.isSavedCustomer ? "\u5df2\u5339\u914d" : "\u65b0\u5ba2\u6237");
+  set("wa-ai-context-mode", currentWhatsAppContext.latestCustomerMessage ? "\u81ea\u52a8\u8bc6\u522b\u6a21\u5f0f" : "\u624b\u52a8\u7c98\u8d34\u6a21\u5f0f");
 }
 
 function seedSelectedTextIntoMessage() {
@@ -1078,11 +1264,11 @@ function mountQuickToolbar() {
   toolbar.id = QUICK_TOOLBAR_ID;
   toolbar.className = "wa-ai-quick-toolbar";
   toolbar.innerHTML = `
-    <button type="button" data-toolbar-action="reply">✨ AI 回复</button>
-    <button type="button" data-toolbar-action="translate">🌐 翻译</button>
-    <button type="button" data-toolbar-action="quote">💬 报价</button>
-    <button type="button" data-toolbar-action="material">🖼 素材</button>
-    <button type="button" data-toolbar-action="more">⋯ 更多</button>
+    <button type="button" data-toolbar-action="reply">AI \u56de\u590d</button>
+    <button type="button" data-toolbar-action="translate">\u7ffb\u8bd1</button>
+    <button type="button" data-toolbar-action="quote">\u62a5\u4ef7</button>
+    <button type="button" data-toolbar-action="material">\u7d20\u6750</button>
+    <button type="button" data-toolbar-action="more">\u66f4\u591a</button>
   `;
   toolbar.querySelectorAll<HTMLButtonElement>("[data-toolbar-action]").forEach((button) => {
     button.addEventListener("click", () => void handleToolbarAction(button.dataset.toolbarAction || "reply"));
@@ -1102,7 +1288,7 @@ function fallbackFloatingAiButton() {
   button.id = FLOATING_BUTTON_ID;
   button.type = "button";
   button.textContent = "AI";
-  button.title = "打开 WhatsApp AI 工作台";
+  button.title = "\u6253\u5f00 AI \u9500\u552e\u52a9\u624b";
   button.addEventListener("click", () => {
     setSidebarMode("docked", { persist: true });
     openSidebarTab("ai");
@@ -1296,17 +1482,17 @@ function applyMatchedCustomerToForm() {
 }
 
 function renderAutoContext() {
-  setText("wa-ai-auto-context-state", currentWhatsAppContext.isSavedCustomer ? "Matched saved customer" : currentWhatsAppContext.contactName ? "New customer / not saved" : "Manual paste fallback");
+  setText("wa-ai-auto-context-state", currentWhatsAppContext.isSavedCustomer ? "\u5df2\u5339\u914d\u5df2\u4fdd\u5b58\u5ba2\u6237" : currentWhatsAppContext.contactName ? "\u65b0\u5ba2\u6237 / \u672a\u4fdd\u5b58" : "\u624b\u52a8\u7c98\u8d34\u6a21\u5f0f");
   setText("wa-ai-auto-phone", currentWhatsAppContext.whatsappNumber || "-");
   setText(
     "wa-ai-auto-country",
     currentWhatsAppContext.phoneCountry
-      ? `根据手机号推测国家: ${currentWhatsAppContext.phoneCountry} (${currentWhatsAppContext.phoneParseConfidence})`
+      ? `\u6839\u636e\u624b\u673a\u53f7\u63a8\u6d4b\u56fd\u5bb6\uff1a${currentWhatsAppContext.phoneCountry} (${currentWhatsAppContext.phoneParseConfidence})`
       : "-"
   );
   setText("wa-ai-auto-language", currentWhatsAppContext.detectedLanguage || "auto");
   setText("wa-ai-auto-intent", [currentWhatsAppContext.detectedIntent, ...currentWhatsAppContext.concerns].filter(Boolean).join(" / ") || "unknown");
-  setText("wa-ai-auto-latest", currentWhatsAppContext.latestCustomerMessage || "No visible customer message detected");
+  setText("wa-ai-auto-latest", currentWhatsAppContext.latestCustomerMessage || "\u672a\u8bfb\u53d6\u5230\u53ef\u89c1\u5ba2\u6237\u6d88\u606f");
 }
 
 function setText(id: string, value: string) {
@@ -1455,6 +1641,7 @@ async function checkAuthStatus() {
     authState = { status: "authenticated", user: result.user };
     renderAuthState();
     await loadBrandsForSidebar();
+    await loadAiKeyUsageForSidebar();
     await loadProducts();
     await loadMaterials();
     await loadScriptExperimentsForSidebar();
@@ -1473,7 +1660,7 @@ function renderAuthState() {
 
   panel.dataset.auth = authState.status;
   if (authState.status === "authenticated" && authState.user) {
-    title.textContent = `已登录：${authState.user.name}`;
+    title.textContent = `\u5df2\u767b\u5f55\uff1a${authState.user.name}`;
     desc.textContent = authState.user.email;
     loginButton.style.display = "none";
     setProtectedControlsDisabled(false);
@@ -1481,17 +1668,87 @@ function renderAuthState() {
   }
 
   if (authState.status === "checking") {
-    title.textContent = "正在检查登录状态";
-    desc.textContent = "请稍候。";
+    title.textContent = "\u6b63\u5728\u68c0\u67e5\u767b\u5f55\u72b6\u6001";
+    desc.textContent = "\u8bf7\u7a0d\u5019";
     loginButton.style.display = "none";
     setProtectedControlsDisabled(true);
     return;
   }
 
-  title.textContent = "请先登录 Web 后台";
-  desc.textContent = "登录后侧边栏才能读取产品、保存客户和生成报价。";
+  title.textContent = "\u8bf7\u5148\u767b\u5f55 Web \u540e\u53f0";
+  desc.textContent = "\u767b\u5f55\u540e\u53ef\u8bfb\u53d6\u4ea7\u54c1\u3001\u4fdd\u5b58\u5ba2\u6237\u548c\u751f\u6210\u62a5\u4ef7\u8349\u7a3f\u3002";
   loginButton.style.display = "inline-flex";
   setProtectedControlsDisabled(true);
+  renderAiKeyUsageCard();
+}
+
+async function loadAiKeyUsageForSidebar() {
+  if (authState.status !== "authenticated" || authState.user?.email !== "goseashop@gmail.com") {
+    sidebarAiKeyUsage = [];
+    renderAiKeyUsageCard();
+    return;
+  }
+  try {
+    if (!sidebarOrganizationId) {
+      const orgResponse = await apiFetch("/api/organizations");
+      if (orgResponse.ok) {
+        const organizations = (await orgResponse.json()) as Array<{ id: string; name: string }>;
+        sidebarOrganizationId = organizations[0]?.id || "";
+      }
+    }
+    if (!sidebarOrganizationId) {
+      sidebarAiKeyUsage = [];
+      renderAiKeyUsageCard("\u8bf7\u5148\u5728 Web \u540e\u53f0\u9009\u62e9\u7ec4\u7ec7");
+      return;
+    }
+    const response = await apiFetch(`/api/ai-keys?organizationId=${encodeURIComponent(sidebarOrganizationId)}&status=active`);
+    if (!response.ok) throw new Error("AI key usage failed");
+    sidebarAiKeyUsage = (await response.json()) as AiKeyUsageSummary[];
+    renderAiKeyUsageCard();
+  } catch {
+    sidebarAiKeyUsage = [];
+    renderAiKeyUsageCard("AI Key \u6d88\u8017\u6682\u65f6\u65e0\u6cd5\u8bfb\u53d6");
+  }
+}
+
+function renderAiKeyUsageCard(message = "") {
+  const card = document.getElementById("wa-ai-key-usage-card") as HTMLElement | null;
+  if (!card) return;
+  const canView = authState.status === "authenticated" && authState.user?.email === "goseashop@gmail.com";
+  card.hidden = !canView;
+  if (!canView) return;
+  const totalTokens = sidebarAiKeyUsage.reduce((sum, item) => sum + Number(item.totalTokens || 0), 0);
+  const totalRequests = sidebarAiKeyUsage.reduce((sum, item) => sum + Number(item.totalRequests || 0), 0);
+  const tokenElement = document.getElementById("wa-ai-key-total-tokens");
+  const requestElement = document.getElementById("wa-ai-key-total-requests");
+  const list = document.getElementById("wa-ai-key-usage-list");
+  if (tokenElement) tokenElement.textContent = formatNumber(totalTokens);
+  if (requestElement) requestElement.textContent = formatNumber(totalRequests);
+  if (!list) return;
+  if (message) {
+    list.innerHTML = `<span>${message}</span>`;
+    return;
+  }
+  if (sidebarAiKeyUsage.length === 0) {
+    list.innerHTML = "<span>\u6682\u65e0\u6d88\u8017\u6570\u636e</span>";
+    return;
+  }
+  const maxTokens = Math.max(1, ...sidebarAiKeyUsage.map((item) => Number(item.totalTokens || 0)));
+  list.innerHTML = sidebarAiKeyUsage.slice(0, 4).map((item) => {
+    const tokens = Number(item.totalTokens || 0);
+    const percent = Math.min(100, Math.round(tokens / maxTokens * 100));
+    return `
+      <div class="wa-ai-key-row">
+        <div><strong>${escapeHtml(item.name || item.model || "AI Key")}</strong><span>${escapeHtml(item.mode || "-")} / ${escapeHtml(item.maskedKey || `****${item.keyLast4 || "----"}`)}</span></div>
+        <em>${formatNumber(tokens)} tokens</em>
+        <i style="width:${percent}%"></i>
+      </div>
+    `;
+  }).join("");
+}
+
+function formatNumber(value: number) {
+  return new Intl.NumberFormat("zh-CN").format(Number.isFinite(value) ? value : 0);
 }
 
 function setProtectedControlsDisabled(disabled: boolean) {
@@ -1669,17 +1926,17 @@ async function loadBrandsForSidebar() {
     }
     if (!sidebarOrganizationId) {
       sidebarBrands = [];
-      select.replaceChildren(option("", "No organization brand"));
+      select.replaceChildren(option("", "\u6682\u65e0\u7ec4\u7ec7\u54c1\u724c"));
       return;
     }
     const response = await apiFetch(`/api/brands?organizationId=${encodeURIComponent(sidebarOrganizationId)}&status=active&pageSize=50`);
     if (!response.ok) throw new Error("brands failed");
     sidebarBrands = (await response.json()) as Array<any>;
-    select.replaceChildren(option("", "No brand context"), ...sidebarBrands.map((brand) => option(brand.id, brand.displayName || brand.name)));
+    select.replaceChildren(option("", "\u672a\u9009\u62e9\u54c1\u724c"), ...sidebarBrands.map((brand) => option(brand.id, brand.displayName || brand.name)));
   } catch {
     sidebarBrands = [];
-    select.replaceChildren(option("", "Brand load failed"));
-    setStatus("Brand/store list failed to load. AI drafts can still run without brand context.");
+    select.replaceChildren(option("", "\u54c1\u724c\u52a0\u8f7d\u5931\u8d25"));
+    setStatus("\u54c1\u724c / \u5e97\u94fa\u5217\u8868\u52a0\u8f7d\u5931\u8d25\uff0cAI \u8349\u7a3f\u4ecd\u53ef\u4f7f\u7528\u65e0\u54c1\u724c\u4e0a\u4e0b\u6587\u3002");
   }
 }
 

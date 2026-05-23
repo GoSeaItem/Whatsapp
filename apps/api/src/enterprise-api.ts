@@ -237,6 +237,179 @@ export function createEnterpriseRouter(db: EnterpriseDb = prisma) {
     }
   });
 
+  router.get("/v6/overview", async (req, res, next) => {
+    try {
+      const organizationId = clean(req.query.organizationId);
+      const role = await requireOrgRead(db as any, organizationId, req.user!.id);
+      if (!role) return res.status(403).json({ message: "organization membership required" });
+      const [
+        multiChannelCustomers,
+        conversationMessages,
+        interactionLogs,
+        aiKeyUsage,
+        activeTeams,
+        activeDepartments
+      ] = await Promise.all([
+        countSafe((db as any).multiChannelCustomer, { organizationId }),
+        countSafe((db as any).conversationHistory, { organizationId }),
+        countSafe((db as any).interactionLog, { organizationId }),
+        (db as any).aIKeyUsageLog?.aggregate
+          ? (db as any).aIKeyUsageLog.aggregate({ where: { organizationId }, _sum: { totalTokens: true }, _count: { id: true } })
+          : { _sum: { totalTokens: 0 }, _count: { id: 0 } },
+        countSafe((db as any).team, { organizationId, status: "active" }),
+        countSafe((db as any).department, { organizationId, status: "active" })
+      ]);
+      res.json({
+        organizationId,
+        generatedAt: new Date().toISOString(),
+        kpis: {
+          multiChannelCustomers,
+          conversationMessages,
+          interactionLogs,
+          aiKeyTokens: aiKeyUsage?._sum?.totalTokens || 0,
+          aiKeyCalls: aiKeyUsage?._count?.id || 0,
+          activeTeams,
+          activeDepartments
+        },
+        safetyBoundaries: enterpriseSafetyBoundaries()
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/multi-channel-customers", async (req, res, next) => {
+    try {
+      const organizationId = clean(req.query.organizationId);
+      const role = await requireOrgRead(db as any, organizationId, req.user!.id);
+      if (!role) return res.status(403).json({ message: "organization membership required" });
+      const q = clean(req.query.q).toLowerCase();
+      const where: any = { organizationId };
+      if (q) {
+        where.OR = [
+          { primaryName: { contains: q, mode: "insensitive" } },
+          { whatsappNumber: { contains: q, mode: "insensitive" } },
+          { email: { contains: q, mode: "insensitive" } },
+          { telegramHandle: { contains: q, mode: "insensitive" } },
+          { wechatId: { contains: q, mode: "insensitive" } }
+        ];
+      }
+      const rows = await (db as any).multiChannelCustomer.findMany({ where, orderBy: { updatedAt: "desc" }, take: 100 });
+      res.json(rows.map(serializeMultiChannelCustomer));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post("/multi-channel-customers", async (req, res, next) => {
+    try {
+      const organizationId = clean(req.body.organizationId);
+      const role = await requireOrgWrite(db as any, organizationId, req.user!.id);
+      if (!role) return res.status(403).json({ message: "owner or manager role required" });
+      const payload = parseMultiChannelCustomerPayload(req.body);
+      if (!payload.primaryName) return res.status(400).json({ message: "primaryName is required" });
+      const row = await (db as any).multiChannelCustomer.create({ data: { organizationId, ...payload, createdBy: req.user!.id } });
+      await auditEnterprise(db as any, req.user!.id, organizationId, "create", "MultiChannelCustomer", row.id, { customer: serializeMultiChannelCustomer(row) }, "low");
+      res.status(201).json(serializeMultiChannelCustomer(row));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/conversation-history", async (req, res, next) => {
+    try {
+      const organizationId = clean(req.query.organizationId);
+      const role = await requireOrgRead(db as any, organizationId, req.user!.id);
+      if (!role) return res.status(403).json({ message: "organization membership required" });
+      const where: any = { organizationId };
+      const multiChannelCustomerId = clean(req.query.multiChannelCustomerId);
+      const customerId = clean(req.query.customerId);
+      const channel = clean(req.query.channel);
+      if (multiChannelCustomerId) where.multiChannelCustomerId = multiChannelCustomerId;
+      if (customerId) where.customerId = customerId;
+      if (channel) where.channel = channel;
+      const rows = await (db as any).conversationHistory.findMany({ where, orderBy: { messageAt: "desc" }, take: 100 });
+      res.json(rows.map(serializeConversationHistory));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post("/conversation-history", async (req, res, next) => {
+    try {
+      const organizationId = clean(req.body.organizationId);
+      const role = await requireOrgRead(db as any, organizationId, req.user!.id);
+      if (!role) return res.status(403).json({ message: "organization membership required" });
+      const payload = parseConversationPayload(req.body);
+      if (!payload.channel || !payload.direction || !payload.senderRole) return res.status(400).json({ message: "channel, direction and senderRole are required" });
+      const row = await (db as any).conversationHistory.create({ data: { organizationId, ...payload, createdBy: req.user!.id } });
+      await auditEnterprise(db as any, req.user!.id, organizationId, "create", "ConversationHistory", row.id, { channel: row.channel, direction: row.direction }, "low");
+      res.status(201).json(serializeConversationHistory(row));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/interaction-logs", async (req, res, next) => {
+    try {
+      const organizationId = clean(req.query.organizationId);
+      const role = await requireOrgRead(db as any, organizationId, req.user!.id);
+      if (!role) return res.status(403).json({ message: "organization membership required" });
+      const where: any = { organizationId };
+      const action = clean(req.query.action);
+      if (action) where.action = action;
+      const rows = await (db as any).interactionLog.findMany({ where, orderBy: { createdAt: "desc" }, take: 100 });
+      res.json(rows.map(serializeInteractionLog));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post("/interaction-logs", async (req, res, next) => {
+    try {
+      const organizationId = clean(req.body.organizationId);
+      const role = await requireOrgRead(db as any, organizationId, req.user!.id);
+      if (!role) return res.status(403).json({ message: "organization membership required" });
+      const action = clean(req.body.action);
+      if (!action) return res.status(400).json({ message: "action is required" });
+      const row = await (db as any).interactionLog.create({
+        data: {
+          organizationId,
+          multiChannelCustomerId: nullable(req.body.multiChannelCustomerId),
+          customerId: nullable(req.body.customerId),
+          channel: nullable(req.body.channel),
+          action,
+          entityType: nullable(req.body.entityType),
+          entityId: nullable(req.body.entityId),
+          summary: nullable(req.body.summary),
+          metadata: typeof req.body.metadata === "object" && req.body.metadata ? req.body.metadata : null,
+          createdBy: req.user!.id
+        }
+      });
+      await auditEnterprise(db as any, req.user!.id, organizationId, "create", "InteractionLog", row.id, { action, entityType: row.entityType }, "low");
+      res.status(201).json(serializeInteractionLog(row));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/ai-key-usage", async (req, res, next) => {
+    try {
+      const organizationId = clean(req.query.organizationId);
+      const role = await requireOrgWrite(db as any, organizationId, req.user!.id);
+      if (!role) return res.status(403).json({ message: "owner or manager role required" });
+      const where: any = { organizationId };
+      const aiProviderKeyId = clean(req.query.aiProviderKeyId);
+      const mode = clean(req.query.mode);
+      if (aiProviderKeyId) where.aiProviderKeyId = aiProviderKeyId;
+      if (mode) where.mode = mode;
+      const rows = await (db as any).aIKeyUsageLog.findMany({ where, orderBy: { createdAt: "desc" }, take: 200 });
+      res.json(rows.map(serializeAIKeyUsageLog));
+    } catch (error) {
+      next(error);
+    }
+  });
+
   router.post("/brand-context", async (req, res, next) => {
     try {
       const organizationId = clean(req.body.organizationId);
@@ -325,6 +498,57 @@ async function buildEnterpriseReport(db: any, organizationId: string, reportType
   };
 }
 
+async function countSafe(model: any, where: Record<string, unknown>) {
+  if (!model?.count) return 0;
+  return model.count({ where }).catch(() => 0);
+}
+
+function enterpriseSafetyBoundaries() {
+  return [
+    "AI content is draft-only and must be confirmed manually before sending.",
+    "The platform does not auto-send WhatsApp messages or simulate the send button.",
+    "Enterprise analytics never exports secrets, environment files, session secrets or API keys.",
+    "Cross-organization data access requires explicit organization membership and role checks."
+  ];
+}
+
+function parseMultiChannelCustomerPayload(body: any) {
+  return {
+    customerId: nullable(body.customerId),
+    primaryName: clean(body.primaryName || body.name),
+    primaryChannel: clean(body.primaryChannel) || "whatsapp",
+    whatsappNumber: nullable(body.whatsappNumber),
+    telegramHandle: nullable(body.telegramHandle),
+    wechatId: nullable(body.wechatId),
+    email: nullable(body.email),
+    phoneCountry: nullable(body.phoneCountry),
+    phoneCountryCode: nullable(body.phoneCountryCode),
+    preferredLanguage: nullable(body.preferredLanguage),
+    preferredCurrency: nullable(body.preferredCurrency),
+    brandId: nullable(body.brandId),
+    ownerId: nullable(body.ownerId),
+    assignedTo: nullable(body.assignedTo),
+    tags: Array.isArray(body.tags) ? body.tags.map(String) : [],
+    metadata: typeof body.metadata === "object" && body.metadata ? body.metadata : null
+  };
+}
+
+function parseConversationPayload(body: any) {
+  return {
+    multiChannelCustomerId: nullable(body.multiChannelCustomerId),
+    customerId: nullable(body.customerId),
+    channel: clean(body.channel) || "whatsapp",
+    externalConversationId: nullable(body.externalConversationId),
+    direction: clean(body.direction) || "unknown",
+    senderRole: clean(body.senderRole) || "unknown",
+    messageText: nullable(body.messageText),
+    language: nullable(body.language),
+    translatedText: nullable(body.translatedText),
+    messageAt: body.messageAt ? new Date(String(body.messageAt)) : new Date(),
+    metadata: typeof body.metadata === "object" && body.metadata ? body.metadata : null
+  };
+}
+
 async function auditEnterprise(db: any, userId: string, organizationId: string | null, action: AuditAction, entityType: string, entityId: string | null, metadata: Record<string, unknown>, riskLevel: EnterpriseRiskLevel = "low") {
   const log = await db.enterpriseAuditLog.create({ data: { organizationId, userId, action, entityType, entityId, metadata: metadata as any, riskLevel } });
   if (db.auditLog?.create) {
@@ -399,6 +623,87 @@ function serializeEnterpriseAuditLog(row: any) {
     entityId: row.entityId || null,
     metadata: row.metadata || null,
     riskLevel: row.riskLevel,
+    createdAt: toIso(row.createdAt)
+  };
+}
+
+function serializeMultiChannelCustomer(row: any) {
+  return {
+    id: row.id,
+    organizationId: row.organizationId || null,
+    customerId: row.customerId || null,
+    primaryName: row.primaryName,
+    primaryChannel: row.primaryChannel,
+    whatsappNumber: row.whatsappNumber || null,
+    telegramHandle: row.telegramHandle || null,
+    wechatId: row.wechatId || null,
+    email: row.email || null,
+    phoneCountry: row.phoneCountry || null,
+    phoneCountryCode: row.phoneCountryCode || null,
+    preferredLanguage: row.preferredLanguage || null,
+    preferredCurrency: row.preferredCurrency || null,
+    brandId: row.brandId || null,
+    ownerId: row.ownerId || null,
+    assignedTo: row.assignedTo || null,
+    tags: Array.isArray(row.tags) ? row.tags : [],
+    metadata: row.metadata || null,
+    createdBy: row.createdBy,
+    createdAt: toIso(row.createdAt),
+    updatedAt: toIso(row.updatedAt)
+  };
+}
+
+function serializeConversationHistory(row: any) {
+  return {
+    id: row.id,
+    organizationId: row.organizationId || null,
+    multiChannelCustomerId: row.multiChannelCustomerId || null,
+    customerId: row.customerId || null,
+    channel: row.channel,
+    externalConversationId: row.externalConversationId || null,
+    direction: row.direction,
+    senderRole: row.senderRole,
+    messageText: row.messageText || null,
+    language: row.language || null,
+    translatedText: row.translatedText || null,
+    messageAt: toIso(row.messageAt),
+    metadata: row.metadata || null,
+    createdBy: row.createdBy || null,
+    createdAt: toIso(row.createdAt)
+  };
+}
+
+function serializeInteractionLog(row: any) {
+  return {
+    id: row.id,
+    organizationId: row.organizationId || null,
+    multiChannelCustomerId: row.multiChannelCustomerId || null,
+    customerId: row.customerId || null,
+    channel: row.channel || null,
+    action: row.action,
+    entityType: row.entityType || null,
+    entityId: row.entityId || null,
+    summary: row.summary || null,
+    metadata: row.metadata || null,
+    createdBy: row.createdBy,
+    createdAt: toIso(row.createdAt)
+  };
+}
+
+function serializeAIKeyUsageLog(row: any) {
+  return {
+    id: row.id,
+    organizationId: row.organizationId || null,
+    aiProviderKeyId: row.aiProviderKeyId || null,
+    provider: row.provider || null,
+    mode: row.mode || null,
+    model: row.model || null,
+    requestSource: row.requestSource || null,
+    promptTokens: row.promptTokens || 0,
+    completionTokens: row.completionTokens || 0,
+    totalTokens: row.totalTokens || 0,
+    success: row.success !== false,
+    errorMessage: row.errorMessage || null,
     createdAt: toIso(row.createdAt)
   };
 }

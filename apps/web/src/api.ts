@@ -4,6 +4,7 @@ import type {
   AuditLogDetail,
   AuditLogListQuery,
   AuditLogSummary,
+  AIKeyUsageLogSummary,
   AfterSalesCaseDetail,
   AfterSalesCaseSummary,
   AfterSalesListQuery,
@@ -29,6 +30,8 @@ import type {
   CustomerPredictionSummary,
   CustomerSummary,
   CustomerUpsertRequest,
+  ConversationHistorySummary,
+  InteractionLogSummary,
   EnterpriseAuditLogSummary,
   EnterpriseBrandContextResponse,
   EnterpriseReportSummary,
@@ -55,6 +58,7 @@ import type {
   MaterialUpsertRequest,
   OrganizationDetail,
   OrganizationUnitSummary,
+  MultiChannelCustomerSummary,
   OrganizationMemberSummary,
   OrganizationMemberUpdateRequest,
   OrganizationMemberUpsertRequest,
@@ -138,6 +142,7 @@ import type {
   ScriptOrgSummary,
   ScriptOrgUpsertRequest,
   TeamDashboardSummary,
+  V6EnterpriseOverview,
   WorkbenchDashboard
 } from "@wa-ai/shared";
 
@@ -421,6 +426,47 @@ export function getEnterpriseBrandContext(payload: { organizationId: string; bra
     method: "POST",
     body: JSON.stringify(payload)
   });
+}
+
+export function getV6EnterpriseOverview(organizationId: string) {
+  return request<V6EnterpriseOverview>(`/api/enterprise/v6/overview${toQuery({ organizationId })}`);
+}
+
+export function getMultiChannelCustomers(organizationId: string, q = "") {
+  return request<MultiChannelCustomerSummary[]>(`/api/enterprise/multi-channel-customers${toQuery({ organizationId, q })}`);
+}
+
+export function createMultiChannelCustomer(payload: Partial<MultiChannelCustomerSummary> & { organizationId: string; primaryName: string }) {
+  return request<MultiChannelCustomerSummary>("/api/enterprise/multi-channel-customers", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function getConversationHistory(query: { organizationId: string; multiChannelCustomerId?: string; customerId?: string; channel?: string }) {
+  return request<ConversationHistorySummary[]>(`/api/enterprise/conversation-history${toQuery(query)}`);
+}
+
+export function createConversationHistory(payload: Partial<ConversationHistorySummary> & { organizationId: string; channel: string; direction: string; senderRole: string }) {
+  return request<ConversationHistorySummary>("/api/enterprise/conversation-history", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function getInteractionLogs(organizationId: string, action = "") {
+  return request<InteractionLogSummary[]>(`/api/enterprise/interaction-logs${toQuery({ organizationId, action })}`);
+}
+
+export function createInteractionLog(payload: Partial<InteractionLogSummary> & { organizationId: string; action: string }) {
+  return request<InteractionLogSummary>("/api/enterprise/interaction-logs", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function getAiKeyUsageLogs(organizationId: string, mode = "") {
+  return request<AIKeyUsageLogSummary[]>(`/api/enterprise/ai-key-usage${toQuery({ organizationId, mode })}`);
 }
 
 export function createCustomer(payload: CustomerUpsertRequest) {

@@ -176,6 +176,13 @@ aiKeysRouter.get("/:id/usage", async (req, res, next) => {
   try {
     requireAiKeyAdmin(req);
     const key = await findManagedKey(req.params.id);
+    const logs = await (prisma as any).aIKeyUsageLog?.findMany
+      ? await (prisma as any).aIKeyUsageLog.findMany({
+          where: { aiProviderKeyId: key.id },
+          orderBy: { createdAt: "desc" },
+          take: 100
+        })
+      : [];
     res.json({
       key: serializeAiProviderKey(key),
       usage: {
@@ -187,7 +194,8 @@ aiKeysRouter.get("/:id/usage", async (req, res, next) => {
         quotaErrorCount: key.quotaErrorCount,
         lastUsedAt: key.lastUsedAt,
         lastSuccessAt: key.lastSuccessAt,
-        lastErrorAt: key.lastErrorAt
+        lastErrorAt: key.lastErrorAt,
+        logs: logs.map(serializeAiKeyUsageLog)
       }
     });
   } catch (error) {
@@ -368,6 +376,24 @@ function assignYamlPair(target: ImportedAiKey, line: string) {
 function requireAiKeyAdmin(req: express.Request) {
   const email = req.user?.email?.toLowerCase();
   if (email !== AI_KEY_ADMIN_EMAIL) throw Object.assign(new Error("AI key management is restricted"), { status: 403 });
+}
+
+function serializeAiKeyUsageLog(row: any) {
+  return {
+    id: row.id,
+    organizationId: row.organizationId || null,
+    aiProviderKeyId: row.aiProviderKeyId || null,
+    provider: row.provider || null,
+    mode: row.mode || null,
+    model: row.model || null,
+    requestSource: row.requestSource || null,
+    promptTokens: row.promptTokens || 0,
+    completionTokens: row.completionTokens || 0,
+    totalTokens: row.totalTokens || 0,
+    success: row.success !== false,
+    errorMessage: row.errorMessage || null,
+    createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt)
+  };
 }
 
 function aiKeysToCsv(keys: any[]) {
